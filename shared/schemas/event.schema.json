@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "undercurrent/event",
+  "title": "Undercurrent event",
+  "description": "One report in a hub's append-only log. Hub sets id, hub_id, created_at, prev_hash, hash.",
+  "type": "object",
+  "required": ["id", "type", "hub_id", "level", "created_at", "author", "payload", "prev_hash", "hash"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "type": { "enum": ["checkin", "hazard", "case", "missing_person"] },
+    "hub_id": { "type": "string", "examples": ["hub-L38"] },
+    "level": { "type": "integer", "minimum": 1, "maximum": 40 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "author": { "type": "string", "description": "Anonymous handle, never a real name", "examples": ["anon-7f3a"] },
+    "priority": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Set by the AI; null until scored" },
+    "payload": { "type": "object", "description": "Shape depends on type; see $defs" },
+    "prev_hash": { "type": "string" },
+    "hash": { "type": "string" }
+  },
+  "$defs": {
+    "checkin": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["ok", "need_help"] },
+        "name": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "hazard": {
+      "type": "object",
+      "required": ["kind", "severity"],
+      "properties": {
+        "kind": { "enum": ["flooding", "bad_air", "bad_water", "heat", "blackout", "collapse", "other"] },
+        "severity": { "enum": ["low", "medium", "high"] },
+        "location": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "case": {
+      "type": "object",
+      "required": ["symptoms"],
+      "properties": {
+        "symptoms": { "type": "array", "items": { "type": "string" } },
+        "people_affected": { "type": "integer", "minimum": 1 },
+        "photo_id": { "type": ["string", "null"], "description": "Stays on the hub that took it; only the id syncs" },
+        "medical_card": { "type": ["object", "null"] },
+        "raw_text": { "type": "string" }
+      }
+    },
+    "missing_person": {
+      "type": "object",
+      "required": ["name", "last_seen_level"],
+      "properties": {
+        "name": { "type": "string" },
+        "last_seen_level": { "type": "integer" },
+        "last_seen_at": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "photo_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

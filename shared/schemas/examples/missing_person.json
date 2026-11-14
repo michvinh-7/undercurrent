@@ -1,0 +1,18 @@
+{
+  "id": "0b6e1f8a-3c2d-4e5f-8a9b-1c2d3e4f5a04",
+  "type": "missing_person",
+  "hub_id": "hub-L12",
+  "level": 12,
+  "created_at": "2087-03-14T02:20:00Z",
+  "author": "anon-91be",
+  "priority": 0.55,
+  "payload": {
+    "name": "Jonah Reyes",
+    "last_seen_level": 34,
+    "last_seen_at": "2087-03-13T22:00:00Z",
+    "description": "17, tall, grey jacket, works the L34 farm shift",
+    "photo_id": null
+  },
+  "prev_hash": "example",
+  "hash": "example"
+}

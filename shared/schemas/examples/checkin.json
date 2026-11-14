@@ -1,0 +1,12 @@
+{
+  "id": "0b6e1f8a-3c2d-4e5f-8a9b-1c2d3e4f5a01",
+  "type": "checkin",
+  "hub_id": "hub-L31",
+  "level": 31,
+  "created_at": "2087-03-14T02:05:00Z",
+  "author": "anon-2c91",
+  "priority": 0.2,
+  "payload": { "status": "ok", "name": "Mara Okafor", "note": "Safe at the L31 pump room with the kids" },
+  "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "hash": "example"
+}
