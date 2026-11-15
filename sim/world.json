@@ -1,0 +1,11 @@
+{
+  "_note": "Starter world sheet (Person 3). Placeholder values; edit freely.",
+  "levels": 40,
+  "deep_levels": [31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
+  "hubs": [{ "hub_id": "hub-L38", "level": 38 }, { "hub_id": "hub-L12", "level": 12 }],
+  "timeline": [
+    { "phase": "blackout", "start_hour": 0 },
+    { "phase": "water_failure", "start_hour": 12 },
+    { "phase": "outbreak", "start_hour": 30 }
+  ]
+}
