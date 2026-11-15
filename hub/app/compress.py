@@ -1,4 +1,4 @@
-"""Compression + fact check (Person 3, Upgrade 2).
+"""Compression + fact check (Person 2, Upgrade 2: starts after the base works Mon 11/16).
 
 Compress a message to a 200-byte packet, then use a DeBERTa NLI model to confirm
 location, injuries, hazard and count survived. If not: reject and retry, then

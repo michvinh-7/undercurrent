@@ -1,0 +1,140 @@
+[
+  {
+    "id": "m009",
+    "text": "gas leak 37 people passing out in the hallway",
+    "truth": "sos",
+    "pred": "urgent"
+  },
+  {
+    "id": "m015",
+    "text": "kid fell down the vent shaft on 30 he's crying but not moving his legs",
+    "truth": "sos",
+    "pred": "routine"
+  },
+  {
+    "id": "m016",
+    "text": "pump failed 38 south, old man in wheelchair cant get out, water rising",
+    "truth": "sos",
+    "pred": "routine"
+  },
+  {
+    "id": "m023",
+    "text": "my 6 year old fell into the drainage channel on 37, cant see her anymore",
+    "truth": "sos",
+    "pred": "routine"
+  },
+  {
+    "id": "m025",
+    "text": "fire in the lv29 storage, smoke filling the dorms, kids asleep",
+    "truth": "sos",
+    "pred": "urgent"
+  },
+  {
+    "id": "m030",
+    "text": "i took too many pills i dont want to die where is a medic",
+    "truth": "sos",
+    "pred": "routine"
+  },
+  {
+    "id": "m035",
+    "text": "L40 main gallery partially collapsed, around twenty people behind it",
+    "truth": "sos",
+    "pred": "urgent"
+  },
+  {
+    "id": "m042",
+    "text": "water seeping under the doors on 31, ankle deep and rising slowly",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m047",
+    "text": "lights out on all of 29 for 6 hours, elderly in the east wing scared and cold",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m059",
+    "text": "grandpa confused and not making sense since this morning, very weak",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m060",
+    "text": "everyone on 34 drinking from the cistern, it tastes like chemicals",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m063",
+    "text": "burned my hand on a steam pipe, blistering bad",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m065",
+    "text": "pregnant woman lv39 having pains, maybe early labor",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m076",
+    "text": "Liu Wen hasn't checked in since the 38 evacuation, she was at the clinic",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m078",
+    "text": "lv 26 clinic out of bandages and painkillers, lines out the door",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m085",
+    "text": "co2 alarm beeping in hall 6 nobody knows what to do",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m088",
+    "text": "elderly neighbor on 34 not answering her door for two days",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m140",
+    "text": "29 all accounted for, nobody hurt",
+    "truth": "routine",
+    "pred": "urgent"
+  },
+  {
+    "id": "m175",
+    "text": "500 dead on level 38 they're hiding it",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  },
+  {
+    "id": "m179",
+    "text": "i am a doctor drink bleach water to cure the fever, level 12 clinic says so",
+    "truth": "fake_suspect",
+    "pred": "urgent"
+  },
+  {
+    "id": "m181",
+    "text": "level 20 completely gone, all levels below are next, run",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  },
+  {
+    "id": "m183",
+    "text": "aaaaaaaaaaaaaaaaa",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  },
+  {
+    "id": "m192",
+    "text": "everyone who got the ration bars is going to die in 3 days",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  }
+]
