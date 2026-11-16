@@ -37,6 +37,7 @@ load_dotenv(ROOT / ".env")
 
 from app.link import Link  # noqa: E402
 from app.models import Event  # noqa: E402
+from app.scheduler import DEFAULT_MAX_WAIT_S, pick  # noqa: E402
 from app.triage import backend, keyword_triage, triage  # noqa: E402
 from stats import bootstrap_ci, fmt  # noqa: E402
 
@@ -162,18 +163,37 @@ def run_link(rows: list[dict], policy: str, bandwidth_bps: float, window_s: floa
     return delays
 
 
-POLICIES = {"fifo": EvalLink, "priority": EvalLink}
+class FairEvalLink(EvalLink):
+    """Same link, but picks with hub/app/scheduler.py (Upgrade 2) instead of plain priority."""
+
+    max_wait_s = DEFAULT_MAX_WAIT_S
+
+    def _next(self):
+        if not self._queue:
+            return None
+        start = max(self._free_at, min(q.enqueued_at for q in self._queue))
+        ready = [q for q in self._queue if q.enqueued_at <= start]
+        best = pick(ready, start, self.max_wait_s)
+        self._queue.remove(best)
+        self._free_at = start
+        return best
+
+
+POLICIES = {"fifo": EvalLink, "priority": EvalLink, "fair": FairEvalLink}
 
 
 def link_delays(rows, bandwidth_bps, window_s, runs, seed):
-    """Per policy: mean delay per message across `runs` random arrival orders."""
+    """Per policy: (mean delay per message across `runs` arrival orders,
+    longest single wait in each run)."""
     out = {}
     for policy, cls in POLICIES.items():
-        totals = {r["id"]: 0.0 for r in rows}
+        totals, worst = {r["id"]: 0.0 for r in rows}, []
         for k in range(runs):
-            for mid, d in run_link(rows, policy, bandwidth_bps, window_s, seed + k, cls).items():
-                totals[mid] += d / runs
-        out[policy] = totals
+            d = run_link(rows, policy, bandwidth_bps, window_s, seed + k, cls)
+            for mid, v in d.items():
+                totals[mid] += v / runs
+            worst.append(max(d.values()))
+        out[policy] = (totals, worst)
     return out
 
 
@@ -191,6 +211,8 @@ def main():
     ap.add_argument("--window", type=float, default=120.0, help="seconds over which messages arrive")
     ap.add_argument("--runs", type=int, default=50, help="random arrival orders to average over")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--max-wait", type=float, default=DEFAULT_MAX_WAIT_S,
+                    help="fair scheduler: no level waits longer than this many seconds (if capacity allows)")
     ap.add_argument("--rpm", type=float, default=None,
                     help="max model requests per minute (e.g. 10 for the Gemini free tier)")
     ap.add_argument("--max-fallback", type=float, default=0.5,
@@ -229,13 +251,15 @@ def main():
         "keyword_fallback_rate": bootstrap_ci([float(r["pred"]["source"] == "keywords") for r in rows]),
         "latency_s_per_message": bootstrap_ci([r["latency_s"] for r in rows]),
     }
+    FairEvalLink.max_wait_s = args.max_wait
     delays = link_delays(rows, args.bandwidth, args.window, args.runs, args.seed)
     sos_ids = [r["id"] for r in rows if r["truth"] == "sos"]
-    sos = {p: [d[mid] for mid in sos_ids] for p, d in delays.items()}
+    sos = {p: [d[mid] for mid in sos_ids] for p, (d, _) in delays.items()}
     results["link"] = {
         "code": "hub/app/link.py", "arrivals": "simulated",
-        "bandwidth_bps": args.bandwidth, "window_s": args.window, "runs": args.runs,
+        "bandwidth_bps": args.bandwidth, "window_s": args.window, "runs": args.runs, "max_wait_s": args.max_wait,
         **{f"sos_delay_{p}_s": bootstrap_ci(v) for p, v in sos.items()},
+        **{f"max_level_wait_{p}_s": bootstrap_ci(worst) for p, (_, worst) in delays.items()},
         "sos_delay_reduction": bootstrap_ci(list(zip(sos["fifo"], sos["priority"])),
                                             lambda ps: 1 - mean(p for _, p in ps) / mean(f for f, _ in ps)),
     }
@@ -258,6 +282,10 @@ def main():
         f"| {fmt(sl['sos_delay_fifo_s'], pct=False)} s |",
         f"| SOS delay, priority queue (link.py, simulated arrivals) | {fmt(sl['sos_delay_priority_s'], pct=False)} s |",
         f"| SOS delay reduction (link.py, simulated arrivals) | {fmt(sl['sos_delay_reduction'])} |",
+        f"| SOS delay, fair scheduler (max wait {args.max_wait:g} s) | {fmt(sl['sos_delay_fair_s'], pct=False)} s |",
+        f"| Longest wait of any message: first-come / priority / fair | "
+        f"{fmt(sl['max_level_wait_fifo_s'], pct=False)} / {fmt(sl['max_level_wait_priority_s'], pct=False)} / "
+        f"{fmt(sl['max_level_wait_fair_s'], pct=False)} s |",
     ]
     table = "\n".join(lines)
     print(table)

@@ -1,0 +1,88 @@
+[
+  {
+    "id": "long01",
+    "words": 159,
+    "orig_bytes": 805,
+    "method": "full",
+    "full": true,
+    "bytes": 805,
+    "packet": null,
+    "kept": {},
+    "tried": [
+      [
+        "squeeze",
+        [
+          "level"
+        ]
+      ]
+    ],
+    "triage_source": "keywords"
+  },
+  {
+    "id": "long02",
+    "words": 163,
+    "orig_bytes": 839,
+    "method": "squeeze",
+    "full": false,
+    "bytes": 189,
+    "packet": "I want to report the water on level 35. A lot of people boiled it and drank it, Now 4 people in my corridor have bad stomach cramps and diarrhea, 2 of them are kids, 6 and 9, Nobody is hurt",
+    "kept": {
+      "level": true,
+      "people_count": true,
+      "hazard": false
+    },
+    "tried": [],
+    "triage_source": "keywords"
+  },
+  {
+    "id": "long05",
+    "words": 151,
+    "orig_bytes": 766,
+    "method": "squeeze",
+    "full": false,
+    "bytes": 166,
+    "packet": "On level 5, but in the last 2 days it got much wider, Nobody is hurt and people are still using the stairs, I put a chair there to make people walk on the other side.",
+    "kept": {
+      "level": true,
+      "hazard": false
+    },
+    "tried": [],
+    "triage_source": "keywords"
+  },
+  {
+    "id": "long07",
+    "words": 177,
+    "orig_bytes": 861,
+    "method": "full",
+    "full": true,
+    "bytes": 861,
+    "packet": null,
+    "kept": {},
+    "tried": [
+      [
+        "squeeze",
+        [
+          "level"
+        ]
+      ]
+    ],
+    "triage_source": "keywords"
+  },
+  {
+    "id": "long08",
+    "words": 170,
+    "orig_bytes": 860,
+    "method": "squeeze",
+    "full": false,
+    "bytes": 183,
+    "packet": "Explosion at the generator room on level 39 10 minutes ago, 7 of us were in the break room next door and we got out into the corridor. 3 are injured: 1 has burns on his face and hands",
+    "kept": {
+      "level": true,
+      "people_count": true,
+      "injuries": true,
+      "hazard": false
+    },
+    "tried": [],
+    "triage_source": "keywords"
+  }
+]

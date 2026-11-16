@@ -6,6 +6,9 @@
 | `review_labels.py` | Page through the set and accept or fix labels (`reviewed: true` once checked) |
 | `run_triage_eval.py` | Runs triage on a split and writes a results table with 95% CIs to `results/` |
 | `stats.py` | `bootstrap_ci()`: percentile bootstrap, pure Python |
+| `long_messages.jsonl` | 20 long pleas (132–207 words) with labeled level, people, injuries, hazard; 8 dev / 12 test. For compression |
+| `run_compression_eval.py` | Compresses each long plea to 200 bytes and checks the labeled facts survived (needs the NLI model: `hub/scripts/download_nli.py`) |
+| `run_fairness_eval.py` | Synthetic starvation scenario: priority-only vs the fair scheduler on the real link code |
 | `make_results_table.py` | Builds `results/RESULTS.md`: newest run per model, test-split numbers for the video, dev numbers labeled as tuning |
 
 ## Rules

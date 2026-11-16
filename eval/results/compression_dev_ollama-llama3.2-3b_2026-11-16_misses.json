@@ -1,0 +1,79 @@
+[
+  {
+    "id": "long02",
+    "words": 163,
+    "orig_bytes": 839,
+    "method": "full",
+    "full": true,
+    "bytes": 839,
+    "packet": null,
+    "kept": {},
+    "tried": [
+      [
+        "squeeze",
+        [
+          "hazard"
+        ]
+      ],
+      [
+        "model",
+        [
+          "level"
+        ]
+      ],
+      [
+        "model",
+        [
+          "level"
+        ]
+      ]
+    ],
+    "triage_source": "model"
+  },
+  {
+    "id": "long05",
+    "words": 151,
+    "orig_bytes": 766,
+    "method": "squeeze",
+    "full": false,
+    "bytes": 166,
+    "packet": "On level 5, but in the last 2 days it got much wider, Nobody is hurt and people are still using the stairs, I put a chair there to make people walk on the other side.",
+    "kept": {
+      "level": true,
+      "hazard": false
+    },
+    "tried": [],
+    "triage_source": "model"
+  },
+  {
+    "id": "long08",
+    "words": 170,
+    "orig_bytes": 860,
+    "method": "full",
+    "full": true,
+    "bytes": 860,
+    "packet": null,
+    "kept": {},
+    "tried": [
+      [
+        "squeeze",
+        [
+          "hazard"
+        ]
+      ],
+      [
+        "model",
+        [
+          "hazard"
+        ]
+      ],
+      [
+        "model",
+        [
+          "hazard"
+        ]
+      ]
+    ],
+    "triage_source": "model"
+  }
+]

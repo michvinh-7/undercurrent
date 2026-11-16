@@ -1,0 +1,56 @@
+{
+  "split": "dev",
+  "backend": "ollama-llama3.2-3b",
+  "n": 8,
+  "date": "2026-11-16",
+  "budget_bytes": 200,
+  "packet_ok": [
+    0.75,
+    0.5,
+    1.0
+  ],
+  "sent_full": [
+    0.25,
+    0.0,
+    0.5
+  ],
+  "facts_kept": {
+    "level": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "people_count": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "injuries": [
+      NaN,
+      NaN,
+      NaN
+    ],
+    "hazard": [
+      0.8,
+      0.4,
+      1.0
+    ]
+  },
+  "facts_kept_n": {
+    "level": 6,
+    "people_count": 5,
+    "injuries": 0,
+    "hazard": 5
+  },
+  "packet_bytes": [
+    166.5,
+    145.16666666666666,
+    183.16666666666666
+  ],
+  "methods": {
+    "model": 2,
+    "full": 2,
+    "squeeze": 4
+  },
+  "words_median": 163
+}
