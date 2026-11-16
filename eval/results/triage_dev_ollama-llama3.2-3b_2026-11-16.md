@@ -2,18 +2,18 @@
 
 | Metric | Value [95% CI] |
 |---|---|
-| SOS ranked first in a batch of 10 | 76.4% [66.4, 86.9] |
-| Urgency accuracy | 60.8% [47.1, 74.5] |
-| sos: precision / recall | 80.0% [50.0, 100.0] / 80.0% [50.0, 100.0] |
-| urgent: precision / recall | 33.3% [0.0, 100.0] / 7.1% [0.0, 25.0] |
-| routine: precision / recall | 54.3% [37.5, 71.0] / 100.0% [100.0, 100.0] |
-| fake_suspect: precision / recall | 100.0% [100.0, 100.0] / 37.5% [0.0, 75.0] |
-| Level extracted exactly | 84.3% [74.5, 94.1] |
-| People count extracted exactly | 92.2% [84.3, 98.0] |
-| Fell back to keyword rules | 3.9% [0.0, 9.8] |
-| Seconds per message | 1.298 [1.241, 1.370] |
-| SOS delay, first-come-first-served (link.py at 50 B/s, simulated arrivals) | 122.2 [118.1, 126.8] s |
-| SOS delay, priority queue (link.py, simulated arrivals) | 17.1 [13.7, 21.2] s |
-| SOS delay reduction (link.py, simulated arrivals) | 86.0% [82.6, 88.8] |
-| SOS delay, fair scheduler (max wait 60 s) | 36.3 [13.8, 67.3] s |
-| Longest wait of any message: first-come / priority / fair | 244.3 [243.5, 245.3] / 314.4 [307.5, 321.2] / 244.7 [243.7, 245.8] s |
+| SOS ranked first in a batch of 10 | 78.3% [68.8, 88.1] |
+| Urgency accuracy | 88.2% [78.4, 96.1] |
+| sos: precision / recall | 76.9% [50.0, 100.0] / 100.0% [100.0, 100.0] |
+| urgent: precision / recall | 100.0% [100.0, 100.0] / 64.3% [37.5, 88.9] |
+| routine: precision / recall | 86.4% [70.0, 100.0] / 100.0% [100.0, 100.0] |
+| fake_suspect: precision / recall | 100.0% [100.0, 100.0] / 87.5% [60.0, 100.0] |
+| Level extracted exactly | 94.1% [86.3, 100.0] |
+| People count extracted exactly | 94.1% [86.3, 100.0] |
+| Fell back to keyword rules | 0.0% [0.0, 0.0] |
+| Seconds per message | 1.550 [1.506, 1.602] |
+| SOS delay, first-come-first-served (link.py at 50 B/s, simulated arrivals) | 122.3 [118.2, 126.9] s |
+| SOS delay, priority queue (link.py, simulated arrivals) | 16.4 [13.6, 19.3] s |
+| SOS delay reduction (link.py, simulated arrivals) | 86.6% [84.1, 89.0] |
+| SOS delay, fair scheduler (max wait 60 s) | 16.4 [13.7, 19.3] s |
+| Longest wait of any message: first-come / priority / fair | 244.6 [243.7, 245.5] / 306.4 [302.6, 310.0] / 245.6 [244.4, 246.9] s |

@@ -209,11 +209,15 @@ def keyword_triage(text: str, level_hint: int | None = None) -> TriageRecord:
 PROMPT = """You sort emergency messages from the Hollow, an underground city with 40 levels.
 Return ONLY a JSON object with exactly these six keys, in this order.
 
-1. "urgency": how fast someone must act. Exactly one of:
-      "sos"          life in danger right now (trapped, not breathing, heavy bleeding, drowning)
-      "urgent"       needs help soon (injuries, illness, hazard spreading, missing person)
-      "routine"      status update, nobody in immediate danger
-      "fake_suspect" spam, rumor, propaganda, or claims that can't be from one person
+1. "urgency": how fast someone must act. Decide in this order and stop at the first match:
+      "fake_suspect" spam, offers of free goods, requests for credits or medical cards, chain messages,
+                     gibberish, or huge claims no one person could know (whole levels gone, hundreds dead)
+      "sos"          someone could die within minutes without help (trapped with water/smoke/gas coming,
+                     not breathing, unconscious, heavy bleeding, drowning, people collapsing)      "urgent"       anyone is hurt, sick, missing or out of medicine, OR a hazard (water, smoke, gas,
+                     cracks, bad water, no power, heat) is present or growing, even if nobody is hurt yet
+      "routine"      ONLY when nobody is hurt, sick, missing or near a hazard: check-ins, "we're fine",
+                     found people, questions, all-clear notices
+   When unsure between "urgent" and "routine", choose "urgent".
 2. "type": what kind of report it is. Exactly one of "checkin", "hazard", "case", "missing_person".
    ("case" = someone sick or hurt.) Never put an urgency word here.
 3. "level": the level number if the message states it, else null
@@ -225,6 +229,21 @@ Never guess a number. If the message does not say it, use null. No priority, no 
 
 Example message: "water coming in fast on level 12, 4 of us stuck in the pump room"
 Example answer: {{"urgency": "sos", "type": "hazard", "level": 12, "injuries": null, "people_count": 4, "hazard": "flooding"}}
+
+Example message: "my son has had a cough and fever for three days now, we're on 17"
+Example answer: {{"urgency": "urgent", "type": "case", "level": 17, "injuries": null, "people_count": null, "hazard": null}}
+
+Example message: "puddle in the stairwell on 9 keeps getting wider, nobody hurt"
+Example answer: {{"urgency": "urgent", "type": "hazard", "level": 9, "injuries": null, "people_count": null, "hazard": "flooding"}}
+
+Example message: "my friend twisted her ankle bad on the stairs at 22, it's swelling up and she can't walk"
+Example answer: {{"urgency": "urgent", "type": "case", "level": 22, "injuries": 1, "people_count": null, "hazard": null}}
+
+Example message: "nobody has heard from Ravi since yesterday morning, he was going to level 5"
+Example answer: {{"urgency": "urgent", "type": "missing_person", "level": 5, "injuries": null, "people_count": null, "hazard": null}}
+
+Example message: "all good in block F on level 14, lights back on"
+Example answer: {{"urgency": "routine", "type": "checkin", "level": 14, "injuries": null, "people_count": null, "hazard": null}}
 
 Message: {text}"""
 
