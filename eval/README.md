@@ -2,7 +2,7 @@
 
 | File | What it is |
 |---|---|
-| `messages_labeled.jsonl` | 200 labeled messages: 40 SOS, 55 urgent, 75 routine, 30 fake. 51 `dev`, 149 `test` (split stratified by label, seed 2087) |
+| `messages_labeled.jsonl` | 200 labeled messages, all reviewed by Michael: 43 SOS, 52 urgent, 75 routine, 30 fake. 51 `dev`, 149 `test` (split stratified by label, seed 2087) |
 | `review_labels.py` | Page through the set and accept or fix labels (`reviewed: true` once checked) |
 | `run_triage_eval.py` | Runs triage on a split and writes a results table with 95% CIs to `results/` |
 | `stats.py` | `bootstrap_ci()`: percentile bootstrap, pure Python |
