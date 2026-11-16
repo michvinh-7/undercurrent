@@ -12,6 +12,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
+from .ai_routes import router as ai_router
+from .ingest import score
 from .link import Link
 from .log import EventLog
 from .models import Event, EventIn, EventType
@@ -31,6 +33,7 @@ app.add_middleware(
 )
 
 log = EventLog(HUB_DB, HUB_ID)
+app.include_router(ai_router)  # POST /triage, POST /organize
 _bps = float(os.getenv("LINK_BANDWIDTH_BPS", "0") or 0)
 link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs; sync.py will drain it
 
@@ -43,7 +46,7 @@ def health():
 
 @app.post("/events", response_model=Event, status_code=201)
 def add_event(event: EventIn):
-    return log.append(event)
+    return log.append(score(event))  # adds a priority before storing (hub/app/ingest.py)
 
 
 @app.get("/events", response_model=list[Event])
