@@ -7,11 +7,15 @@ Docs: http://localhost:8000/docs
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
+from .link import Link
 from .log import EventLog
 from .models import Event, EventIn, EventType
+from .stream import event_stream
 
 load_dotenv()
 
@@ -27,6 +31,8 @@ app.add_middleware(
 )
 
 log = EventLog(HUB_DB, HUB_ID)
+_bps = float(os.getenv("LINK_BANDWIDTH_BPS", "0") or 0)
+link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs; sync.py will drain it
 
 
 @app.get("/health")
@@ -53,3 +59,47 @@ def list_events(
 def verify_chain():
     intact, first_bad = log.verify()
     return {"chain_intact": intact, "first_bad_event": first_bad}
+
+
+@app.get("/events/stream")
+async def stream_events(
+    type: EventType | None = None,
+    level: int | None = Query(default=None, ge=1, le=40),
+    after: int = Query(default=0, ge=0, description="Start after this event position (0 = from the beginning)"),
+    last_event_id: str | None = Header(default=None),
+):
+    """Server-Sent Events: every stored event, then each new one as it arrives.
+    Browsers reconnect on their own and resume from Last-Event-ID."""
+    start = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
+    return StreamingResponse(
+        event_stream(log, start, type, level),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+class LinkSettings(BaseModel):
+    bandwidth_bps: float | None = Field(default=None, gt=0, description="Bytes per second; omit to leave unchanged")
+    unlimited: bool = False
+    cut: bool | None = Field(default=None, description="true = cut the network, false = restore")
+
+
+@app.get("/link")
+def link_status():
+    return link.status()
+
+
+@app.post("/link")
+def set_link(settings: LinkSettings):
+    """For the dashboard's bandwidth slider and "cut the network" button."""
+    if settings.unlimited and settings.bandwidth_bps is not None:
+        raise HTTPException(422, "send bandwidth_bps or unlimited, not both")
+    if settings.unlimited:
+        link.set_bandwidth(None)
+    elif settings.bandwidth_bps is not None:
+        link.set_bandwidth(settings.bandwidth_bps)
+    if settings.cut is True:
+        link.cut()
+    elif settings.cut is False:
+        link.restore()
+    return link.status()

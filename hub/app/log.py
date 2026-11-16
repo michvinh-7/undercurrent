@@ -97,6 +97,20 @@ class EventLog:
         rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
         return [self._row_to_event(r) for r in rows]
 
+    def after(self, seq: int, type: str | None = None, level: int | None = None) -> list[tuple[int, Event]]:
+        """Events stored after position `seq`, with their positions. Used by the live stream:
+        positions never repeat or skip, unlike timestamps (which only have 1-second precision)."""
+        query, params = "SELECT * FROM events WHERE seq > ?", [seq]
+        if type:
+            query += " AND type = ?"
+            params.append(type)
+        if level is not None:
+            query += " AND level = ?"
+            params.append(level)
+        with self._lock:
+            rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
+        return [(row["seq"], self._row_to_event(row)) for row in rows]
+
     def count(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
 
