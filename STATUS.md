@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Mon 11/16 by Michael
+**Last updated:** Mon 11/16 (evening) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 Tasks are copied from the team contract. `[x]` means done and in the repo. Anything partly done stays unchecked, with a note saying what's left.
@@ -17,22 +17,26 @@ The base has to work end to end before any upgrade starts.
 |---|---|
 | A phone opens the hub page and submits a check-in, hazard, case or missing person | 🟡 All 4 forms work end to end in a phone-sized browser. The phone opens `http://<laptop-ip>:3000` for now, until the hub serves the pages itself. Not yet tried on a real phone |
 | It's saved to the hub's log and appears on the dashboard | ✅ Tested end to end: report saved, then shown live on `/dashboard` |
-| The AI turns a messy message into a structured record with a priority score | 🟡 Built and tested on `michael/triage-hook`: every report gets a priority as it arrives (tested with the live model). Waiting for Tisya to review and merge. Until then, phone reports show as "unscored" |
+| The AI turns a messy message into a structured record with a priority score | ✅ Merged: every report gets a priority as it arrives (tested with the live model), so the dashboard shows real priorities. The full structured record comes from `POST /triage`; only the priority is saved with the event |
 | Two hubs edit separately, reconnect and merge with nothing lost | ❌ Sync isn't started |
 | The hazard map and Truth screen show community numbers next to the official ones | ❌ Not started |
 | The online mirror is live | ❌ Not started |
 
 **Blocking the most people:**
 1. **Sync (Tisya).** "Zero lost reports" is our core claim, and two base items depend on it.
-2. **Reviewing `michael/triage-hook` (Tisya),** so reports arrive with a priority.
-3. **Hazard map and Truth screen (Taheful),** plus the official numbers they compare against (Alanna).
+2. **Hazard map and Truth screen (Taheful),** plus the official numbers they compare against (Alanna).
+3. **The online mirror (Tisya).**
 
-**Open branches:**
-- `michael/triage-hook`: scores reports on arrival and mounts `/triage` and `/organize`. Changes 3 lines in `main.py`, so Tisya reviews it.
-- `michael/eval`: eval on the real `link.py`, the local model's field fix, and the results table.
-- `michael/upgrade2`: fair scheduler and compression, built on top of `michael/eval`. It adds torch + transformers to `requirements.txt`, so post in the group chat first. Merge it after the base passes.
+**Working branches:** one per person, all matching `main` as of Mon 11/16 evening.
 
-The stream, link, phone forms and dashboard are all merged into `main`.
+| Person | Branch |
+|---|---|
+| Tisya | `tisya/stream-and-link` |
+| Michael | `michael/ai` |
+| Alanna | `alanna/phone-pages` |
+| Taheful | `taheful/dashboard` |
+
+If you already have yours checked out, run `git pull` (a fast-forward, no conflicts). Everything built so far is merged into `main`. Nothing from Tisya, Alanna or Taheful has been pushed yet: push your work so this page can count it.
 
 ---
 
@@ -65,7 +69,8 @@ The stream, link, phone forms and dashboard are all merged into `main`.
   - *Each teammate still needs to confirm it runs on theirs.*
 - [x] `triage.py`: messy text in, JSON out (type, level, injuries, hazard, people count, priority 0 to 1); retry once on broken JSON, then fall back to keyword rules.
   - *Priority is computed by code, not by the model.*
-  - *On `michael/eval`: a fix for the local model mixing up fields cut keyword fallback from 16% to 4%.*
+  - *A fix for the local model mixing up fields cut keyword fallback from 16% to 4%.*
+  - *Merged into the hub: every report is scored as it arrives.*
 - [ ] Write and label ~200 test messages (SOS, urgent, routine, fake) before tuning anything; never tune on the test set.
   - *200 are drafted, 51 for tuning and 149 held back. Michael hasn't reviewed the labels yet.*
 - [ ] Measure SOS ranked first (%), and time-to-deliver for critical messages vs first-come-first-served on a slow link.
@@ -74,10 +79,10 @@ The stream, link, phone forms and dashboard are all merged into `main`.
 - [x] `organize.py`: medical reports in a fixed responder format (symptoms + photo + medical card); documents, never diagnoses.
 - [x] Cloud model fallback (Gemini) for the online mirror only. *(`gemini-3.1-flash-lite`, tested.)*
 - [ ] Upgrade 2: compress each message to a 200-byte packet; a fact-checking model (DeBERTa NLI) confirms location, injuries, hazard and count survived; reject and retry if not.
-  - *Built and tested on `michael/upgrade2`, not wired into the hub yet (base first).*
+  - *Built, tested and merged, but not wired into the hub yet (base first).*
   - *Tuning set: 75% of long pleas fit 200 bytes; level and people count kept 100%, hazard 80%; the rest are safely sent in full.*
 - [ ] Upgrade 2: fair scheduler, urgent first, but no level waits longer than a set limit.
-  - *Built and tested on `michael/upgrade2`, not wired into `link.py` yet.*
+  - *Built, tested and merged, but not wired into `link.py` yet.*
   - *Synthetic scenario: the quiet level's worst wait drops from 410 s to 77 s, with SOS unchanged and urgent messages waiting 22 → 40 s.*
 - [ ] Results table: every number with a bootstrapped 95% confidence interval.
   - *Set up: `eval/make_results_table.py` builds `eval/results/RESULTS.md`.*
@@ -146,9 +151,11 @@ Next: few-shot tuning for "urgent" (the local model calls most urgent messages r
 
 ## Open questions between people
 
-- **Tisya:** review `michael/triage-hook`. It scores each report before it's appended and mounts the AI router (3 lines in `main.py`).
-  - Phone submits take ~1.4–3 s while the local model scores them. If that's too slow, the alternative is to append first and score afterwards.
+- **Everyone, now:** torch + transformers were added to `hub/requirements.txt`.
+  - Run `pip install -r hub/requirements.txt` again.
+  - On any laptop that will run compression, also run `hub/.venv/bin/python hub/scripts/download_nli.py` once, while you have internet (~740 MB).
 - **Everyone:** confirm `llama3.2:3b` runs on your laptop (`ollama run llama3.2:3b "say hi"`), and post how long it takes.
-- **Everyone, before `michael/upgrade2` merges:** it adds torch + transformers (~1–2 GB) to `hub/requirements.txt`. Run `pip install -r requirements.txt` again afterwards, plus `hub/.venv/bin/python hub/scripts/download_nli.py` on any laptop that runs compression.
-- **Tisya:** when sync starts using `link.py`, decide whether to turn on the fair scheduler. It's one change, and only worth it when the link has spare capacity: under heavy overload it slowed near-SOS messages.
+- **Tisya:**
+  - Phone submits now take ~1.4–3 s while the local model scores each report. If that's too slow for the demo, the alternative is to append first and score afterwards.
+  - When sync starts using `link.py`, decide whether to turn on the fair scheduler. It's one change, and only worth it when the link has spare capacity: under heavy overload it slowed near-SOS messages.
 - **Sign-off (contract page 9):** each person ticks their box once they've read their section.
