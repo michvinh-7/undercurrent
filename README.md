@@ -93,6 +93,9 @@ Every report in Undercurrent is one **event** in an append-only log. The full de
 | POST | `/events` | Add an event (client sends `type`, `level`, `author`, `payload`) |
 | GET | `/events` | List events. Filters: `type`, `level`, `since` (ISO time) |
 | GET | `/events/verify` | Re-check the whole hash chain |
+| GET | `/events/stream` | Live feed (Server-Sent Events): all events, then each new one. Same filters; resumes via `Last-Event-ID` |
+| GET | `/link` | Simulated outbound link: bandwidth, cut or not, queue size |
+| POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}` |
 
 Sync, link simulation and AI endpoints get added by their owners.
 
