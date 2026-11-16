@@ -1,31 +1,34 @@
-import { fakeEvents } from "@/lib/fake-events";
+import Link from "next/link";
 
-// Placeholder home: shows the fake events by priority so everyone can see the format.
-// Person 3 builds the phone pages, Person 4 builds the dashboard.
+// The hub's home page on a resident's phone: pick what to report.
+const REPORTS = [
+  { href: "/checkin", title: "Check in", hint: "I'm OK, or I need help" },
+  { href: "/hazard", title: "Report a hazard", hint: "Flooding, bad air, collapse…" },
+  { href: "/symptoms", title: "Report symptoms", hint: "Someone is sick or hurt" },
+  { href: "/missing", title: "Missing person", hint: "Someone you can't find" },
+];
+
 export default function Home() {
-  const queue = [...fakeEvents].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Hub online · offline-first</p>
-      <h1 className="mt-2 text-3xl font-semibold">Undercurrent</h1>
-      <p className="mt-2 text-[var(--muted)]">The Hollow&apos;s network the Directorate can&apos;t shut off.</p>
-
-      <h2 className="mt-10 font-mono text-sm uppercase tracking-widest text-[var(--muted)]">Priority queue (fake data)</h2>
-      <ul className="mt-3 space-y-2">
-        {queue.map((e) => (
-          <li
-            key={e.id}
-            className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-3"
-          >
-            <span>
-              <span className="font-mono text-xs uppercase text-[var(--accent)]">{e.type}</span>
-              <span className="ml-3">Level {e.level}</span>
-            </span>
-            <span className="font-mono text-sm">{(e.priority ?? 0).toFixed(2)}</span>
+    <main className="mx-auto max-w-md px-4 pb-16 pt-8">
+      <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Undercurrent · works without internet</p>
+      <h1 className="mt-2 text-3xl font-semibold">What do you need to report?</h1>
+      <ul className="mt-6 space-y-3">
+        {REPORTS.map((r) => (
+          <li key={r.href}>
+            <Link
+              href={r.href}
+              className="block rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4 active:border-[var(--accent)]"
+            >
+              <span className="block text-lg font-semibold">{r.title}</span>
+              <span className="block text-[var(--muted)]">{r.hint}</span>
+            </Link>
           </li>
         ))}
       </ul>
+      <Link href="/dashboard" className="mt-10 inline-block py-2 text-sm text-[var(--muted)]">
+        Command dashboard →
+      </Link>
     </main>
   );
 }
