@@ -94,3 +94,26 @@ def test_keyword_fields():
 
 def test_spam_is_flagged():
     assert keyword_triage("FREE RATIONS click here!!!! forward this").urgency == "fake_suspect"
+
+
+# --- repairing small-model field mix-ups ----------------------------------------------
+
+def test_urgency_word_in_type_key_is_moved_not_discarded():
+    x = Extraction.model_validate({"type": "fake_suspect", "urgency": "routine", "level": None,
+                                   "injuries": None, "people_count": None, "hazard": None})
+    assert (x.urgency, x.type) == ("fake_suspect", "checkin")
+
+
+def test_swapped_type_and_urgency():
+    x = Extraction.model_validate({"type": "sos", "urgency": "hazard"})
+    assert (x.type, x.urgency) == ("hazard", "sos")
+
+
+def test_hazard_kind_in_type_key():
+    x = Extraction.model_validate({"type": "flooding", "urgency": "urgent"})
+    assert (x.type, x.hazard) == ("hazard", "flooding")
+
+
+def test_repair_never_invents_an_urgency():
+    with pytest.raises(Exception):
+        Extraction.model_validate({"type": "checkin", "urgency": "panic"})

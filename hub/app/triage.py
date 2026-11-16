@@ -18,7 +18,7 @@ import re
 from typing import Literal
 
 import httpx
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 Urgency = Literal["sos", "urgent", "routine", "fake_suspect"]
 HazardKind = Literal["flooding", "bad_air", "bad_water", "heat", "blackout", "collapse", "other"]
@@ -39,6 +39,34 @@ class Extraction(BaseModel):
     @classmethod
     def _blank_hazard(cls, v):
         return None if v in ("", "none", "null") else v
+
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_fields(cls, data):
+        """Small models put the right word in the wrong key (seen: "type": "fake_suspect").
+        Move it where it belongs instead of throwing the whole answer away.
+        Only relabels words the model chose; never adds a fact or a number."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        t, u = data.get("type"), data.get("urgency")
+        if t in _URGENCIES and u in _TYPES:  # the two keys swapped
+            data["type"], data["urgency"] = u, t
+        elif t in _URGENCIES:  # urgency word in the type key: the model's urgency call is in `type`
+            data["urgency"], data["type"] = t, "checkin"
+        elif t in _HAZARD_KINDS:  # "type": "flooding" means a hazard report about flooding
+            data["type"] = "hazard"
+            if data.get("hazard") is None:
+                data["hazard"] = t
+        elif isinstance(t, str) and t.replace("-", "_").replace(" ", "_").lower() in _TYPE_ALIASES:
+            data["type"] = _TYPE_ALIASES[t.replace("-", "_").replace(" ", "_").lower()]
+        return data
+
+
+_URGENCIES = {"sos", "urgent", "routine", "fake_suspect"}
+_TYPES = {"checkin", "hazard", "case", "missing_person"}
+_HAZARD_KINDS = {"flooding", "bad_air", "bad_water", "heat", "blackout", "collapse"}
+_TYPE_ALIASES = {"check_in": "checkin", "missing": "missing_person", "medical": "case", "symptoms": "case"}
 
 
 class TriageRecord(Extraction):
@@ -179,18 +207,24 @@ def keyword_triage(text: str, level_hint: int | None = None) -> TriageRecord:
 # --------------------------------------------------------------------------- model backends
 
 PROMPT = """You sort emergency messages from the Hollow, an underground city with 40 levels.
-Return ONLY a JSON object with exactly these keys:
-  "type": one of "checkin", "hazard", "case", "missing_person"
-  "urgency": one of
+Return ONLY a JSON object with exactly these six keys, in this order.
+
+1. "urgency": how fast someone must act. Exactly one of:
       "sos"          life in danger right now (trapped, not breathing, heavy bleeding, drowning)
       "urgent"       needs help soon (injuries, illness, hazard spreading, missing person)
       "routine"      status update, nobody in immediate danger
       "fake_suspect" spam, rumor, propaganda, or claims that can't be from one person
-  "level": the level number if the message states it, else null
-  "injuries": number of injured people if the message states it, else null
-  "people_count": number of people involved if the message states it, else null
-  "hazard": one of "flooding","bad_air","bad_water","heat","blackout","collapse","other", or null
+2. "type": what kind of report it is. Exactly one of "checkin", "hazard", "case", "missing_person".
+   ("case" = someone sick or hurt.) Never put an urgency word here.
+3. "level": the level number if the message states it, else null
+4. "injuries": number of injured people if the message states it, else null
+5. "people_count": number of people involved if the message states it, else null
+6. "hazard": one of "flooding","bad_air","bad_water","heat","blackout","collapse","other", or null
+
 Never guess a number. If the message does not say it, use null. No priority, no explanation.
+
+Example message: "water coming in fast on level 12, 4 of us stuck in the pump room"
+Example answer: {{"urgency": "sos", "type": "hazard", "level": 12, "injuries": null, "people_count": 4, "hazard": "flooding"}}
 
 Message: {text}"""
 

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "m009",
+    "text": "gas leak 37 people passing out in the hallway",
+    "truth": "sos",
+    "pred": "urgent"
+  },
+  {
+    "id": "m025",
+    "text": "fire in the lv29 storage, smoke filling the dorms, kids asleep",
+    "truth": "sos",
+    "pred": "urgent"
+  },
+  {
+    "id": "m041",
+    "text": "three people in our row have high fever since yesterday, lvl 38",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m042",
+    "text": "water seeping under the doors on 31, ankle deep and rising slowly",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m047",
+    "text": "lights out on all of 29 for 6 hours, elderly in the east wing scared and cold",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m059",
+    "text": "grandpa confused and not making sense since this morning, very weak",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m060",
+    "text": "everyone on 34 drinking from the cistern, it tastes like chemicals",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m063",
+    "text": "burned my hand on a steam pipe, blistering bad",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m065",
+    "text": "pregnant woman lv39 having pains, maybe early labor",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m066",
+    "text": "loud cracking from the wall by the main stairs, nobody hurt yet",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m071",
+    "text": "smoke smell on 28, cant see fire, getting stronger",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m076",
+    "text": "Liu Wen hasn't checked in since the 38 evacuation, she was at the clinic",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m078",
+    "text": "lv 26 clinic out of bandages and painkillers, lines out the door",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m085",
+    "text": "co2 alarm beeping in hall 6 nobody knows what to do",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m088",
+    "text": "elderly neighbor on 34 not answering her door for two days",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m171",
+    "text": "FREE RATIONS at the level 1 gate!!!! forward this to everyone",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  },
+  {
+    "id": "m175",
+    "text": "500 dead on level 38 they're hiding it",
+    "truth": "fake_suspect",
+    "pred": "sos"
+  },
+  {
+    "id": "m181",
+    "text": "level 20 completely gone, all levels below are next, run",
+    "truth": "fake_suspect",
+    "pred": "sos"
+  },
+  {
+    "id": "m183",
+    "text": "aaaaaaaaaaaaaaaaa",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  },
+  {
+    "id": "m191",
+    "text": "free water credits for the first 50 who send their medical card",
+    "truth": "fake_suspect",
+    "pred": "routine"
+  }
+]
