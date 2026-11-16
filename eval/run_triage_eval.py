@@ -9,13 +9,15 @@ Metrics
   from the same split; how often does it get the top priority? (ties count half)
 - Urgency precision/recall per class, field accuracy for level and people count,
   and how often the model path fell back to keyword rules.
-- Time-to-deliver for SOS messages on a SIMULATED slow link: priority queue vs
-  first-come-first-served. Interim model until hub/app/link.py lands; label it
-  "simulated link" anywhere it's shown.
+- Time-to-deliver for SOS messages over the hubs' real link code (hub/app/link.py),
+  priority queue vs first-come-first-served. The link code is real; the arrival
+  times are simulated (messages arrive at random over --window seconds), so say
+  "simulated arrivals" wherever it's shown.
+
+Use other messages (e.g. Alanna's simulator output, same JSONL fields) with --messages PATH.
 """
 
 import argparse
-import heapq
 import json
 import os
 import random
@@ -33,16 +35,20 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
+from app.link import Link  # noqa: E402
+from app.models import Event  # noqa: E402
 from app.triage import backend, keyword_triage, triage  # noqa: E402
 from stats import bootstrap_ci, fmt  # noqa: E402
 
 LABEL_TO_URGENCY = {"sos": "sos", "urgent": "urgent", "routine": "routine", "fake": "fake_suspect"}
 CLASSES = list(LABEL_TO_URGENCY.values())
-HEADER_BYTES = 64  # event envelope (id, hub, level, hashes) on top of the text
 
 
-def load(split: str) -> list[dict]:
-    rows = [json.loads(line) for line in (ROOT / "eval" / "messages_labeled.jsonl").open()]
+DEFAULT_MESSAGES = ROOT / "eval" / "messages_labeled.jsonl"
+
+
+def load(split: str, path: Path = DEFAULT_MESSAGES) -> list[dict]:
+    rows = [json.loads(line) for line in Path(path).open()]
     return rows if split == "all" else [r for r in rows if r["split"] == split]
 
 
@@ -102,39 +108,72 @@ def field_match(field):
     return lambda rs: mean(r["pred"][field] == r[field] for r in rs)
 
 
-# --------------------------------------------------------------------------- simulated link
+# --------------------------------------------------------------------------- link (real hub code)
 
-def simulate_link(rows: list[dict], policy: str, bandwidth_bps: float, window_s: float, seed: int) -> dict[str, float]:
-    """Single non-preemptive link. Messages arrive uniformly over `window_s`.
+class FakeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+class EvalLink(Link):
+    """hub/app/link.py as-is, plus a read-only peek at when the in-flight event lands."""
+
+    def next_delivery_at(self) -> float | None:
+        return self._sending[1] if self._sending else None
+
+
+def as_event(r: dict, prioritized: bool) -> Event:
+    """The message as the hub would carry it. FIFO sends every event unscored,
+    so Link's tie-break (arrival order) makes it first-come-first-served."""
+    return Event(
+        id=r["id"], type=r["pred"]["type"], level=r.get("level") or r["pred"]["level"] or 1,
+        author="eval", payload={"text": r["text"]},
+        priority=r["pred"]["priority"] if prioritized else None,
+        hub_id="hub-eval", created_at="2087-01-01T00:00:00Z", prev_hash="0" * 64, hash="0" * 64,
+    )
+
+
+def run_link(rows: list[dict], policy: str, bandwidth_bps: float, window_s: float, seed: int,
+             link_cls: type[EvalLink] = EvalLink) -> dict[str, float]:
+    """Push every message through one link; messages arrive at random over `window_s`.
     Returns delivery delay (s) per message id."""
     rng = random.Random(seed)
     arrivals = sorted((rng.uniform(0, window_s), r["id"], r) for r in rows)
-    queue, delays, clock, i = [], {}, 0.0, 0
-    while i < len(arrivals) or queue:
-        if not queue and clock < arrivals[i][0]:
-            clock = arrivals[i][0]
-        while i < len(arrivals) and arrivals[i][0] <= clock:
-            t, mid, r = arrivals[i]
-            key = -r["pred"]["priority"] if policy == "priority" else 0.0
-            heapq.heappush(queue, (key, t, mid, len(r["text"].encode()) + HEADER_BYTES))
+    arrived_at = {mid: t for t, mid, _ in arrivals}
+    clock = FakeClock()
+    link = link_cls(bandwidth_bps=bandwidth_bps, clock=clock)
+    delays, i = {}, 0
+    while True:
+        next_arrival = arrivals[i][0] if i < len(arrivals) else None
+        next_delivery = link.next_delivery_at()
+        candidates = [t for t in (next_arrival, next_delivery) if t is not None]
+        if not candidates:
+            break
+        clock.t = min(candidates)
+        while i < len(arrivals) and arrivals[i][0] <= clock.t:
+            link.enqueue(as_event(arrivals[i][2], prioritized=policy != "fifo"))
             i += 1
-        _, t, mid, size = heapq.heappop(queue)
-        clock += size / bandwidth_bps
-        delays[mid] = clock - t
+        for e in link.poll():
+            delays[e.id] = clock.t - arrived_at[e.id]
+    assert len(delays) == len(rows), "link lost messages"
     return delays
 
 
+POLICIES = {"fifo": EvalLink, "priority": EvalLink}
+
+
 def link_delays(rows, bandwidth_bps, window_s, runs, seed):
-    """Mean SOS delay per message across `runs` arrival orders, for each policy."""
-    sos_ids = [r["id"] for r in rows if r["truth"] == "sos"]
+    """Per policy: mean delay per message across `runs` random arrival orders."""
     out = {}
-    for policy in ("fifo", "priority"):
-        totals = {mid: 0.0 for mid in sos_ids}
+    for policy, cls in POLICIES.items():
+        totals = {r["id"]: 0.0 for r in rows}
         for k in range(runs):
-            d = simulate_link(rows, policy, bandwidth_bps, window_s, seed + k)
-            for mid in sos_ids:
-                totals[mid] += d[mid] / runs
-        out[policy] = [totals[mid] for mid in sos_ids]
+            for mid, d in run_link(rows, policy, bandwidth_bps, window_s, seed + k, cls).items():
+                totals[mid] += d / runs
+        out[policy] = totals
     return out
 
 
@@ -146,9 +185,11 @@ def main():
     ap.add_argument("--backend", choices=["auto", "keywords"], default="auto",
                     help="auto = Ollama (or Gemini if CLOUD_PROVIDER=gemini) with keyword fallback")
     ap.add_argument("--batches", type=int, default=200)
-    ap.add_argument("--bandwidth", type=float, default=50.0, help="simulated link, bytes per second")
+    ap.add_argument("--messages", type=Path, default=DEFAULT_MESSAGES,
+                    help="labeled messages JSONL (default: eval/messages_labeled.jsonl)")
+    ap.add_argument("--bandwidth", type=float, default=50.0, help="link bandwidth, bytes per second")
     ap.add_argument("--window", type=float, default=120.0, help="seconds over which messages arrive")
-    ap.add_argument("--runs", type=int, default=50, help="simulated arrival orders to average over")
+    ap.add_argument("--runs", type=int, default=50, help="random arrival orders to average over")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--rpm", type=float, default=None,
                     help="max model requests per minute (e.g. 10 for the Gemini free tier)")
@@ -159,7 +200,7 @@ def main():
     if args.split == "test":
         print("TEST SPLIT: report these numbers, do not tune on them.\n", file=sys.stderr)
 
-    rows = load(args.split)
+    rows = load(args.split, args.messages)
     if args.backend == "auto":
         probe = triage(rows[0]["text"])
         if probe.source == "keywords":
@@ -188,16 +229,18 @@ def main():
         "keyword_fallback_rate": bootstrap_ci([float(r["pred"]["source"] == "keywords") for r in rows]),
         "latency_s_per_message": bootstrap_ci([r["latency_s"] for r in rows]),
     }
-    link = link_delays(rows, args.bandwidth, args.window, args.runs, args.seed)
-    results["simulated_link"] = {
+    delays = link_delays(rows, args.bandwidth, args.window, args.runs, args.seed)
+    sos_ids = [r["id"] for r in rows if r["truth"] == "sos"]
+    sos = {p: [d[mid] for mid in sos_ids] for p, d in delays.items()}
+    results["link"] = {
+        "code": "hub/app/link.py", "arrivals": "simulated",
         "bandwidth_bps": args.bandwidth, "window_s": args.window, "runs": args.runs,
-        "sos_delay_fifo_s": bootstrap_ci(link["fifo"]),
-        "sos_delay_priority_s": bootstrap_ci(link["priority"]),
-        "sos_delay_reduction": bootstrap_ci(list(zip(link["fifo"], link["priority"])),
+        **{f"sos_delay_{p}_s": bootstrap_ci(v) for p, v in sos.items()},
+        "sos_delay_reduction": bootstrap_ci(list(zip(sos["fifo"], sos["priority"])),
                                             lambda ps: 1 - mean(p for _, p in ps) / mean(f for f, _ in ps)),
     }
 
-    sl = results["simulated_link"]
+    sl = results["link"]
     lines = [
         f"## Triage results: {args.split} split, {label} ({len(rows)} messages, {n_sos} SOS)",
         "",
@@ -211,10 +254,10 @@ def main():
         f"| People count extracted exactly | {fmt(results['people_count_exact'])} |",
         f"| Fell back to keyword rules | {fmt(results['keyword_fallback_rate'])} |",
         f"| Seconds per message | {fmt(results['latency_s_per_message'], pct=False, digits=3)} |",
-        f"| SOS delay, first-come-first-served (simulated link, {args.bandwidth:g} B/s) "
+        f"| SOS delay, first-come-first-served (link.py at {args.bandwidth:g} B/s, simulated arrivals) "
         f"| {fmt(sl['sos_delay_fifo_s'], pct=False)} s |",
-        f"| SOS delay, priority queue (simulated link) | {fmt(sl['sos_delay_priority_s'], pct=False)} s |",
-        f"| SOS delay reduction (simulated link) | {fmt(sl['sos_delay_reduction'])} |",
+        f"| SOS delay, priority queue (link.py, simulated arrivals) | {fmt(sl['sos_delay_priority_s'], pct=False)} s |",
+        f"| SOS delay reduction (link.py, simulated arrivals) | {fmt(sl['sos_delay_reduction'])} |",
     ]
     table = "\n".join(lines)
     print(table)

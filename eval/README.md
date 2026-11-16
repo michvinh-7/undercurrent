@@ -6,13 +6,15 @@
 | `review_labels.py` | Page through the set and accept or fix labels (`reviewed: true` once checked) |
 | `run_triage_eval.py` | Runs triage on a split and writes a results table with 95% CIs to `results/` |
 | `stats.py` | `bootstrap_ci()`: percentile bootstrap, pure Python |
+| `make_results_table.py` | Builds `results/RESULTS.md`: newest run per model, test-split numbers for the video, dev numbers labeled as tuning |
 
 ## Rules
 
 - **Tune on `dev` only.** Prompt changes, keyword rules and score weights get checked against `dev`. `test` is run to report numbers, never to decide changes. The script writes per-message misses only for `dev`.
 - **Separate from the sim.** This set stays apart from Alanna's simulated ground truth; neither is used to tune the other.
 - **Rerun before the video.** If a number looks too good, rerun it on held-out messages before it goes in the video (contract).
-- **Label the link.** Time-to-deliver comes from a *simulated link* until `hub/app/link.py` is wired in, and is labeled that way wherever it's shown.
+- **Label the arrivals.** Time-to-deliver runs messages through the hubs' real link code (`hub/app/link.py`), but arrival times are simulated. Say "simulated arrivals" wherever it's shown.
+- **Other message sets.** `--messages PATH` runs the same eval on any JSONL with the same fields (for example Alanna's simulator output).
 
 ## Labeling conventions
 
