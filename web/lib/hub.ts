@@ -30,3 +30,26 @@ export async function addEvent(event: NewEvent) {
   if (!res.ok) throw new Error(`Hub returned ${res.status}`);
   return (await res.json()) as HollowEvent;
 }
+
+export interface LinkStatus {
+  bandwidth_bps: number | null;
+  cut: boolean;
+  queued: number;
+  queued_bytes: number;
+}
+
+export async function getLink() {
+  const res = await fetch(`${hubUrl()}/link`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Hub returned ${res.status}`);
+  return (await res.json()) as LinkStatus;
+}
+
+export async function setLink(settings: { bandwidth_bps?: number; unlimited?: boolean; cut?: boolean }) {
+  const res = await fetch(`${hubUrl()}/link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error(`Hub returned ${res.status}`);
+  return (await res.json()) as LinkStatus;
+}
