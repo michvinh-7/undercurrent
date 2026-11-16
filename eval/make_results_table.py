@@ -44,6 +44,14 @@ METRICS: dict[str, list[tuple[str, str, bool]]] = {
         ("Hazard kept", "facts_kept.hazard", True),
         ("Average packet size (bytes)", "packet_bytes", False),
     ],
+    "fairness": [
+        ("Longest wait on the quiet level, priority only (s)", "quiet_level_worst_wait_priority_s", False),
+        ("Longest wait on the quiet level, fair scheduler (s)", "quiet_level_worst_wait_fair_s", False),
+        ("Average SOS delay, priority only (s)", "sos_delay_priority_s", False),
+        ("Average SOS delay, fair scheduler (s)", "sos_delay_fair_s", False),
+        ("Average urgent delay, priority only (s)", "urgent_delay_priority_s", False),
+        ("Average urgent delay, fair scheduler (s)", "urgent_delay_fair_s", False),
+    ],
 }
 
 
@@ -96,11 +104,13 @@ def main():
         "(`hub/app/link.py`) with simulated arrival times.",
         "",
     ]
-    for split in ("test", "dev"):
+    headings = {"test": "use these in the video", "dev": "tuning numbers, NOT for the video",
+                "synthetic": "synthetic scenario, say so in the video"}
+    for split in ("test", "synthetic", "dev"):
         for kind in METRICS:
             if (kind, split) not in runs:
                 continue
-            heading = "use these in the video" if split == "test" else "tuning numbers, NOT for the video"
+            heading = headings[split]
             out += [f"## {kind.capitalize()}, {split} split ({heading})", "", *table(kind, runs[(kind, split)]), ""]
     if not any(split == "test" for _, split in runs):
         out += ["**No test-split runs yet.** Finish tuning on dev, then run each eval once with `--split test`.", ""]

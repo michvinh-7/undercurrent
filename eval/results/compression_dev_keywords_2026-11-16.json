@@ -1,0 +1,55 @@
+{
+  "split": "dev",
+  "backend": "keywords",
+  "n": 8,
+  "date": "2026-11-16",
+  "budget_bytes": 200,
+  "packet_ok": [
+    0.75,
+    0.375,
+    1.0
+  ],
+  "sent_full": [
+    0.25,
+    0.0,
+    0.625
+  ],
+  "facts_kept": {
+    "level": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "people_count": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "injuries": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "hazard": [
+      0.4,
+      0.0,
+      0.8
+    ]
+  },
+  "facts_kept_n": {
+    "level": 6,
+    "people_count": 5,
+    "injuries": 1,
+    "hazard": 5
+  },
+  "packet_bytes": [
+    181.83333333333334,
+    174,
+    188.83333333333334
+  ],
+  "methods": {
+    "full": 2,
+    "squeeze": 6
+  },
+  "words_median": 163
+}
