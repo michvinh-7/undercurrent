@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (afternoon) by Michael
+**Last updated:** Tue 11/17 (evening) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -16,15 +16,15 @@ The demo is done when all five beats work on the flat console.
 | Demo beat | Status |
 |---|---|
 | 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
-| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 `link.py` cuts, queues and restores. Sync isn't started, so nothing crosses between hubs yet |
+| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side done (`michael/sync`, waiting for review): two real hubs, 200 of 200 alerts on both after 26 random cuts, 0 duplicates. Needs the console to show it |
 | 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done and tested: a forged event gets 403 "unknown key" and shows in `GET /rejected`. The console counter isn't built |
 | 4. An edited record: the chain check points to the exact row | 🟡 `GET /events/verify` already names the first bad row. The attack script and the console display aren't built |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ❌ Only the encrypted payload shape is defined (`{enc, nonce, ciphertext}`) |
 
-**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema and the hub checks are merged. Still open: sync, phone signing, the simulation, the console badges, and the minimum box.
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema and the hub checks are merged; sync is built and waiting for Tisya's review. Still open: phone signing, the simulation, the console badges, and the minimum box.
 
 **Blocking the most people:**
-1. **Sync (Michael).** Beats 2 and 1 both need events to cross between hubs, and headline number 3 waits on it.
+1. **Sync review (Tisya).** Sync is built on `michael/sync`; beats 1 and 2 need it merged.
 2. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
 3. **The level pair.** L34/L12 (rework plan) or L38/L12 (`sim/world.json`, the `HUB_ID` default). Pick it in the chat before anyone writes it in code.
 
@@ -70,7 +70,8 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] Labels: all 200 test messages reviewed. Tuned "urgent" on the 51 tuning messages only, then froze the prompt.
 - [x] Final held-back triage run (149 messages), keyword rules and local model. Gemini rerun still pending (needs internet).
 - [ ] Web setup PR: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(On `michael/rework-setup`, waiting for review.)*
-- [ ] Sync: one chain per origin hub in `log.py`; `sync.py` (union by id, through `gate.admit`); drain `link.py`'s queue; stress script with 0 lost and 0 duplicated.
+- [ ] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(Built and tested on `michael/sync`, waiting for Tisya's review. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
+  - *Stress test (simulated cuts, real hubs): 200 of 200 alerts on both hubs after 26 cuts, 0 duplicates, chains intact, 0 false rejections. `eval/run_sync_stress.py`.*
 - [ ] Attack script: forge, replay, edit, cut.
 - [ ] Security eval: the four headline numbers with 95% confidence intervals.
 - [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
