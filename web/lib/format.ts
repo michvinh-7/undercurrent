@@ -33,6 +33,8 @@ export function summary(e: HollowEvent): string {
       return [`Missing: ${str(p.name) ?? "unknown"}`, `last seen level ${p.last_seen_level ?? "?"}`, str(p.description)]
         .filter(Boolean)
         .join(" · ");
+    case "roster":
+      return `${p.action === "remove" ? "Removed" : "Added"} ${p.role === "operator" ? "operator" : "member"} ${String(p.pub ?? "?").slice(0, 8)}…`;
   }
 }
 
@@ -41,4 +43,5 @@ export const TYPE_LABEL: Record<HollowEvent["type"], string> = {
   hazard: "hazard",
   case: "symptoms",
   missing_person: "missing",
+  roster: "roster",
 };

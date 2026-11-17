@@ -12,7 +12,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from .models import Event, EventIn
+from .models import SIGNED_FIELDS, Event, EventIn
 
 GENESIS = "0" * 64
 
@@ -28,16 +28,41 @@ CREATE TABLE IF NOT EXISTS events (
     priority   REAL,
     payload    TEXT NOT NULL,
     prev_hash  TEXT NOT NULL,
-    hash       TEXT NOT NULL
+    hash       TEXT NOT NULL,
+    author_pub TEXT,
+    sig        TEXT,
+    source     TEXT,
+    device_id  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_level ON events(level);
+CREATE TABLE IF NOT EXISTS rejected (
+    seq         INTEGER PRIMARY KEY AUTOINCREMENT,
+    received_at TEXT NOT NULL,
+    reason      TEXT NOT NULL,
+    via         TEXT NOT NULL,
+    event       TEXT NOT NULL
+);
 """
+
+# Columns added for signing; added to older hub.db files on open.
+_SIGNING_COLUMNS = ("author_pub", "sig", "source", "device_id")
+_COLUMNS = (
+    "id", "type", "hub_id", "level", "created_at", "author", "priority", "payload",
+    "prev_hash", "hash", *_SIGNING_COLUMNS,
+)
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def compute_hash(fields: dict, prev_hash: str) -> str:
-    """SHA-256 over the event's content (stable key order) + prev_hash."""
-    content = {k: fields[k] for k in ("id", "type", "hub_id", "level", "created_at", "author", "payload")}
+    """SHA-256 over the event's content (stable key order) + prev_hash.
+
+    Covers SIGNED_FIELDS plus sig, leaving out null ones, so events stored before
+    signing existed hash exactly as they always did. priority is outside on purpose."""
+    content = {k: fields[k] for k in (*SIGNED_FIELDS, "sig") if fields.get(k) is not None}
     blob = json.dumps(content, sort_keys=True, separators=(",", ":")) + prev_hash
     return hashlib.sha256(blob.encode()).hexdigest()
 
@@ -49,39 +74,53 @@ class EventLog:
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        have = {r["name"] for r in self._db.execute("PRAGMA table_info(events)")}
+        for col in _SIGNING_COLUMNS:
+            if col not in have:
+                self._db.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT")
+        self._db.commit()
 
     def _last_hash(self) -> str:
         row = self._db.execute("SELECT hash FROM events ORDER BY seq DESC LIMIT 1").fetchone()
         return row["hash"] if row else GENESIS
 
     def append(self, event_in: EventIn) -> Event:
+        """Store an event. A signed event keeps the id, created_at and hub_id its signer set
+        (they're under the signature); the hub mints them only when the client left them out."""
         with self._lock:
-            fields = {
-                "id": str(uuid.uuid4()),
-                "type": event_in.type,
-                "hub_id": self.hub_id,
-                "level": event_in.level,
-                "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-                "author": event_in.author,
-                "payload": event_in.payload,
-            }
-            prev_hash = self._last_hash()
-            event = Event(
-                **fields,
-                priority=event_in.priority,
-                prev_hash=prev_hash,
-                hash=compute_hash(fields, prev_hash),
-            )
+            fields = event_in.model_dump()
+            fields["id"] = fields["id"] or str(uuid.uuid4())
+            fields["created_at"] = fields["created_at"] or now_iso()
+            fields["hub_id"] = fields["hub_id"] or self.hub_id
+            fields["prev_hash"] = self._last_hash()
+            fields["hash"] = compute_hash(fields, fields["prev_hash"])
+            event = Event(**fields)
+            row = event.model_dump()
+            row["payload"] = json.dumps(row["payload"])
             self._db.execute(
-                "INSERT INTO events (id, type, hub_id, level, created_at, author, priority, payload, prev_hash, hash)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    event.id, event.type, event.hub_id, event.level, event.created_at, event.author,
-                    event.priority, json.dumps(event.payload), event.prev_hash, event.hash,
-                ),
+                f"INSERT INTO events ({', '.join(_COLUMNS)}) VALUES ({', '.join('?' * len(_COLUMNS))})",
+                [row[c] for c in _COLUMNS],
             )
             self._db.commit()
             return event
+
+    def reject(self, event_in: EventIn, reason: str, fresh: bool = True) -> None:
+        """Keep a record of an event that failed the checks (feeds GET /rejected and the counter)."""
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO rejected (received_at, reason, via, event) VALUES (?, ?, ?, ?)",
+                (now_iso(), reason, "post" if fresh else "sync", event_in.model_dump_json()),
+            )
+            self._db.commit()
+
+    def rejected(self, limit: int = 100) -> tuple[int, list[dict]]:
+        """(total count, newest `limit` rejections)."""
+        total = self._db.execute("SELECT COUNT(*) FROM rejected").fetchone()[0]
+        rows = self._db.execute("SELECT * FROM rejected ORDER BY seq DESC LIMIT ?", (limit,)).fetchall()
+        return total, [{**dict(r), "event": json.loads(r["event"])} for r in rows]
+
+    def has(self, event_id: str) -> bool:
+        return self._db.execute("SELECT 1 FROM events WHERE id = ?", (event_id,)).fetchone() is not None
 
     def list(self, type: str | None = None, level: int | None = None, since: str | None = None) -> list[Event]:
         query, params = "SELECT * FROM events WHERE 1=1", []

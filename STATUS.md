@@ -151,9 +151,10 @@ Next: few-shot tuning for "urgent" (the local model calls most urgent messages r
 
 ## Open questions between people
 
-- **Everyone, now:** torch + transformers were added to `hub/requirements.txt`.
-  - Run `pip install -r hub/requirements.txt` again.
-  - On any laptop that will run compression, also run `hub/.venv/bin/python hub/scripts/download_nli.py` once, while you have internet (~740 MB).
+- **Everyone, now:** `hub/requirements.txt` now holds only what the hub needs, plus `pynacl` for signing. torch + transformers moved to `hub/requirements-ai.txt`.
+  - Run `pip install -r hub/requirements.txt` again (adds `pynacl`).
+  - On the UNO Q, install `hub/requirements.txt` only.
+  - Only on a laptop that will run the compression eval: `pip install -r hub/requirements-ai.txt`, then `hub/.venv/bin/python hub/scripts/download_nli.py` once, while you have internet (~740 MB).
 - **Everyone:** confirm `llama3.2:3b` runs on your laptop (`ollama run llama3.2:3b "say hi"`), and post how long it takes.
 - **Tisya:**
   - Phone submits now take ~1.4–3 s while the local model scores each report. If that's too slow for the demo, the alternative is to append first and score afterwards.

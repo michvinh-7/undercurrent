@@ -1,0 +1,4 @@
+# Only for compress.py (200-byte compression + NLI fact check), which is out of the demo.
+# Laptops that run the compression eval: pip install -r hub/requirements.txt -r hub/requirements-ai.txt
+torch>=2.4
+transformers>=4.44
