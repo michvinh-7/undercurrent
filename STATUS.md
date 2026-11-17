@@ -16,7 +16,7 @@ The demo is done when all five beats work on the flat console.
 | Demo beat | Status |
 |---|---|
 | 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
-| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side merged (PR #14): two real hubs, 200 of 200 alerts on both after 26 random cuts, 0 duplicates. Needs the console to show it |
+| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side merged (PRs #14, #19): 200 of 200 alerts on both hubs after 26 random cuts, 0 duplicates. Tested by hand on `/dashboard`: during a cut the sending hub shows "3 waiting to send" and none arrive; after restore all arrive. Needs the console to show the sending hub's link |
 | 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console counter isn't built |
 | 4. An edited record: the chain check points to the exact row | 🟡 Hub side done: 140 of 140 edits to the database caught at the exact row by `GET /events/verify`. The console display isn't built |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ❌ Only the encrypted payload shape is defined (`{enc, nonce, ciphertext}`) |
@@ -71,6 +71,7 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] Final held-back triage run (149 messages): keyword rules, local model and Gemini.
 - [x] Web setup: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(PR #12.)*
 - [x] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(PR #14. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
+  - *PR #19: while cut, the backlog shows in `GET /link` ("waiting to send") and drains on restore. Tested by hand with two hubs and the dashboard.*
 - [x] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(PR #15, `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
 - [ ] Security eval, the four headline numbers:
   - *1. Forged and replayed messages accepted: **0 of 300** (95% upper bound 1.0%); all 40 real member alerts accepted.*
@@ -96,7 +97,7 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 
 - [ ] By Tue night: test your board (blink an LED, read a button, read an analog pin) and post whether it works and has Wi-Fi.
   - *If it works: build the Directorate kill switch (a button that calls `POST /link`). If Tisya's board fails: it becomes the Canary box.*
-- [x] All 4 phone forms work end to end at phone width. *(Built by Michael; restyle anything.)*
+- [x] All 4 phone forms work end to end at phone width. *(Built by Michael; restyle anything. PR #19 fixed a hydration error from the random handle in `web/components/phone.tsx`: pull `main`.)*
 - [ ] `web/lib/sign.ts`: a keypair on first visit, kept in the browser; fetch `hub_id` from `GET /health`; sign every report with `canonicalBytes`.
 - [ ] `web/lib/cell.ts` first (encrypted payload shape, encrypt and decrypt), posted in the chat; then the cell message page.
 - [ ] Test on a real phone.
