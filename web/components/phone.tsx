@@ -8,16 +8,24 @@ import { useEffect, useState } from "react";
 import { addEvent } from "@/lib/hub";
 import type { EventType } from "@/lib/types";
 
-/** localStorage-backed state. Falls back to memory if storage is blocked (private mode). */
+/**
+ * localStorage-backed state. Falls back to memory if storage is blocked (private mode).
+ * A function `initial` (e.g. a random handle) runs only in the browser, after the page
+ * loads: running it during render would give the server and the browser different
+ * values and break hydration. Until then the value is undefined.
+ */
 export function useStored<T>(key: string, initial: T | (() => T)) {
-  const [value, setValue] = useState<T>(initial);
+  const lazy = typeof initial === "function";
+  const [value, setValue] = useState<T>(lazy ? (undefined as T) : (initial as T));
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    let next: T | undefined;
     try {
       const raw = localStorage.getItem(key);
-      if (raw !== null) setValue(JSON.parse(raw));
-      else localStorage.setItem(key, JSON.stringify(typeof initial === "function" ? (initial as () => T)() : initial));
+      if (raw !== null) next = JSON.parse(raw);
     } catch {}
+    if (next === undefined && lazy) next = (initial as () => T)();
+    if (next !== undefined) setValue(next);
     setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -123,7 +131,7 @@ export function ReportForm({
   const [level, setLevel] = useStored<number | null>("uc-level", null);
   const [author] = useStored("uc-author", newHandle);
   const [sent, setSent] = useState<Sent>({ state: "idle" });
-  const ready = payload !== null && level !== null && sent.state !== "sending";
+  const ready = payload !== null && level !== null && !!author && sent.state !== "sending";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -176,7 +184,7 @@ export function ReportForm({
         {sent.state === "error" && <p className="rounded-lg border border-[var(--danger)] px-3 py-3">{sent.message}</p>}
       </div>
 
-      <p className="text-xs text-[var(--muted)]">Sent as {author}. Your real name is never attached unless you type it.</p>
+      <p className="text-xs text-[var(--muted)]">Sent as {author ?? "an anonymous handle"}. Your real name is never attached unless you type it.</p>
     </form>
   );
 }

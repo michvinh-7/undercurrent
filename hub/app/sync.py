@@ -15,7 +15,8 @@ Why nothing is lost:
 Why nothing is duplicated: the receiver stores an id once; a repeat is "duplicate".
 
 While the link is cut, the hub doesn't ask peers for their ids either: nothing
-crosses a cut link. One outbound link per hub, pushed to every peer: right for the
+crosses a cut link. It still queues new events against the last id list each peer
+sent, so the backlog shows in GET /link ("queued") and drains on restore. One outbound link per hub, pushed to every peer: right for the
 two-hub demo (multi-hop is out of scope).
 
 Run it: set HUB_PEERS (comma-separated peer URLs) and the hub starts a sync loop
@@ -63,6 +64,7 @@ class Syncer:
         self.peers = [p for p in peers if p]
         self.transport = transport
         self.in_flight: set[str] = set()
+        self.peer_ids: dict[str, set[str]] = {}  # the last id list each peer sent
         self.last_ok: dict[str, float] = {}
         self.last_error: dict[str, str] = {}
         self._lock = threading.Lock()  # guards the link and in_flight; never held during a push
@@ -99,16 +101,22 @@ class Syncer:
 
     def tick(self) -> None:
         self.deliver(self._poll())
-        if self.link.is_cut:
-            return
         held = None
         for peer in self.peers:
-            try:
-                theirs = self.transport.ids(peer)
-                self._ok(peer)
-            except Exception as err:
-                self.last_error[peer] = str(err)
-                continue
+            if self.link.is_cut:
+                # Nothing crosses a cut link, not even the list of ids. Queue against the
+                # last list the peer sent, so the backlog shows in GET /link ("queued")
+                # and drains when the link is restored.
+                theirs = self.peer_ids.get(peer)
+                if theirs is None:
+                    continue
+            else:
+                try:
+                    theirs = self.peer_ids[peer] = self.transport.ids(peer)
+                    self._ok(peer)
+                except Exception as err:
+                    self.last_error[peer] = str(err)
+                    continue
             held = held if held is not None else self.log.list()
             with self._lock:
                 for e in held:
