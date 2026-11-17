@@ -13,10 +13,11 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from .ai_routes import router as ai_router
-from .ingest import score
+from .gate import Gate, Rejected
 from .link import Link
 from .log import EventLog
 from .models import Event, EventIn, EventType
+from .roster import Roster
 from .stream import event_stream
 
 load_dotenv()
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 log = EventLog(HUB_DB, HUB_ID)
+gate = Gate(log, Roster.from_env(), HUB_ID)  # signature, roster and replay checks (hub/app/gate.py)
 app.include_router(ai_router)  # POST /triage, POST /organize
 _bps = float(os.getenv("LINK_BANDWIDTH_BPS", "0") or 0)
 link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs; sync.py will drain it
@@ -46,7 +48,32 @@ def health():
 
 @app.post("/events", response_model=Event, status_code=201)
 def add_event(event: EventIn):
-    return log.append(score(event))  # adds a priority before storing (hub/app/ingest.py)
+    """Checks the event (hub/app/gate.py), scores its priority (hub/app/ingest.py), stores it.
+    A failed check returns 403 with the reason and is listed in GET /rejected."""
+    try:
+        return gate.admit(event, fresh=True)
+    except Rejected as r:
+        raise HTTPException(403, r.reason) from None
+
+
+@app.get("/rejected")
+def list_rejected(limit: int = Query(default=100, ge=1, le=1000)):
+    """Events that failed the checks, newest first. `total` feeds the "forgeries blocked" counter."""
+    total, items = log.rejected(limit)
+    return {"total": total, "rejected": items}
+
+
+@app.get("/roster")
+def get_roster():
+    return {"require_signed": gate.require_signed, "members": gate.roster.snapshot()}
+
+
+@app.post("/roster", response_model=Event, status_code=201)
+def add_roster_event(event: EventIn):
+    """Add or remove a member. The event must be type "roster" and signed by an operator."""
+    if event.type != "roster":
+        raise HTTPException(422, 'type must be "roster"')
+    return add_event(event)
 
 
 @app.get("/events", response_model=list[Event])

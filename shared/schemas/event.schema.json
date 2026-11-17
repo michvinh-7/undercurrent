@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "undercurrent/event",
   "title": "Undercurrent event",
-  "description": "One report in a hub's append-only log. Hub sets id, hub_id, created_at, prev_hash, hash.",
+  "description": "One report in a hub's append-only log. Signed: the signer sets id, created_at and hub_id, then signs id, type, hub_id, level, created_at, author, payload, author_pub, source and device_id (null ones left out) as compact JSON with keys sorted at every depth, UTF-8; see hub/app/crypto.py. priority is never signed. Unsigned (no sig): the hub sets id, hub_id and created_at. The hub always sets prev_hash and hash.",
   "type": "object",
   "required": ["id", "type", "hub_id", "level", "created_at", "author", "payload", "prev_hash", "hash"],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
-    "type": { "enum": ["checkin", "hazard", "case", "missing_person"] },
+    "type": { "enum": ["checkin", "hazard", "case", "missing_person", "roster"] },
     "hub_id": { "type": "string", "examples": ["hub-L38"] },
     "level": { "type": "integer", "minimum": 1, "maximum": 40 },
     "created_at": { "type": "string", "format": "date-time" },
@@ -15,7 +15,11 @@
     "priority": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Set by the AI; null until scored" },
     "payload": { "type": "object", "description": "Shape depends on type; see $defs" },
     "prev_hash": { "type": "string" },
-    "hash": { "type": "string" }
+    "hash": { "type": "string" },
+    "author_pub": { "type": ["string", "null"], "description": "Signer's Ed25519 public key, base64. Must be on the roster" },
+    "sig": { "type": ["string", "null"], "description": "Ed25519 signature over the signed fields, base64" },
+    "source": { "enum": ["resident", "sensor", null], "description": "null means resident. Sensor alerts are type hazard; the SOS button is checkin with status need_help" },
+    "device_id": { "type": ["string", "null"], "description": "Canary box id, sensor events only", "examples": ["canary-34"] }
   },
   "$defs": {
     "checkin": {
@@ -57,6 +61,26 @@
         "last_seen_at": { "type": "string", "format": "date-time" },
         "description": { "type": "string" },
         "photo_id": { "type": ["string", "null"] }
+      }
+    },
+    "roster": {
+      "type": "object",
+      "description": "Adds or removes a member. Must be signed by an operator",
+      "required": ["action", "pub"],
+      "properties": {
+        "action": { "enum": ["add", "remove"] },
+        "pub": { "type": "string" },
+        "role": { "enum": ["member", "operator"] }
+      }
+    },
+    "encrypted": {
+      "type": "object",
+      "description": "A cell message's payload, readable only with the cell's shared key. Hubs relay it without reading it",
+      "required": ["enc", "nonce", "ciphertext"],
+      "properties": {
+        "enc": { "const": true },
+        "nonce": { "type": "string" },
+        "ciphertext": { "type": "string" }
       }
     }
   }
