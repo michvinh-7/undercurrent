@@ -20,68 +20,20 @@ Say "simulated cuts" wherever the number is shown.
 
 import argparse
 import json
-import os
 import random
-import subprocess
 import sys
 import tempfile
 import time
-import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from statistics import median
 
 import httpx
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "hub"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app import crypto  # noqa: E402
+from hub_procs import ROOT, crypto, signed_alert, start_hub, stop, wait_up  # noqa: E402
 from stats import bootstrap_ci, fmt  # noqa: E402
-
-
-def start_hub(hub_id, port, peer_port, tmp, args):
-    env = {
-        **os.environ,
-        "HUB_ID": hub_id,
-        "HUB_DB": str(Path(tmp) / f"{hub_id}.db"),
-        "HUB_PEERS": f"http://127.0.0.1:{peer_port}",
-        "REQUIRE_SIGNED": "1",
-        "ROSTER_FILE": str(Path(tmp) / "roster.json"),
-        "TRIAGE_ON_INGEST": "0",
-        "LINK_BANDWIDTH_BPS": str(args.bandwidth),
-        "SYNC_INTERVAL_S": str(args.interval),
-    }
-    log = open(Path(tmp) / f"{hub_id}.log", "w")
-    return subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "warning"],
-        cwd=ROOT / "hub", env=env, stdout=log, stderr=subprocess.STDOUT,
-    )
-
-
-def wait_up(client, url, timeout=30):
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            if client.get(f"{url}/health").status_code == 200:
-                return
-        except httpx.HTTPError:
-            pass
-        time.sleep(0.2)
-    raise SystemExit(f"hub at {url} didn't start; see its log in the temp folder")
-
-
-def alert(hub_id, level, key, rng):
-    fields = {
-        "id": str(uuid.uuid4()), "type": "hazard", "hub_id": hub_id, "level": level,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "author": f"canary-{level}", "source": "sensor", "device_id": f"canary-{level}",
-        "payload": {"kind": rng.choice(["flooding", "bad_air", "heat"]), "severity": rng.choice(["low", "medium", "high"])},
-    }
-    signed = crypto.sign(fields, key)
-    signed["priority"] = round(rng.random(), 2)  # outside the signature, like the hub's own score
-    return signed
 
 
 def main():
@@ -106,7 +58,11 @@ def main():
 
     tmp = tempfile.mkdtemp(prefix="sync-stress-")
     (Path(tmp) / "roster.json").write_text(json.dumps([{"pub": crypto.public_key(k), "role": "member"} for k in keys]))
-    procs = [start_hub(hub_ids[i], ports[i], ports[1 - i], tmp, args) for i in (0, 1)]
+    procs = [
+        start_hub(hub_ids[i], ports[i], tmp, peers=[ports[1 - i]],
+                  LINK_BANDWIDTH_BPS=args.bandwidth, SYNC_INTERVAL_S=args.interval)
+        for i in (0, 1)
+    ]
     client = httpx.Client(timeout=10)
     sent: set[str] = set()
     rounds, cuts_total = [], 0
@@ -117,7 +73,7 @@ def main():
             cuts = 0
             for _ in range(args.alerts):
                 i = rng.randrange(2)
-                res = client.post(f"{urls[i]}/events", json=alert(hub_ids[i], levels[i], rng.choice(keys), rng))
+                res = client.post(f"{urls[i]}/events", json=signed_alert(hub_ids[i], levels[i], rng.choice(keys), rng))
                 if res.status_code != 201:
                     raise SystemExit(f"post refused: {res.status_code} {res.text}")
                 sent.add(res.json()["id"])
@@ -151,10 +107,7 @@ def main():
         verify = [client.get(f"{u}/events/verify").json() for u in urls]
         rejected = [client.get(f"{u}/rejected").json()["total"] for u in urls]
     finally:
-        for p in procs:
-            p.terminate()
-        for p in procs:
-            p.wait(timeout=10)
+        stop(procs)
 
     last = rounds[-1]
     results = {

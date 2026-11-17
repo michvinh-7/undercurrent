@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (evening) by Michael
+**Last updated:** Tue 11/17 (night) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -16,19 +16,19 @@ The demo is done when all five beats work on the flat console.
 | Demo beat | Status |
 |---|---|
 | 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
-| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side done (`michael/sync`, waiting for review): two real hubs, 200 of 200 alerts on both after 26 random cuts, 0 duplicates. Needs the console to show it |
-| 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done and tested: a forged event gets 403 "unknown key" and shows in `GET /rejected`. The console counter isn't built |
-| 4. An edited record: the chain check points to the exact row | 🟡 `GET /events/verify` already names the first bad row. The attack script and the console display aren't built |
+| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side merged (PR #14): two real hubs, 200 of 200 alerts on both after 26 random cuts, 0 duplicates. Needs the console to show it |
+| 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console counter isn't built |
+| 4. An edited record: the chain check points to the exact row | 🟡 Hub side done: 140 of 140 edits to the database caught at the exact row by `GET /events/verify`. The console display isn't built |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ❌ Only the encrypted payload shape is defined (`{enc, nonce, ciphertext}`) |
 
-**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema and the hub checks are merged; sync is built and waiting for Tisya's review. Still open: phone signing, the simulation, the console badges, and the minimum box.
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Still open: phone signing, the simulation, the console badges, and the minimum box.
 
 **Blocking the most people:**
-1. **Sync review (Tisya).** Sync is built on `michael/sync`; beats 1 and 2 need it merged.
-2. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
+1. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
+2. **The console (Taheful).** Beats 2, 3 and 4 work on the hub; they need the console to show them.
 3. **The level pair.** L34/L12 (rework plan) or L38/L12 (`sim/world.json`, the `HUB_ID` default). Pick it in the chat before anyone writes it in code.
 
-**Before the web work starts:** the `michael/rework-setup` PR adds every web dependency at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. After it merges, run `npm install` in `web/`, and nobody adds a dependency without posting first.
+**Web setup (merged, PR #12):** every web dependency is in at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. Run `npm install` in `web/`. Nobody adds a dependency without posting first.
 
 **Working branches:** renamed Tue 11/17 for the rework, all starting from that day's `main`. The old ones are deleted.
 
@@ -69,11 +69,14 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] `web/lib/canonical.ts`: the JS side of signing, checked against Python with tweetnacl.
 - [x] Labels: all 200 test messages reviewed. Tuned "urgent" on the 51 tuning messages only, then froze the prompt.
 - [x] Final held-back triage run (149 messages), keyword rules and local model. Gemini rerun still pending (needs internet).
-- [ ] Web setup PR: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(On `michael/rework-setup`, waiting for review.)*
-- [ ] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(Built and tested on `michael/sync`, waiting for Tisya's review. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
-  - *Stress test (simulated cuts, real hubs): 200 of 200 alerts on both hubs after 26 cuts, 0 duplicates, chains intact, 0 false rejections. `eval/run_sync_stress.py`.*
-- [ ] Attack script: forge, replay, edit, cut.
-- [ ] Security eval: the four headline numbers with 95% confidence intervals.
+- [x] Web setup: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(PR #12.)*
+- [x] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(PR #14. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
+- [ ] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(Built on `michael/sync`: `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
+- [ ] Security eval, the four headline numbers:
+  - *1. Forged and replayed messages accepted: **0 of 300** (95% upper bound 1.0%); all 40 real member alerts accepted.*
+  - *2. Edited records caught at the exact row: **140 of 140** (95% upper bound on misses 2.1%). Known limits, not counted: changing `priority`, and deleting the newest row (sync restores it from the other hub).*
+  - *3. Alerts delivered after random link cuts: **200 of 200**, 0 duplicates (simulated cuts).*
+  - *4. Probe to the alert on the other hub: waits on the box.*
 - [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
 - [ ] Results slide; practice answering "how do you know it works?"
 

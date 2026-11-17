@@ -109,6 +109,8 @@ class Gate:
             if held.hash == e.hash:
                 return "duplicate"
             return self._reject_synced(e, "conflict: same id, different content")
+        if e.hub_id == self.hub_id:  # only this hub writes its own chain
+            return self._reject_synced(e, "claims to come from this hub")
         if compute_hash(e.model_dump(), e.prev_hash) != e.hash:
             return self._reject_synced(e, "bad hash")
         reason = self.check(e, fresh=False)

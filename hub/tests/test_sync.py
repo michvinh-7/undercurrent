@@ -246,3 +246,13 @@ def test_sync_routes(pair):
     assert r.status_code == 200 and r.json()["stored"] == 1
     assert client.get("/sync/ids").json() == {"hub_id": "hub-L12", "ids": [e.id]}
     assert client.get("/sync/status").json()["in_flight"] == 0
+
+
+def test_synced_event_claiming_to_be_from_this_hub_is_rejected(pair):
+    a, b, _ = pair
+    e = post(b, level=12)  # a real event of B's
+    b.log._db.execute("DELETE FROM events")  # pretend B never stored it
+    b.log._db.commit()
+    with pytest.raises(Rejected, match="this hub"):
+        b.gate.admit_synced(e)
+    assert b.receive([post(a)])["stored"] == 1  # other hubs' events still go through

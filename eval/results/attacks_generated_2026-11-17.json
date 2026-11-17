@@ -1,0 +1,165 @@
+{
+  "split": "attacks",
+  "backend": "hub-checks",
+  "date": "2026-11-17",
+  "seed": 0,
+  "real_sent": 40,
+  "real_accepted": 40,
+  "attacks": {
+    "forged": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "unknown key": 25
+      }
+    },
+    "impersonated": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "bad signature": 25
+      }
+    },
+    "tampered": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "bad signature": 25
+      }
+    },
+    "replayed": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "replay: duplicate id": 25
+      }
+    },
+    "re-id replay": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "bad signature": 25
+      }
+    },
+    "wrong hub": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "addressed to hub-L12, not this hub": 25
+      }
+    },
+    "stale": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "replay: outside the time window": 25
+      }
+    },
+    "unsigned": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "unsigned": 25
+      }
+    },
+    "roster grab": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "roster: signer is not an operator": 25
+      }
+    },
+    "sync forged": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "deferred": 25
+      }
+    },
+    "sync tampered": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "rejected": 25
+      }
+    },
+    "sync own-hub": {
+      "n": 25,
+      "accepted": 0,
+      "outcomes": {
+        "rejected": 25
+      }
+    }
+  },
+  "attack_n": 300,
+  "attack_accepted": 0,
+  "stored_events": 40,
+  "only_real_stored": true,
+  "rejected_counter": 275,
+  "verify": {
+    "chain_intact": true,
+    "first_bad_event": null,
+    "gaps": {}
+  },
+  "edits": {
+    "payload": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "level": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "author": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "created_at": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "rehash": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "rehash chain": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "delete": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
+    "priority": {
+      "n": 20,
+      "caught_exact_row": 0,
+      "flagged": 0,
+      "counted": false
+    },
+    "delete newest": {
+      "n": 20,
+      "caught_exact_row": 0,
+      "flagged": 0,
+      "counted": false
+    }
+  },
+  "edit_n": 140,
+  "edit_caught": 140,
+  "attack_accept_upper95": 0.01,
+  "edit_miss_upper95": 0.02142857142857143,
+  "passed": true
+}
