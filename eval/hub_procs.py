@@ -52,7 +52,11 @@ def stop(procs: list[subprocess.Popen]) -> None:
     for p in procs:
         p.terminate()
     for p in procs:
-        p.wait(timeout=10)
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:  # an open live feed keeps uvicorn waiting
+            p.kill()
+            p.wait(timeout=5)
 
 
 def iso(t: datetime) -> str:

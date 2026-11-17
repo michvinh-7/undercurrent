@@ -1,0 +1,32 @@
+[
+  {
+    "id": "m047",
+    "text": "lights out on all of 29 for 6 hours, elderly in the east wing scared and cold",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m059",
+    "text": "grandpa confused and not making sense since this morning, very weak",
+    "truth": "urgent",
+    "pred": "routine"
+  },
+  {
+    "id": "m102",
+    "text": "small puddle by the vent on 15, maintenance knows",
+    "truth": "routine",
+    "pred": "urgent"
+  },
+  {
+    "id": "m107",
+    "text": "level 9 a bit warm today, fans running",
+    "truth": "routine",
+    "pred": "urgent"
+  },
+  {
+    "id": "m140",
+    "text": "29 all accounted for, nobody hurt",
+    "truth": "routine",
+    "pred": "urgent"
+  }
+]
