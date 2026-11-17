@@ -1,162 +1,115 @@
 # Team status
 
-**Last updated:** Mon 11/16 (evening) by Michael
+**Last updated:** Tue 11/17 (afternoon) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
-Tasks are copied from the team contract. `[x]` means done and in the repo. Anything partly done stays unchecked, with a note saying what's left.
+The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
 
-**How to update:** edit your own section when you finish something, and change the date above. Keep notes to one line.
+**How to update:** edit only your own section when you finish something. Michael updates the date line. Keep notes to one line.
 
 ---
 
-## Tonight: base integration (Mon 11/16)
+## Where the demo stands
 
-The base has to work end to end before any upgrade starts.
+The demo is done when all five beats work on the flat console.
 
-| Base checklist item | Status |
+| Demo beat | Status |
 |---|---|
-| A phone opens the hub page and submits a check-in, hazard, case or missing person | 🟡 All 4 forms work end to end in a phone-sized browser. The phone opens `http://<laptop-ip>:3000` for now, until the hub serves the pages itself. Not yet tried on a real phone |
-| It's saved to the hub's log and appears on the dashboard | ✅ Tested end to end: report saved, then shown live on `/dashboard` |
-| The AI turns a messy message into a structured record with a priority score | ✅ Merged: every report gets a priority as it arrives (tested with the live model), so the dashboard shows real priorities. The full structured record comes from `POST /triage`; only the priority is saved with the event |
-| Two hubs edit separately, reconnect and merge with nothing lost | ❌ Sync isn't started |
-| The hazard map and Truth screen show community numbers next to the official ones | ❌ Not started |
-| The online mirror is live | ❌ Not started |
+| 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
+| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 `link.py` cuts, queues and restores. Sync isn't started, so nothing crosses between hubs yet |
+| 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done and tested: a forged event gets 403 "unknown key" and shows in `GET /rejected`. The console counter isn't built |
+| 4. An edited record: the chain check points to the exact row | 🟡 `GET /events/verify` already names the first bad row. The attack script and the console display aren't built |
+| 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ❌ Only the encrypted payload shape is defined (`{enc, nonce, ciphertext}`) |
+
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema and the hub checks are merged. Still open: sync, phone signing, the simulation, the console badges, and the minimum box.
 
 **Blocking the most people:**
-1. **Sync (Tisya).** "Zero lost reports" is our core claim, and two base items depend on it.
-2. **Hazard map and Truth screen (Taheful),** plus the official numbers they compare against (Alanna).
-3. **The online mirror (Tisya).**
+1. **Sync (Michael).** Beats 2 and 1 both need events to cross between hubs, and headline number 3 waits on it.
+2. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
+3. **The level pair.** L34/L12 (rework plan) or L38/L12 (`sim/world.json`, the `HUB_ID` default). Pick it in the chat before anyone writes it in code.
 
-**Working branches:** one per person, all matching `main` as of Mon 11/16 evening.
+**Before the web work starts:** the `michael/rework-setup` PR adds every web dependency at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. After it merges, run `npm install` in `web/`, and nobody adds a dependency without posting first.
 
-| Person | Branch |
-|---|---|
-| Tisya | `tisya/stream-and-link` |
-| Michael | `michael/ai` |
-| Alanna | `alanna/phone-pages` |
-| Taheful | `taheful/dashboard` |
-
-If you already have yours checked out, run `git pull` (a fast-forward, no conflicts). Everything built so far is merged into `main`. Nothing from Tisya, Alanna or Taheful has been pushed yet: push your work so this page can count it.
+**Who touches which files:** `hub/` and `eval/` Michael · `firmware/` and `bridge/` Tisya · `sim/`, the phone pages, `web/lib/hub.ts`, `sign.ts` and `cell.ts` Alanna · `web/app/dashboard`, `truth`, `hollow`, `layout.tsx` and `globals.css` Taheful. Ask the owner before changing someone else's file.
 
 ---
 
-## Person 1: Hubs, sync and network (Tisya)
+## Tisya: the Canary box
 
-- [x] Kickoff: agree on the event format; set up the repo, `.env.example` and the FastAPI skeleton. *(Done in the scaffold.)*
-- [x] `hub.py`: endpoints to add an event, list events (filtered by type and level) and stream new events.
-  - *Lives in `hub/app/main.py`.*
-  - *Includes the live stream (`GET /events/stream`), built by Michael and merged.*
-- [x] `log.py`: SQLite append-only log, each event hash-chained to the one before it. *(Includes tamper-detection tests.)*
-- [ ] Serve the phone pages from the hub, so a phone on the hub's Wi-Fi needs no internet and no app.
-- [ ] `sync.py`: two hubs exchange the events the other is missing; merge = union by id; verify the hash chain on arrival.
-- [ ] Test: two hubs edit offline, reconnect and compare counts, with zero lost or duplicated events.
-- [ ] `link.py`: adjustable bandwidth between hubs (bytes per second); the queue sends highest priority first.
-  - *Bandwidth, priority order, cut/restore and `GET/POST /link` are built, tested and merged.*
-  - *It isn't carrying anything between hubs yet, because that needs sync.*
-- [ ] Deploy one demo hub online (Render, Fly.io or Azure) for the judges' mirror.
-- [ ] Upgrade 1: each teammate runs a hub, connected peer to peer (Tailscale or WebRTC); messages hop through other hubs when there's no direct path; a killed hub catches up when it returns.
-- [ ] Upgrade 3 defense: trust weighting (who vouches for whom) so fake reports count less; flag bursts of fakes from one hub or author; measure how close the Truth estimate stays to the real count as fakes rise from 0% to 30%.
-- [ ] Freeze to video: write the architecture slide and practice explaining sync in one sentence.
+- [ ] Email PhysicalComputing@umass.edu to confirm parts, then the makerspace run: bin parts, a PC fan, and check for an air sensor.
+- [ ] UNO Q setup: App Lab, Wi-Fi, blink an LED, hello-world Python app.
+- [ ] SOS button, LED and buzzer, then the water probe (3 seconds past threshold before alerting).
+- [ ] Hub on the board: install `hub/requirements.txt` only (no torch now), with `TRIAGE_ON_INGEST=0`.
+- [ ] Bridge: readings from the sketch to Python on the board.
+- [ ] `bridge/canary_bridge.py`: sign each alert with `crypto.sign` and post it to the hub on the board.
+- [ ] Temperature, then the fan monitor if there's time.
+- [ ] Film the box shots.
+- [ ] Review the sync PR.
 
-**Done when:** two hubs can be cut off, edited and reconnected on camera with every report accounted for, and the online mirror is live.
+**Done when:** water on the probe makes a verified alert appear on the other hub, on camera.
 
 ---
 
-## Person 2: AI and evaluation (Michael)
+## Michael: channel core, sync and numbers
 
-- [ ] Kickoff: install Ollama and pick a small (3B-class) model that runs on all four laptops.
-  - *`llama3.2:3b` is picked and runs on Michael's laptop (~1.8 s per message).*
-  - *Each teammate still needs to confirm it runs on theirs.*
-- [x] `triage.py`: messy text in, JSON out (type, level, injuries, hazard, people count, priority 0 to 1); retry once on broken JSON, then fall back to keyword rules.
-  - *Priority is computed by code, not by the model.*
-  - *A fix for the local model mixing up fields cut keyword fallback from 16% to 4%.*
-  - *Merged into the hub: every report is scored as it arrives.*
-- [ ] Write and label ~200 test messages (SOS, urgent, routine, fake) before tuning anything; never tune on the test set.
-  - *200 are drafted, 51 for tuning and 149 held back. Michael hasn't reviewed the labels yet.*
-- [ ] Measure SOS ranked first (%), and time-to-deliver for critical messages vs first-come-first-served on a slow link.
-  - *Set up: delivery times now run through the hubs' real `link.py` (arrival times simulated).*
-  - *Only tuning-set numbers so far. The final run on the held-back messages waits on the label review.*
-- [x] `organize.py`: medical reports in a fixed responder format (symptoms + photo + medical card); documents, never diagnoses.
-- [x] Cloud model fallback (Gemini) for the online mirror only. *(`gemini-3.1-flash-lite`, tested.)*
-- [ ] Upgrade 2: compress each message to a 200-byte packet; a fact-checking model (DeBERTa NLI) confirms location, injuries, hazard and count survived; reject and retry if not.
-  - *Built, tested and merged, but not wired into the hub yet (base first).*
-  - *Tuning set: 75% of long pleas fit 200 bytes; level and people count kept 100%, hazard 80%; the rest are safely sent in full.*
-- [ ] Upgrade 2: fair scheduler, urgent first, but no level waits longer than a set limit.
-  - *Built, tested and merged, but not wired into `link.py` yet.*
-  - *Synthetic scenario: the quiet level's worst wait drops from 410 s to 77 s, with SOS unchanged and urgent messages waiting 22 → 40 s.*
-- [ ] Results table: every number with a bootstrapped 95% confidence interval.
-  - *Set up: `eval/make_results_table.py` builds `eval/results/RESULTS.md`.*
-  - *Final numbers wait on the test-set runs.*
-- [ ] Freeze to video: write the results slide and practice answering "how do you know it works?"
+- [x] Schema: the signer sets `id`, `created_at` and `hub_id`; new fields `author_pub`, `sig`, `source`, `device_id`; new `roster` event type. *(PR #10.)*
+- [x] Hub checks: signature, roster and replay on `POST /events`; `GET /rejected`, `GET/POST /roster`; `gate.admit(event, fresh=False)` for sync. *(71 tests pass; checked against a running hub.)*
+- [x] `hub/requirements.txt` split: hub + `pynacl`; torch and transformers moved to `hub/requirements-ai.txt`.
+- [x] `web/lib/canonical.ts`: the JS side of signing, checked against Python with tweetnacl.
+- [x] Labels: all 200 test messages reviewed. Tuned "urgent" on the 51 tuning messages only, then froze the prompt.
+- [x] Final held-back triage run (149 messages), keyword rules and local model. Gemini rerun still pending (needs internet).
+- [ ] Web setup PR: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(On `michael/rework-setup`, waiting for review.)*
+- [ ] Sync: one chain per origin hub in `log.py`; `sync.py` (union by id, through `gate.admit`); drain `link.py`'s queue; stress script with 0 lost and 0 duplicated.
+- [ ] Attack script: forge, replay, edit, cut.
+- [ ] Security eval: the four headline numbers with 95% confidence intervals.
+- [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
+- [ ] Results slide; practice answering "how do you know it works?"
 
-**Done when:** every message on screen has a priority and a structured record, and every claim in the video has a measured number behind it.
+**Triage numbers (149 held-back messages, final; supporting numbers in the rework):**
 
-**Current numbers (tuning set only, not final):**
+| Model | Urgency accuracy | SOS ranked first | SOS recall | Fakes caught |
+|---|---|---|---|---|
+| llama3.2:3b, local | 76% [69, 83] | 62% [52, 71] | 88% | 27% |
+| Keyword rules only | 54% | 37% | 27% | 27% |
 
-| Model | Urgency accuracy | SOS ranked first | Fell back to keywords |
-|---|---|---|---|
-| llama3.2:3b, local | 61% | 76% | 4% |
-| Gemini, cloud | 98% | 89% | 0% |
-
-Next: few-shot tuning for "urgent" (the local model calls most urgent messages routine), after the label review.
+The priority queue cuts SOS delay by 72% against first-come-first-served on the slow link (simulated arrivals). Full table: [`eval/results/RESULTS.md`](eval/results/RESULTS.md).
 
 ---
 
-## Person 3: The Hollow and the phone app (Alanna)
+## Alanna: phones, simulation, and the backup board
 
-- [ ] Kickoff: write the world sheet: 40 levels, which levels are deep, hub locations, a blackout → water failure → outbreak timeline.
-  - *`sim/world.json` has placeholder values from the scaffold, waiting for Alanna's real version.*
-- [ ] Phone pages (Next.js, phone width): check-in, hazard report, symptom report with photo, missing person; each posts one event.
-  - *All 4 forms are built by Michael and tested end to end at phone width; each posts one event in the schema's shape. They remember the resident's level and give them an anonymous handle.*
-  - *Left: the photo on the symptom report, which needs somewhere on the hub to store photos (see the next task).*
-  - *Alanna: restyle or reword anything you like. Shared pieces are in `web/components/phone.tsx`.*
-- [ ] Photos stay on the hub where they were taken; only text and a tiny thumbnail sync.
-- [ ] Medical card stored encrypted on the phone (allergies, conditions, medications) that fills the symptom report.
-- [ ] `simulate.py`: generates residents' messages over time from the crisis timeline, with the true case count per level saved separately. *(Stub only.)*
-- [ ] The Directorate's official numbers: plausible but falsified, with the lies recorded so we can score the Truth screen.
-- [ ] Hand Person 2 a slice of messages for labeling; keep the ground truth away from anything that tunes the AI.
-- [ ] Upgrade 3: scale to ~10,000 residents across 40 levels; attack mode injects fake reports (from 0% to 30%), jams a hub and publishes false numbers.
-- [ ] Freeze to video: play the resident on camera and write the "why the deep levels" slide.
+- [ ] By Tue night: test your board (blink an LED, read a button, read an analog pin) and post whether it works and has Wi-Fi.
+  - *If it works: build the Directorate kill switch (a button that calls `POST /link`). If Tisya's board fails: it becomes the Canary box.*
+- [x] All 4 phone forms work end to end at phone width. *(Built by Michael; restyle anything.)*
+- [ ] `web/lib/sign.ts`: a keypair on first visit, kept in the browser; fetch `hub_id` from `GET /health`; sign every report with `canonicalBytes`.
+- [ ] `web/lib/cell.ts` first (encrypted payload shape, encrypt and decrypt), posted in the chat; then the cell message page.
+- [ ] Test on a real phone.
+- [ ] `sim/world.json` with the agreed level pair (it still has scaffold placeholders).
+- [ ] `sim/simulate.py`: simulated canaries and residents on other levels, each with its own key, preloaded through `ROSTER_FILE`. *(Stub only; `feature/simulation` is an empty "dummy push".)*
 
-**Done when:** a phone can file every report type, and the simulation produces a crisis with true numbers we can score against.
-
-*Note: trust weighting was in this section in the original contract. The updated contract moves it to Person 1's Upgrade 3 defense.*
+**Done when:** a phone files every report type signed, and one command fills two hubs with signed alerts.
 
 ---
 
-## Person 4: Command dashboard, Truth and the demo (Taheful)
+## Taheful: console, Directorate view, map, video
 
-- [ ] Kickoff: save fake examples of every event type in the frontend; deploy a hello-world to Vercel.
-  - *The fake examples are done (`web/lib/fake-events.ts`, loaded from `shared/schemas/examples/`).*
-  - *There's no Vercel deploy in the repo yet.*
-- [x] Priority queue: incoming messages sorted by priority, with an SOS visibly jumping ahead.
-  - *On `/dashboard`: live from the hub, sorted by priority; SOS is marked red, new arrivals flash. Built by Michael and tested.*
-  - *Falls back to labeled fake examples when no hub answers.*
-- [ ] The Hollow cross-section: 40 stacked levels, hubs as nodes, messages moving between them, hazards lighting up by level. *(The video's look; start it on day one.)*
-- [x] Missing-persons board and check-in search ("seen on level 31, 2 hours ago").
-  - *A side panel on `/dashboard`. Searching a name finds check-ins and missing reports, e.g. "Mara Okafor checked in on level 31, 2 hours ago".*
-- [ ] Truth screen: community estimate with its confidence range next to the Directorate's figure, by level. *(`/truth` is a placeholder route.)*
-- [x] Network controls: a bandwidth slider and a "cut the network" button wired to Person 1's link simulation.
-  - *A side panel on `/dashboard`. Tested: the button really cuts and restores the hub's link.*
-  - *The slider goes from 10 B/s to 100 kB/s, or unlimited.*
-- [ ] Upgrade 3 UI: attack-mode buttons (fake reports, jam a hub, false numbers) and the Truth screen holding steady.
-- [ ] Check every page at phone width and in the online mirror.
-  - *Every page built so far fits 375px with no sideways scroll (tested). Needs rechecking as pages are added, and in the mirror once it exists.*
-- [ ] Write the demo script, lead two rehearsals, record the video (Thu 11/19).
-- [ ] Devpost page: story, how it works, results table, what it does not do.
+- [x] `/dashboard` is live: priority queue, SOS flash, missing-persons search, bandwidth slider, cut button.
+- [ ] Rebel console: "verified" badges, a "forgeries blocked" counter from `listRejected()`, a Directorate-view toggle. Build against fake events first.
+- [ ] Directorate view (`web/app/truth`, a placeholder today): ciphertext next to plaintext, in monospace.
+- [ ] Fonts: one `next/font` sans and one mono in `layout.tsx`; CSS tokens on the console pages.
+- [ ] Bonus: the 3D Hollow map (`web/app/hollow`), loaded with `next/dynamic` and `ssr: false`. Ship or cut at Wed noon.
+- [ ] Check every page at phone width.
+- [ ] Demo script, two rehearsals, record and edit the video (Thu 11/19).
+- [ ] Devpost: story, how it works, results, what it doesn't do. Submit early Fri 11/20.
 
-**Done when:** a judge can open the mirror, watch messages move through the Hollow, trigger an attack and see the Truth screen hold, without anyone touching a laptop.
+**Done when:** all five beats can be read on the console, and the video and Devpost are submitted.
 
 ---
 
 ## Open questions between people
 
-- **Everyone, now:** `hub/requirements.txt` now holds only what the hub needs, plus `pynacl` for signing. torch + transformers moved to `hub/requirements-ai.txt`.
-  - Run `pip install -r hub/requirements.txt` again (adds `pynacl`).
-  - On the UNO Q, install `hub/requirements.txt` only.
-  - Only on a laptop that will run the compression eval: `pip install -r hub/requirements-ai.txt`, then `hub/.venv/bin/python hub/scripts/download_nli.py` once, while you have internet (~740 MB).
-- **Everyone:** confirm `llama3.2:3b` runs on your laptop (`ollama run llama3.2:3b "say hi"`), and post how long it takes.
-- **Tisya:**
-  - Phone submits now take ~1.4–3 s while the local model scores each report. If that's too slow for the demo, the alternative is to append first and score afterwards.
-  - When sync starts using `link.py`, decide whether to turn on the fair scheduler. It's one change, and only worth it when the link has spare capacity: under heavy overload it slowed near-SOS messages.
-- **Sign-off (contract page 9):** each person ticks their box once they've read their section.
+- **Everyone, now:** run `pip install -r hub/requirements.txt` again; it adds `pynacl`. Torch is no longer in it.
+- **Everyone:** pick the level pair (L34/L12 or L38/L12) in the chat.
+- **Everyone:** check the Discord for the submission deadline and the video length limit.
+- **Keep or cut:** the judges' online mirror, and photos with the encrypted medical card. Both were in the old contract; the rework plan doesn't mention them.
+- **Sign-off:** each person ticks their box in the reworked team contract once they've read it.

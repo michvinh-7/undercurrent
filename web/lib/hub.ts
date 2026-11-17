@@ -27,7 +27,8 @@ export async function addEvent(event: NewEvent) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(event),
   });
-  if (!res.ok) throw new Error(`Hub returned ${res.status}`);
+  // A 403 means the hub's checks refused it; `detail` says why (e.g. "unknown key").
+  if (!res.ok) throw new Error(`Hub returned ${res.status}${await res.json().then((b) => `: ${b.detail}`, () => "")}`);
   return (await res.json()) as HollowEvent;
 }
 
@@ -52,4 +53,32 @@ export async function setLink(settings: { bandwidth_bps?: number; unlimited?: bo
   });
   if (!res.ok) throw new Error(`Hub returned ${res.status}`);
   return (await res.json()) as LinkStatus;
+}
+
+/** One event the hub refused (GET /rejected). `via` says whether it came from a post or from sync. */
+export interface RejectedEvent {
+  seq: number;
+  received_at: string;
+  reason: string; // e.g. "unknown key", "bad signature", "replay: duplicate id", "unsigned"
+  via: "post" | "sync";
+  event: Partial<HollowEvent>;
+}
+
+/** Newest rejections first. `total` is the "forgeries blocked" counter. */
+export async function listRejected(limit = 100) {
+  const res = await fetch(`${hubUrl()}/rejected?limit=${limit}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Hub returned ${res.status}`);
+  return (await res.json()) as { total: number; rejected: RejectedEvent[] };
+}
+
+export interface RosterStatus {
+  require_signed: boolean; // false until phones sign; then the hub rejects unsigned events
+  members: { pub: string; role: "member" | "operator" }[];
+}
+
+/** Who may post. A "verified" badge = the event has a sig and its author_pub is in `members`. */
+export async function getRoster() {
+  const res = await fetch(`${hubUrl()}/roster`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Hub returned ${res.status}`);
+  return (await res.json()) as RosterStatus;
 }
