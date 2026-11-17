@@ -30,6 +30,17 @@ The demo is done when all five beats work on the flat console.
 
 **Before the web work starts:** the `michael/rework-setup` PR adds every web dependency at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. After it merges, run `npm install` in `web/`, and nobody adds a dependency without posting first.
 
+**Working branches:** renamed Tue 11/17 for the rework, all starting from that day's `main`. The old ones are deleted.
+
+| Person | Branch |
+|---|---|
+| Tisya | `tisya/canary-box` |
+| Michael | `michael/sync` |
+| Alanna | `alanna/phones-and-sim` |
+| Taheful | `taheful/console` |
+
+To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -D <your old branch>`. Then run `npm install` in `web/` and `pip install -r hub/requirements.txt`.
+
 **Who touches which files:** `hub/` and `eval/` Michael · `firmware/` and `bridge/` Tisya · `sim/`, the phone pages, `web/lib/hub.ts`, `sign.ts` and `cell.ts` Alanna · `web/app/dashboard`, `truth`, `hollow`, `layout.tsx` and `globals.css` Taheful. Ask the owner before changing someone else's file.
 
 ---
