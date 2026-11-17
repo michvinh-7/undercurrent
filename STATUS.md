@@ -71,7 +71,7 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] Final held-back triage run (149 messages), keyword rules and local model. Gemini rerun still pending (needs internet).
 - [x] Web setup: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(PR #12.)*
 - [x] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(PR #14. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
-- [ ] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(Built on `michael/sync`: `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
+- [x] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(PR #15, `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
 - [ ] Security eval, the four headline numbers:
   - *1. Forged and replayed messages accepted: **0 of 300** (95% upper bound 1.0%); all 40 real member alerts accepted.*
   - *2. Edited records caught at the exact row: **140 of 140** (95% upper bound on misses 2.1%). Known limits, not counted: changing `priority`, and deleting the newest row (sync restores it from the other hub).*
