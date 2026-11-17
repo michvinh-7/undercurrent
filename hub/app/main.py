@@ -1,10 +1,13 @@
-"""Undercurrent hub: starter API.
+"""Undercurrent hub API.
 
 Run:  uvicorn app.main:app --reload --port 8000
 Docs: http://localhost:8000/docs
+Two hubs that sync: HUB_ID=hub-L34 HUB_DB=l34.db HUB_PEERS=http://localhost:8002 uvicorn app.main:app --port 8001
+                    HUB_ID=hub-L12 HUB_DB=l12.db HUB_PEERS=http://localhost:8001 uvicorn app.main:app --port 8002
 """
 
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -19,13 +22,25 @@ from .log import EventLog
 from .models import Event, EventIn, EventType
 from .roster import Roster
 from .stream import event_stream
+from .sync import HttpTransport, Syncer, make_router
 
 load_dotenv()
 
 HUB_ID = os.getenv("HUB_ID", "hub-L38")
 HUB_DB = os.getenv("HUB_DB", "hub.db")
+HUB_PEERS = [p.strip() for p in os.getenv("HUB_PEERS", "").split(",") if p.strip()]
+SYNC_INTERVAL_S = float(os.getenv("SYNC_INTERVAL_S", "1") or 1)
 
-app = FastAPI(title="Undercurrent hub", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if HUB_PEERS:  # sync runs in a background thread only when there are peers
+        syncer.start(SYNC_INTERVAL_S)
+    yield
+    syncer.stop()
+
+
+app = FastAPI(title="Undercurrent hub", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # hubs run on local networks; tighten for the online mirror
@@ -37,7 +52,9 @@ log = EventLog(HUB_DB, HUB_ID)
 gate = Gate(log, Roster.from_env(), HUB_ID)  # signature, roster and replay checks (hub/app/gate.py)
 app.include_router(ai_router)  # POST /triage, POST /organize
 _bps = float(os.getenv("LINK_BANDWIDTH_BPS", "0") or 0)
-link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs; sync.py will drain it
+link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs, drained by sync
+syncer = Syncer(log, gate, link, HUB_PEERS, HttpTransport())
+app.include_router(make_router(syncer))  # GET /sync/ids, POST /sync/events, GET /sync/status
 
 
 @app.get("/health")
@@ -87,8 +104,9 @@ def list_events(
 
 @app.get("/events/verify")
 def verify_chain():
-    intact, first_bad = log.verify()
-    return {"chain_intact": intact, "first_bad_event": first_bad}
+    """chain_intact + the first bad event; gaps = events per origin hub whose predecessor
+    hasn't arrived yet (normal mid-sync, 0 once sync settles)."""
+    return log.verify_report()
 
 
 @app.get("/events/stream")
@@ -124,12 +142,13 @@ def set_link(settings: LinkSettings):
     """For the dashboard's bandwidth slider and "cut the network" button."""
     if settings.unlimited and settings.bandwidth_bps is not None:
         raise HTTPException(422, "send bandwidth_bps or unlimited, not both")
+    # Through the syncer: events that finished crossing before the change get pushed, not dropped.
     if settings.unlimited:
-        link.set_bandwidth(None)
+        syncer.link_control(lambda l: l.set_bandwidth(None))
     elif settings.bandwidth_bps is not None:
-        link.set_bandwidth(settings.bandwidth_bps)
+        syncer.link_control(lambda l: l.set_bandwidth(settings.bandwidth_bps))
     if settings.cut is True:
-        link.cut()
+        syncer.link_control(lambda l: l.cut())
     elif settings.cut is False:
-        link.restore()
-    return link.status()
+        syncer.link_control(lambda l: l.restore())
+    return syncer.link_control(lambda l: None)
