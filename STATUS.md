@@ -68,7 +68,7 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] `hub/requirements.txt` split: hub + `pynacl`; torch and transformers moved to `hub/requirements-ai.txt`.
 - [x] `web/lib/canonical.ts`: the JS side of signing, checked against Python with tweetnacl.
 - [x] Labels: all 200 test messages reviewed. Tuned "urgent" on the 51 tuning messages only, then froze the prompt.
-- [x] Final held-back triage run (149 messages), keyword rules and local model. Gemini rerun still pending (needs internet).
+- [x] Final held-back triage run (149 messages): keyword rules, local model and Gemini.
 - [x] Web setup: every web dependency at an exact version, plus `listRejected()` and `getRoster()`. *(PR #12.)*
 - [x] Sync: one chain per origin hub, `sync.py`, cuts that hold events back, stress test. *(PR #14. Run two hubs with `HUB_PEERS`; see the top of `hub/app/main.py`.)*
 - [x] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(PR #15, `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
@@ -76,9 +76,9 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
   - *1. Forged and replayed messages accepted: **0 of 300** (95% upper bound 1.0%); all 40 real member alerts accepted.*
   - *2. Edited records caught at the exact row: **140 of 140** (95% upper bound on misses 2.1%). Known limits, not counted: changing `priority`, and deleting the newest row (sync restores it from the other hub).*
   - *3. Alerts delivered after random link cuts: **200 of 200**, 0 duplicates (simulated cuts).*
-  - *4. Probe to the alert on the other hub: waits on the box.*
+  - *4. Probe to the alert on the other hub: dry run with a simulated canary, **0.81 s** median (30 of 30 arrived). The real run waits on the box: `eval/run_probe_latency.py --real`.*
 - [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
-- [ ] Results slide; practice answering "how do you know it works?"
+- [ ] Results slide; practice answering "how do you know it works?" *(Deck drafted with the practice answer in its notes; the real number 4 goes in Wed.)*
 
 **Triage numbers (149 held-back messages, final; supporting numbers in the rework):**
 
@@ -86,6 +86,7 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 |---|---|---|---|---|
 | llama3.2:3b, local | 76% [69, 83] | 62% [52, 71] | 88% | 27% |
 | Keyword rules only | 54% | 37% | 27% | 27% |
+| Gemini, cloud (online mirror only) | 88% [83, 93] | 84% [74, 92] | 88% | 64% |
 
 The priority queue cuts SOS delay by 72% against first-come-first-served on the slow link (simulated arrivals). Full table: [`eval/results/RESULTS.md`](eval/results/RESULTS.md).
 
