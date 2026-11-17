@@ -1,0 +1,88 @@
+{
+  "split": "simulated-cuts",
+  "backend": "sync",
+  "date": "2026-11-17",
+  "hubs": [
+    "hub-L34",
+    "hub-L12"
+  ],
+  "bandwidth_bps": 2000,
+  "rounds": 5,
+  "alerts_per_round": 40,
+  "seed": 0,
+  "alerts_sent": 200,
+  "delivered_to_both": 200,
+  "cuts": 26,
+  "duplicates": 0,
+  "unknown_events": 0,
+  "chains": [
+    {
+      "chain_intact": true,
+      "first_bad_event": null,
+      "gaps": {}
+    },
+    {
+      "chain_intact": true,
+      "first_bad_event": null,
+      "gaps": {}
+    }
+  ],
+  "sync_rejections": [
+    0,
+    0
+  ],
+  "settle_s_median": 5.77,
+  "settle_s_ci": [
+    6.086,
+    5.728,
+    6.696
+  ],
+  "per_round": [
+    {
+      "round": 1,
+      "sent_total": 40,
+      "cuts": 5,
+      "delivered_both": 40,
+      "duplicates": 0,
+      "extra_events": 0,
+      "settle_s": 5.7
+    },
+    {
+      "round": 2,
+      "sent_total": 80,
+      "cuts": 6,
+      "delivered_both": 80,
+      "duplicates": 0,
+      "extra_events": 0,
+      "settle_s": 7.26
+    },
+    {
+      "round": 3,
+      "sent_total": 120,
+      "cuts": 7,
+      "delivered_both": 120,
+      "duplicates": 0,
+      "extra_events": 0,
+      "settle_s": 5.97
+    },
+    {
+      "round": 4,
+      "sent_total": 160,
+      "cuts": 4,
+      "delivered_both": 160,
+      "duplicates": 0,
+      "extra_events": 0,
+      "settle_s": 5.73
+    },
+    {
+      "round": 5,
+      "sent_total": 200,
+      "cuts": 4,
+      "delivered_both": 200,
+      "duplicates": 0,
+      "extra_events": 0,
+      "settle_s": 5.77
+    }
+  ],
+  "passed": true
+}
