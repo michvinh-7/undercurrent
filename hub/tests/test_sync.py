@@ -256,3 +256,17 @@ def test_synced_event_claiming_to_be_from_this_hub_is_rejected(pair):
     with pytest.raises(Rejected, match="this hub"):
         b.gate.admit_synced(e)
     assert b.receive([post(a)])["stored"] == 1  # other hubs' events still go through
+
+
+def test_cut_link_shows_the_backlog_and_drains_on_restore(pair):
+    a, b, _ = pair
+    post(a)
+    settle(a, b)  # A now knows which ids B holds
+    a.link_control(lambda l: l.cut())
+    held = {post(a).id for _ in range(3)}
+    a.tick()
+    assert a.link.status()["queued"] == 3  # the dashboard's "waiting to send"
+    assert not held & ids(b)
+    a.link_control(lambda l: l.restore())
+    settle(a, b)
+    assert held <= ids(b) and a.link.status()["queued"] == 0
