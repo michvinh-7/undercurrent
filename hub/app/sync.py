@@ -41,7 +41,8 @@ from .models import Event
 
 
 class Transport(Protocol):
-    def ids(self, peer: str) -> set[str]: ...
+    # The peer's ids, with its fingerprint when it sends one (older hubs send ids only).
+    def ids(self, peer: str) -> set[str] | tuple[set[str], str | None]: ...
     def push(self, peer: str, events: list[Event]) -> dict: ...
 
 
@@ -49,10 +50,11 @@ class HttpTransport:
     def __init__(self, timeout_s: float = 5.0):
         self.client = httpx.Client(timeout=timeout_s)
 
-    def ids(self, peer: str) -> set[str]:
+    def ids(self, peer: str) -> tuple[set[str], str | None]:
         r = self.client.get(f"{peer.rstrip('/')}/sync/ids")
         r.raise_for_status()
-        return set(r.json()["ids"])
+        body = r.json()
+        return set(body["ids"]), body.get("fingerprint")
 
     def push(self, peer: str, events: list[Event]) -> dict:
         r = self.client.post(
@@ -70,6 +72,7 @@ class Syncer:
         self.in_flight: set[str] = set()
         self.peer_ids: dict[str, set[str]] = {}  # the last id list each peer sent
         self.refused: dict[str, set[str]] = {}  # ids each peer refused: not sent to it again
+        self.peer_fingerprint: dict[str, str | None] = {}  # from the peer's last id list
         self.last_ok: dict[str, float] = {}
         self.last_error: dict[str, str] = {}
         self._lock = threading.Lock()  # guards the link and in_flight; never held during a push
@@ -120,10 +123,13 @@ class Syncer:
                     continue
             else:
                 try:
-                    theirs = self.peer_ids[peer] = self.transport.ids(peer)
+                    reply = self.transport.ids(peer)
+                    theirs, fp = reply if isinstance(reply, tuple) else (reply, None)
+                    self.peer_ids[peer], self.peer_fingerprint[peer] = theirs, fp
                     self._ok(peer)
                 except Exception as err:
                     self.last_error[peer] = str(err)
+                    self.peer_fingerprint.pop(peer, None)
                     continue
             held = held if held is not None else self.log.list()
             with self._lock:
@@ -170,8 +176,19 @@ class Syncer:
     def stop(self) -> None:
         self._stop.set()
 
+    def agrees_with(self) -> dict[str, bool | None]:
+        """Per peer: does it hold exactly the events we hold? None = can't tell right now
+        (link cut, peer not answering, or a peer on older code that sends no fingerprint)."""
+        if self.link.is_cut:
+            return {p: None for p in self.peers}
+        mine = self.log.fingerprint()
+        return {p: (None if self.peer_fingerprint.get(p) is None else self.peer_fingerprint[p] == mine)
+                for p in self.peers}
+
     def status(self) -> dict:
         return {
+            "fingerprint": self.log.fingerprint(),
+            "agrees_with": self.agrees_with(),
             "peers": [
                 {"url": p, "last_ok": self.last_ok.get(p), "error": self.last_error.get(p)} for p in self.peers
             ],
@@ -189,7 +206,7 @@ def make_router(syncer: Syncer) -> APIRouter:
     @router.get("/ids")
     def sync_ids():
         """Every event id this hub holds. Peers use it to work out what to send."""
-        return {"hub_id": syncer.log.hub_id, "ids": syncer.log.ids()}
+        return {"hub_id": syncer.log.hub_id, "ids": syncer.log.ids(), "fingerprint": syncer.log.fingerprint()}
 
     @router.post("/events")
     def sync_events(events: list[Event]):

@@ -103,7 +103,8 @@ def newest(prefix: str) -> dict | None:
 
 
 def security_section() -> list[str]:
-    attacks, sync = newest("attacks_"), newest("sync_stress_")
+    attacks, sync = newest("attacks_"), newest("sync_stress_simulated-cuts")
+    real_net = newest("sync_stress_real-network")
     probe = newest("probe_latency_real-box") or newest("probe_latency_")  # the real box wins over the dry run
     rows = []
     if attacks:
@@ -119,6 +120,11 @@ def security_section() -> list[str]:
                         f"chain intact, \"forgeries blocked\" counter moved by {attacks['restore_counter_moved']}, "
                         f"median {attacks['restore_median_s']} s | rows deleted from a running hub's database, two real "
                         f"hubs synced | {attacks['date']}, `{attacks['_file']}` |")
+    if real_net:
+        rows.append(f"| 3. Alerts delivered with the plug really pulled | **{real_net['delivered_to_receiver']} of "
+                    f"{real_net['alerts_sent']}** after {real_net['outages']} real outages, {real_net['duplicates']} "
+                    f"duplicates, hubs agree: {'yes' if real_net['fingerprints_agree'] else 'no'} | {real_net['how']} | "
+                    f"{real_net['date']}, `{real_net['_file']}` |")
     if sync:
         rows.append(f"| 3. Alerts delivered after random link cuts | **{sync['delivered_to_both']} of {sync['alerts_sent']}** "
                     f"after {sync['cuts']} cuts, {sync['duplicates']} duplicates | two real hubs, simulated cuts at "

@@ -219,6 +219,13 @@ class EventLog:
             rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
         return [(row["seq"], self._row_to_event(row)) for row in rows]
 
+    def fingerprint(self) -> str:
+        """One short hash of every event this hub holds, in any order: two hubs that hold
+        exactly the same events show the same fingerprint, whatever order they got them in."""
+        hashes = sorted(r[0] for r in self._db.execute("SELECT hash FROM events"))
+        blob = f"{len(hashes)}:" + ",".join(hashes)
+        return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
     def count(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
 

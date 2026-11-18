@@ -119,6 +119,22 @@ cd hub
 .venv/bin/python scripts/demo_hubs.py down
 ```
 
+Both hubs show a **fingerprint**: one short hash of every event they hold. After a cut and a reconnect, the two match, which is a one-glance proof they hold exactly the same events (`GET /health`, `GET /sync/status` → `agrees_with`).
+
+**Playing the Directorate live.** `hub/scripts/directorate.py` fires one real attack per command at the running demo hubs and prints what the hub said, so the console's counters move on screen:
+
+```bash
+.venv/bin/python scripts/directorate.py forge     # fake "all clear" from an unknown key → refused
+.venv/bin/python scripts/directorate.py replay    # a real alert sent again → refused
+.venv/bin/python scripts/directorate.py tamper    # a real alert with its words changed → refused
+.venv/bin/python scripts/directorate.py edit      # change a stored record → the chain check names it
+.venv/bin/python scripts/directorate.py delete    # delete the newest record → flagged, then put back
+.venv/bin/python scripts/directorate.py cut       # then `restore`; `status` shows whether the hubs agree
+.venv/bin/python scripts/directorate.py revoke-demo --member demo/phone.key --operator demo/operator.key
+```
+
+**Number 3 with the plug really pulled.** Two hubs on two laptops on the same Wi-Fi, peered by LAN address. On the sending laptop run `hub/.venv/bin/python eval/run_sync_stress.py --real --receiver http://<other laptop>:8002 --key <member key> --n 50`, and turn its Wi-Fi off and on about 10 times while it runs.
+
 **4. Signing**
 
 Unsigned events are accepted while `REQUIRE_SIGNED=0` (the default). For the demo, set `REQUIRE_SIGNED=1` and point `ROSTER_FILE` at a JSON list of members' public keys:
@@ -189,7 +205,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 
 | Method | Path | Does |
 |---|---|---|
-| GET | `/health` | Hub id, event count, whether the chain is intact |
+| GET | `/health` | Hub id, event count, whether the chain is intact, fingerprint |
 | POST | `/events` | Add an event. Checked first; a failed check returns 403 with the reason |
 | GET | `/events` | List events. Filters: `type`, `level`, `since` |
 | GET | `/events/stream` | Live feed (Server-Sent Events); resumes via `Last-Event-ID` |
@@ -201,7 +217,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 | POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}` |
 | GET | `/sync/ids` | Every event id this hub holds |
 | POST | `/sync/events` | Events from a peer hub, each checked before it's stored |
-| GET | `/sync/status` | Peers, last success, events in flight, gaps |
+| GET | `/sync/status` | Peers, last success, events in flight, gaps, rows restored, fingerprint, whether each peer agrees |
 | POST | `/triage` | Messy text in, a structured record with a priority out |
 | POST | `/organize` | A symptom report in the fixed responder format. Documents, never diagnoses |
 

@@ -33,7 +33,8 @@ class Memory:
         return self.hubs[peer]
 
     def ids(self, peer):
-        return set(self._hub(peer).log.ids())
+        log = self._hub(peer).log
+        return set(log.ids()), log.fingerprint()
 
     def push(self, peer, events):
         return self._hub(peer).receive(events)
@@ -244,7 +245,7 @@ def test_sync_routes(pair):
     e = post(a)
     r = client.post("/sync/events", json=[e.model_dump(mode="json")])
     assert r.status_code == 200 and r.json()["stored"] == 1
-    assert client.get("/sync/ids").json() == {"hub_id": "hub-L12", "ids": [e.id]}
+    assert client.get("/sync/ids").json() == {"hub_id": "hub-L12", "ids": [e.id], "fingerprint": b.log.fingerprint()}
     assert client.get("/sync/status").json()["in_flight"] == 0
 
 
@@ -396,3 +397,48 @@ def test_roster_event_from_a_new_operator_waits_for_the_promotion(pair):
     assert b.log.rejected()[0] == 0
     settle(a, b)
     assert {promote.id, add.id} <= ids(b) and b.gate.roster.is_member(crypto.public_key(newbie))
+
+
+# ---------------------------------------------------------------- "hubs agree" fingerprint
+
+def test_fingerprint_matches_once_synced_whatever_the_order(pair):
+    a, b, _ = pair
+    a1, a2, a3 = post(a), post(a), post(a)
+    b1 = post(b, level=12)
+    b.receive([a3, a1])  # B gets A's events out of order
+    assert a.log.fingerprint() != b.log.fingerprint()
+    settle(a, b)
+    assert a.log.fingerprint() == b.log.fingerprint()
+    assert a.status()["agrees_with"] == {"hub-L12": True} and b.status()["agrees_with"] == {"hub-L34": True}
+
+
+def test_fingerprint_differs_while_an_event_is_held_back_and_matches_after(pair):
+    a, b, _ = pair
+    post(a)
+    settle(a, b)
+    a.link_control(lambda l: l.cut())
+    post(a)
+    a.tick()
+    b.tick()
+    assert a.log.fingerprint() != b.log.fingerprint()
+    assert a.status()["agrees_with"] == {"hub-L12": None}  # nothing crosses a cut link, not even this
+    a.link_control(lambda l: l.restore())
+    settle(a, b)
+    assert a.log.fingerprint() == b.log.fingerprint() and a.status()["agrees_with"] == {"hub-L12": True}
+
+
+def test_fingerprint_is_short_and_changes_with_any_event(pair):
+    a, _, _ = pair
+    empty = a.log.fingerprint()
+    post(a)
+    assert len(empty) == 12 and a.log.fingerprint() != empty
+
+
+def test_peer_on_older_code_without_a_fingerprint_is_unknown(pair):
+    a, b, net = pair
+    post(a)
+    old_ids = net.ids
+    net.ids = lambda peer: old_ids(peer)[0]  # ids only, no fingerprint: what an old hub sends
+    settle(a, b)
+    assert a.status()["agrees_with"] == {"hub-L12": None}
+    assert a.last_error == {} and ids(a) == ids(b)  # and sync with it still works
