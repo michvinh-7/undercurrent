@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (late night, after PR #21) by Michael
+**Last updated:** Tue 11/17 (late night, after the sync fix and demo tools) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -21,7 +21,7 @@ The demo is done when all five beats work on the flat console.
 | 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 160 of 160 edits to the database caught at the exact row by `GET /events/verify`, deleting the newest row included; a deleted row comes back from the other hub in about 1 s. The console's chain check names the edited row (PR #21) |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | 🟡 `/truth` is built (PR #21) and shows one labeled demo cell message. Needs Alanna's `cell.ts` for real encrypted messages |
 
-**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21). Still open: phone signing, `cell.ts`, the simulation, and the box.
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21), and sync puts a hub's deleted rows back from the other hub (number 2 is now 160 of 160). Still open: phone signing, `cell.ts`, the simulation, and the box.
 
 **Blocking the most people:**
 1. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
