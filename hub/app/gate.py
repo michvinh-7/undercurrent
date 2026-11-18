@@ -15,7 +15,10 @@ and raises Rejected. Unsigned events pass only while REQUIRE_SIGNED=0.
 
 Sync uses admit_synced(), which keeps the event exactly as its origin hub stored it
 (prev_hash and hash included) and treats a repeat of an event we already hold as
-normal, not as a replay.
+normal, not as a replay. A peer can also hand back a row of this hub's own chain
+that was deleted here: it's taken back ("restored") only if this hub wrote exactly
+that event (its hash is in the log's own_hashes), so nobody can add to this hub's
+chain through sync.
 """
 
 import os
@@ -49,6 +52,7 @@ class Gate:
         self.log, self.roster, self.hub_id = log, roster, hub_id
         self.require_signed = (os.getenv("REQUIRE_SIGNED", "0") == "1") if require_signed is None else require_signed
         self.window_s = float(os.getenv("REPLAY_WINDOW_S", "300")) if window_s is None else window_s
+        self.restored = 0  # own rows taken back from a peer since the hub started
         for event in log.list(type="roster"):  # rebuild membership changes from the log
             self.roster.apply(event.payload)
 
@@ -100,22 +104,32 @@ class Gate:
 
     def admit_synced(self, e: Event) -> str:
         """Store an event that arrived from another hub. Returns "stored", "duplicate"
-        (we already hold this exact event: normal in sync, never counted) or "deferred"
-        (signed by a key we don't know yet, likely because its roster event is still in
-        transit: not stored, not counted, the sender retries next round). Raises Rejected
-        for anything else that fails, recorded with via="sync"."""
+        (we already hold this exact event: normal in sync, never counted), "restored"
+        (a row of our own chain that was deleted here, handed back by a peer) or
+        "deferred" (signed by a key we don't know yet, likely because its roster event is
+        still in transit: not stored, not counted, the sender retries next round). Raises
+        Rejected for anything else that fails, recorded once per event with via="sync"."""
         held = self.log.get(e.id)
         if held is not None:
             if held.hash == e.hash:
                 return "duplicate"
             return self._reject_synced(e, "conflict: same id, different content")
-        if e.hub_id == self.hub_id:  # only this hub writes its own chain
-            return self._reject_synced(e, "claims to come from this hub")
         if compute_hash(e.model_dump(), e.prev_hash) != e.hash:
             return self._reject_synced(e, "bad hash")
+        if e.hub_id == self.hub_id:  # only this hub writes its own chain
+            if not self.log.wrote(e.hash):
+                return self._reject_synced(e, "claims to come from this hub")
+            if e.sig is not None and not crypto.verify(e.model_dump()):
+                return self._reject_synced(e, "bad signature")
+            try:
+                self.log.insert_synced(e)
+            except sqlite3.IntegrityError:
+                return "duplicate"
+            self.restored += 1
+            return "restored"
         reason = self.check(e, fresh=False)
-        if reason == "unknown key":
-            return "deferred"
+        if reason in ("unknown key", "roster: signer is not an operator"):
+            return "deferred"  # the roster event that admits this key may still be in transit
         if reason:
             return self._reject_synced(e, reason)
         try:

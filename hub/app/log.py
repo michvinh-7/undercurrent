@@ -9,6 +9,10 @@ Synced events can arrive out of chain order (the link sends highest priority fir
 so verify() checks each event's own hash and signature on its own, and the links
 between events per origin: a missing link in this hub's own chain means a deleted
 row; in another hub's chain it's a gap, an event still in transit.
+
+The hub also keeps the hash of every event it wrote itself (own_hashes). That
+list is how it knows its own chain's tip even if the newest row is deleted, and how
+it can take a deleted row back from a peer: only a row whose hash it wrote.
 """
 
 import hashlib
@@ -44,12 +48,18 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 CREATE INDEX IF NOT EXISTS idx_events_level ON events(level);
 CREATE INDEX IF NOT EXISTS idx_events_hub ON events(hub_id);
+CREATE TABLE IF NOT EXISTS own_hashes (
+    n        INTEGER PRIMARY KEY AUTOINCREMENT,
+    hash     TEXT UNIQUE NOT NULL,
+    event_id TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS rejected (
     seq         INTEGER PRIMARY KEY AUTOINCREMENT,
     received_at TEXT NOT NULL,
     reason      TEXT NOT NULL,
     via         TEXT NOT NULL,
-    event       TEXT NOT NULL
+    event       TEXT NOT NULL,
+    event_id    TEXT
 );
 """
 
@@ -86,24 +96,47 @@ class EventLog:
         for col in _SIGNING_COLUMNS:
             if col not in have:
                 self._db.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT")
+        if "event_id" not in {r["name"] for r in self._db.execute("PRAGMA table_info(rejected)")}:
+            self._db.execute("ALTER TABLE rejected ADD COLUMN event_id TEXT")
+        if self._db.execute("SELECT COUNT(*) FROM own_hashes").fetchone()[0] == 0:
+            # A hub.db from before own_hashes: its own events were stored in chain order.
+            self._db.execute(
+                "INSERT OR IGNORE INTO own_hashes (hash, event_id) SELECT hash, id FROM events WHERE hub_id = ? ORDER BY seq",
+                (hub_id,),
+            )
         self._db.commit()
 
     def _last_hash(self, hub_id: str) -> str:
-        """The tip of `hub_id`'s chain. Only used for this hub's own events, which are
-        stored in chain order, so the last one stored is the tip."""
+        """The tip of `hub_id`'s chain. For this hub: the last hash it wrote, even if that
+        row has since been deleted (so the deletion shows in verify) or a restored row was
+        stored after it."""
+        if hub_id == self.hub_id:
+            row = self._db.execute("SELECT hash FROM own_hashes ORDER BY n DESC LIMIT 1").fetchone()
+            if row:
+                return row["hash"]
         row = self._db.execute(
             "SELECT hash FROM events WHERE hub_id = ? ORDER BY seq DESC LIMIT 1", (hub_id,)
         ).fetchone()
         return row["hash"] if row else GENESIS
 
-    def _insert(self, event: Event) -> None:
+    def _insert(self, event: Event, own: bool = False) -> None:
         row = event.model_dump()
         row["payload"] = json.dumps(row["payload"])
-        self._db.execute(
-            f"INSERT INTO events ({', '.join(_COLUMNS)}) VALUES ({', '.join('?' * len(_COLUMNS))})",
-            [row[c] for c in _COLUMNS],
-        )
+        try:
+            self._db.execute(
+                f"INSERT INTO events ({', '.join(_COLUMNS)}) VALUES ({', '.join('?' * len(_COLUMNS))})",
+                [row[c] for c in _COLUMNS],
+            )
+            if own:
+                self._db.execute("INSERT OR IGNORE INTO own_hashes (hash, event_id) VALUES (?, ?)", (event.hash, event.id))
+        except sqlite3.IntegrityError:
+            self._db.rollback()
+            raise
         self._db.commit()
+
+    def wrote(self, event_hash: str) -> bool:
+        """Did this hub write an event with this hash itself?"""
+        return self._db.execute("SELECT 1 FROM own_hashes WHERE hash = ?", (event_hash,)).fetchone() is not None
 
     def append(self, event_in: EventIn) -> Event:
         """Store an event. A signed event keeps the id, created_at and hub_id its signer set
@@ -116,7 +149,7 @@ class EventLog:
             fields["prev_hash"] = self._last_hash(fields["hub_id"])
             fields["hash"] = compute_hash(fields, fields["prev_hash"])
             event = Event(**fields)
-            self._insert(event)
+            self._insert(event, own=event.hub_id == self.hub_id)
             return event
 
     def insert_synced(self, event: Event) -> Event:
@@ -133,14 +166,21 @@ class EventLog:
     def ids(self) -> list[str]:
         return [r[0] for r in self._db.execute("SELECT id FROM events ORDER BY seq")]
 
-    def reject(self, event_in: EventIn, reason: str, fresh: bool = True) -> None:
-        """Keep a record of an event that failed the checks (feeds GET /rejected and the counter)."""
+    def reject(self, event_in: EventIn, reason: str, fresh: bool = True) -> bool:
+        """Keep a record of an event that failed the checks (feeds GET /rejected and the counter).
+        Over sync, each event is recorded once: a peer that keeps offering it isn't a new
+        forgery each time. Returns whether it was recorded."""
         with self._lock:
+            if not fresh and event_in.id and self._db.execute(
+                "SELECT 1 FROM rejected WHERE via = 'sync' AND event_id = ?", (event_in.id,)
+            ).fetchone():
+                return False
             self._db.execute(
-                "INSERT INTO rejected (received_at, reason, via, event) VALUES (?, ?, ?, ?)",
-                (now_iso(), reason, "post" if fresh else "sync", event_in.model_dump_json()),
+                "INSERT INTO rejected (received_at, reason, via, event, event_id) VALUES (?, ?, ?, ?, ?)",
+                (now_iso(), reason, "post" if fresh else "sync", event_in.model_dump_json(), event_in.id),
             )
             self._db.commit()
+            return True
 
     def rejected(self, limit: int = 100) -> tuple[int, list[dict]]:
         """(total count, newest `limit` rejections)."""
@@ -194,6 +234,8 @@ class EventLog:
         - an event whose hash doesn't match its content, or whose signature doesn't verify
         - two events of one origin claiming the same predecessor (a fork)
         - an event of THIS hub whose predecessor is missing (a deleted row)
+        - an event this hub wrote that is no longer stored (a deleted row, newest included);
+          reported only if nothing above was found, since a later row already points at it
         Not bad: another hub's event whose predecessor hasn't arrived yet. Counted in `gaps`.
         """
         events = [self._row_to_event(r) for r in self._db.execute("SELECT * FROM events ORDER BY seq")]
@@ -216,6 +258,11 @@ class EventLog:
                     gaps[e.hub_id] = gaps.get(e.hub_id, 0) + 1
             if bad and first_bad is None:
                 first_bad = e.id
+        if first_bad is None:
+            missing = self._db.execute(
+                "SELECT event_id FROM own_hashes WHERE event_id NOT IN (SELECT id FROM events) ORDER BY n LIMIT 1"
+            ).fetchone()
+            first_bad = missing["event_id"] if missing else None
         return {"chain_intact": first_bad is None, "first_bad_event": first_bad, "gaps": gaps}
 
     @staticmethod

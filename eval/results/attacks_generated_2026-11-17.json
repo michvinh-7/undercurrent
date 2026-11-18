@@ -144,22 +144,34 @@
       "flagged": 20,
       "counted": true
     },
+    "delete newest": {
+      "n": 20,
+      "caught_exact_row": 20,
+      "flagged": 20,
+      "counted": true
+    },
     "priority": {
       "n": 20,
       "caught_exact_row": 0,
       "flagged": 0,
       "counted": false
     },
-    "delete newest": {
+    "delete newest and record": {
       "n": 20,
       "caught_exact_row": 0,
       "flagged": 0,
       "counted": false
     }
   },
-  "edit_n": 140,
-  "edit_caught": 140,
+  "edit_n": 160,
+  "edit_caught": 160,
+  "restore_n": 20,
+  "restored": 20,
+  "restored_intact": 20,
+  "restore_counter_moved": 0,
+  "restore_median_s": 0.96,
+  "restore_hub_count": 20,
   "attack_accept_upper95": 0.01,
-  "edit_miss_upper95": 0.02142857142857143,
+  "edit_miss_upper95": 0.01875,
   "passed": true
 }

@@ -114,6 +114,11 @@ def security_section() -> list[str]:
         rows.append(f"| 2. Edited records caught at the exact row | **{attacks['edit_caught']} of {attacks['edit_n']}** "
                     f"(95% upper bound on misses {attacks['edit_miss_upper95'] * 100:.1f}%) | direct edits to a copy of a "
                     f"real hub's database | {attacks['date']}, `{attacks['_file']}` |")
+        if "restore_n" in attacks:
+            rows.append(f"| 2b. Deleted rows put back by the other hub | **{attacks['restored_intact']} of {attacks['restore_n']}**, "
+                        f"chain intact, \"forgeries blocked\" counter moved by {attacks['restore_counter_moved']}, "
+                        f"median {attacks['restore_median_s']} s | rows deleted from a running hub's database, two real "
+                        f"hubs synced | {attacks['date']}, `{attacks['_file']}` |")
     if sync:
         rows.append(f"| 3. Alerts delivered after random link cuts | **{sync['delivered_to_both']} of {sync['alerts_sent']}** "
                     f"after {sync['cuts']} cuts, {sync['duplicates']} duplicates | two real hubs, simulated cuts at "
@@ -137,8 +142,9 @@ def security_section() -> list[str]:
         out += [
             "Known limits, measured and not counted: "
             + "; ".join(f"`{k}` edits caught {v['caught_exact_row']} of {v['n']}" for k, v in lim.items())
-            + ". `priority` is the hub's own score, outside the hash on purpose; a deleted newest row is restored "
-            "by sync from the other hub.",
+            + ". `priority` is the hub's own score, outside the hash on purpose. A deleted newest row is caught "
+            "because the hub keeps the hash of every event it wrote; erasing that record too hides it from a hub "
+            "on its own.",
             "",
         ]
     return out

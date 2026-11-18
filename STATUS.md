@@ -18,7 +18,7 @@ The demo is done when all five beats work on the flat console.
 | 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
 | 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | ✅ Hub side merged (PRs #14, #19): 200 of 200 alerts on both hubs after 26 random cuts, 0 duplicates. Tested by hand on `/dashboard`: during a cut the sending hub shows "3 waiting to send" and none arrive; after restore all arrive. The console now shows the sending hub's backlog (PR #21) |
 | 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | ✅ Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console's "forgeries blocked" counter is in (PR #21) |
-| 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 140 of 140 edits to the database caught at the exact row by `GET /events/verify`. The console's chain check names the edited row (PR #21) |
+| 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 160 of 160 edits to the database caught at the exact row by `GET /events/verify`, deleting the newest row included; a deleted row comes back from the other hub in about 1 s. The console's chain check names the edited row (PR #21) |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | 🟡 `/truth` is built (PR #21) and shows one labeled demo cell message. Needs Alanna's `cell.ts` for real encrypted messages |
 
 **Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21). Still open: phone signing, `cell.ts`, the simulation, and the box.
@@ -75,9 +75,11 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 - [x] Attack script: forge, replay, impersonate, tamper, stale and wrong-hub messages, roster grabs, attacks over sync, and direct edits to the database. *(PR #15, `eval/run_attacks.py`. It also found and closed one gap: sync now refuses events that claim to come from the receiving hub.)*
 - [ ] Security eval, the four headline numbers:
   - *1. Forged and replayed messages accepted: **0 of 300** (95% upper bound 1.0%); all 40 real member alerts accepted.*
-  - *2. Edited records caught at the exact row: **140 of 140** (95% upper bound on misses 2.1%). Known limits, not counted: changing `priority`, and deleting the newest row (sync restores it from the other hub).*
+  - *2. Edited records caught at the exact row: **160 of 160** (95% upper bound on misses 1.9%), now including deleting the newest row. Deleted rows put back by the other hub: **20 of 20**, counter unmoved. Known limits, not counted: changing `priority`, and deleting the newest row together with the hub's own record of writing it.*
   - *3. Alerts delivered after random link cuts: **200 of 200**, 0 duplicates (simulated cuts).*
   - *4. Probe to the alert on the other hub: dry run with a simulated canary, **0.81 s** median (30 of 30 arrived). The real run waits on the box: `eval/run_probe_latency.py --real`.*
+- [x] Sync fix: a row deleted from a hub came back as a refusal every second, so the "forgeries blocked" counter climbed by 1 a second. Now the other hub puts the row back (only if this hub wrote exactly that event), and any refusal over sync is counted once and not resent. *(104 tests pass.)*
+- [x] Demo tools: `hub/scripts/roster_tool.py` (operator key, roster file, add or remove a member on a running hub) and `hub/scripts/demo_hubs.py` (start, reset and stop both hubs together). *Send me your public keys: Tisya the box's, Alanna the simulated senders'.*
 - [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
 - [ ] Results slide; practice answering "how do you know it works?" *(Deck drafted with the practice answer in its notes; the real number 4 goes in Wed.)*
 

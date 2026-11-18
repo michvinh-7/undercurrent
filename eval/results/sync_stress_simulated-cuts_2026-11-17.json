@@ -31,11 +31,11 @@
     0,
     0
   ],
-  "settle_s_median": 5.77,
+  "settle_s_median": 5.96,
   "settle_s_ci": [
-    6.086,
-    5.728,
-    6.696
+    6.142,
+    5.788,
+    6.712
   ],
   "per_round": [
     {
@@ -45,7 +45,7 @@
       "delivered_both": 40,
       "duplicates": 0,
       "extra_events": 0,
-      "settle_s": 5.7
+      "settle_s": 5.96
     },
     {
       "round": 2,
@@ -54,7 +54,7 @@
       "delivered_both": 80,
       "duplicates": 0,
       "extra_events": 0,
-      "settle_s": 7.26
+      "settle_s": 7.27
     },
     {
       "round": 3,
@@ -63,7 +63,7 @@
       "delivered_both": 120,
       "duplicates": 0,
       "extra_events": 0,
-      "settle_s": 5.97
+      "settle_s": 5.73
     },
     {
       "round": 4,
@@ -72,7 +72,7 @@
       "delivered_both": 160,
       "duplicates": 0,
       "extra_events": 0,
-      "settle_s": 5.73
+      "settle_s": 5.99
     },
     {
       "round": 5,
@@ -81,7 +81,7 @@
       "delivered_both": 200,
       "duplicates": 0,
       "extra_events": 0,
-      "settle_s": 5.77
+      "settle_s": 5.76
     }
   ],
   "passed": true

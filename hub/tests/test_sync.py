@@ -169,7 +169,7 @@ def test_peer_down_then_back_loses_nothing(pair):
 def test_same_event_twice_is_stored_once_and_not_a_forgery(pair):
     a, b, _ = pair
     e = post(a)
-    assert b.receive([e, e]) == {"stored": 1, "duplicate": 1, "deferred": 0, "rejected": 0}
+    assert b.receive([e, e]) == {"stored": 1, "restored": 0, "duplicate": 1, "deferred": 0, "rejected": 0, "refused": []}
     assert b.log.count() == 1 and b.log.rejected()[0] == 0
 
 
@@ -193,7 +193,7 @@ def test_forged_event_over_sync_is_rejected_and_counted(pair):
     forged = Event(**forged_fields)
     forged = forged.model_copy(update={"hash": compute_hash(forged.model_dump(), forged.prev_hash)})
     # An unknown key over sync is deferred (its roster event may be in transit), never stored
-    assert b.receive([forged]) == {"stored": 0, "duplicate": 0, "deferred": 1, "rejected": 0}
+    assert b.receive([forged]) == {"stored": 0, "restored": 0, "duplicate": 0, "deferred": 1, "rejected": 0, "refused": []}
     tampered = e.model_copy(update={"level": 12})
     tampered = tampered.model_copy(update={"hash": compute_hash(tampered.model_dump(), tampered.prev_hash)})
     assert b.receive([tampered])["rejected"] == 1
@@ -251,7 +251,8 @@ def test_sync_routes(pair):
 def test_synced_event_claiming_to_be_from_this_hub_is_rejected(pair):
     a, b, _ = pair
     e = post(b, level=12)  # a real event of B's
-    b.log._db.execute("DELETE FROM events")  # pretend B never stored it
+    b.log._db.execute("DELETE FROM events")  # pretend B never stored it, and has
+    b.log._db.execute("DELETE FROM own_hashes")  # no record of writing it either
     b.log._db.commit()
     with pytest.raises(Rejected, match="this hub"):
         b.gate.admit_synced(e)
@@ -270,3 +271,128 @@ def test_cut_link_shows_the_backlog_and_drains_on_restore(pair):
     a.link_control(lambda l: l.restore())
     settle(a, b)
     assert held <= ids(b) and a.link.status()["queued"] == 0
+
+
+# ---------------------------------------------------------------- a hub gets its own deleted rows back
+
+def delete_row(hub, event_id):
+    hub.log._db.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    hub.log._db.commit()
+
+
+def rejected_total(hub):
+    return hub.log.rejected()[0]
+
+
+def test_deleted_newest_row_comes_back_from_the_peer(pair):
+    a, b, _ = pair
+    a1, a2, a3 = post(a), post(a), post(a)
+    settle(a, b)
+    delete_row(a, a3.id)  # the Directorate deletes A's newest row
+    settle(a, b)
+    assert a3.id in ids(a)
+    assert a.log.verify_report() == {"chain_intact": True, "first_bad_event": None, "gaps": {}}
+    assert rejected_total(a) == 0  # a row coming home is not a forgery
+    assert a.status()["restored"] == 1 and b.status()["restored"] == 0  # B sent it; A counts it
+
+
+def test_deleted_middle_row_comes_back_and_the_chain_continues(pair):
+    a, b, _ = pair
+    a1, a2, a3 = post(a), post(a), post(a)
+    settle(a, b)
+    delete_row(a, a2.id)
+    assert a.log.verify() == (False, a3.id)  # caught while it's missing
+    settle(a, b)
+    assert a.log.verify_report()["chain_intact"]
+    a4 = post(a)  # the next event chains after a3, the real tip, not after the restored a2
+    assert a4.prev_hash == a3.hash
+    settle(a, b)
+    assert a.log.verify_report()["chain_intact"] and b.log.verify_report()["chain_intact"]
+
+
+def test_new_event_after_newest_row_deleted_still_chains_to_it(pair):
+    a, b, _ = pair
+    a1, a2 = post(a), post(a)
+    settle(a, b)
+    delete_row(a, a2.id)
+    a3 = post(a)  # posted before sync brings a2 back
+    assert a3.prev_hash == a2.hash  # the hub remembers its own tip
+    assert a.log.verify() == (False, a3.id)  # and the deletion now shows
+    settle(a, b)
+    assert a.log.verify_report()["chain_intact"] and a2.id in ids(a)
+
+
+def test_wiped_hub_refuses_its_old_events_once_not_every_tick(tmp_path):
+    net = Memory()
+    a = make_hub(tmp_path, net, "hub-L34", "hub-L12")
+    b = make_hub(tmp_path, net, "hub-L12", "hub-L34")
+    old = [post(a) for _ in range(3)]
+    settle(a, b)
+    # A's database is wiped (a rehearsal reset of one hub only); B keeps its copy
+    a.log._db.close()
+    (tmp_path / "hub-L34.db").unlink()
+    a = make_hub(tmp_path, net, "hub-L34", "hub-L12")
+    b.peer_ids.clear()
+    settle(a, b, rounds=10)
+    assert not {e.id for e in old} & ids(a)  # A can't prove it wrote them: not taken back
+    assert rejected_total(a) == 3  # each counted once, not once per tick
+    assert b.refused["hub-L34"] == {e.id for e in old}  # and B stops sending them
+    assert b.link.status()["queued"] == 0
+    fresh = post(a)
+    settle(a, b)
+    assert fresh.id in ids(b)
+
+
+def test_restored_row_must_match_what_this_hub_wrote(pair):
+    a, b, _ = pair
+    a1 = post(a)
+    settle(a, b)
+    delete_row(a, a1.id)
+    from app.log import compute_hash
+    altered = a1.model_copy(update={"payload": {"kind": "flooding", "severity": "low"}})
+    altered = altered.model_copy(update={"hash": compute_hash(altered.model_dump(), altered.prev_hash)})
+    with pytest.raises(Rejected):
+        a.gate.admit_synced(altered)
+    assert a1.id not in ids(a)
+
+
+def test_member_cannot_slip_an_event_into_this_hubs_chain_over_sync(pair):
+    a, b, _ = pair
+    a1 = post(a)
+    from app.log import compute_hash
+    from app.models import Event
+    fields = crypto.sign({"id": str(uuid.uuid4()), "type": "hazard", "hub_id": "hub-L34", "level": 34,
+                          "created_at": "2020-01-01T00:00:00Z", "author": "x",
+                          "payload": {"kind": "flooding", "severity": "low"}}, MEMBER)
+    e = Event(**fields, prev_hash=a1.hash, hash="0")
+    e = e.model_copy(update={"hash": compute_hash(e.model_dump(), e.prev_hash)})
+    with pytest.raises(Rejected, match="this hub"):
+        a.gate.admit_synced(e)  # fits A's tip and is validly signed, but A never wrote it
+    assert e.id not in ids(a)
+
+
+def test_own_hashes_backfilled_for_an_existing_database(tmp_path):
+    net = Memory()
+    a = make_hub(tmp_path, net, "hub-L34", "hub-L12")
+    a1, a2 = post(a), post(a)
+    a.log._db.execute("DROP TABLE own_hashes")  # a hub.db from before this change
+    a.log._db.commit()
+    a.log._db.close()
+    a = make_hub(tmp_path, net, "hub-L34", "hub-L12")
+    a3 = post(a)
+    assert a3.prev_hash == a2.hash
+    delete_row(a, a1.id)
+    assert a.gate.admit_synced(a1) == "restored"
+
+
+def test_roster_event_from_a_new_operator_waits_for_the_promotion(pair):
+    a, b, _ = pair
+    op2, newbie = crypto.new_key(), crypto.new_key()
+    promote = post(a, key=OP, type="roster", author="op", source=None,
+                   payload={"action": "add", "pub": crypto.public_key(op2), "role": "operator"})
+    add = post(a, key=op2, type="roster", author="op2", source=None,
+               payload={"action": "add", "pub": crypto.public_key(newbie), "role": "member"})
+    assert b.receive([add])["deferred"] == 1  # op2 isn't an operator on B yet: wait, don't refuse
+    assert b.log.rejected()[0] == 0
+    settle(a, b)
+    assert {promote.id, add.id} <= ids(b) and b.gate.roster.is_member(crypto.public_key(newbie))

@@ -12,3 +12,5 @@ next-env.d.ts
 hub/photos/
 sim/ground_truth/*.json
 !sim/ground_truth/.gitkeep
+*.key
+hub/demo/
