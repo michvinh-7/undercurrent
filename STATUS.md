@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (late night, after the sync fix and demo tools) by Michael
+**Last updated:** Wed 11/18 (early morning, after the live Directorate script and the fingerprint) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
