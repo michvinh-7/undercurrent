@@ -18,6 +18,13 @@
   --ok: #22c55e; /* verified, intact, connected */
   --sim: #c084fc; /* simulated data: always labeled, never mixed with real */
   --directorate: #f43f5e;
+
+  /* Stacking order, lowest to highest. Use these, never raw numbers. */
+  --z-labels: 10;  /* map labels, drawn over the 3D canvas */
+  --z-map-ui: 20;  /* buttons and banners floating on the map */
+  --z-panels: 30;  /* side columns */
+  --z-header: 40;  /* top bar */
+  --z-popover: 50; /* menus and popovers */
 }
 
 @theme inline {

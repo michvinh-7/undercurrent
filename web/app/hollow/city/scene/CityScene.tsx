@@ -94,7 +94,7 @@ export default function CityScene(props: CitySceneProps) {
       <CameraRig view={props.view} focus={props.focus} resetKey={props.resetKey} active={props.active} />
       <Projector labels={labels} registry={registry} />
     </Canvas>
-      <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
+      <div className="pointer-events-none absolute inset-0 z-[var(--z-labels)] overflow-hidden" aria-hidden>
         {labels.map((l) => (
           <div
             key={l.id}
@@ -112,7 +112,10 @@ export default function CityScene(props: CitySceneProps) {
 
 // --- Labels: plain DOM, positioned each frame (no extra React roots) ----------------------
 
-interface Label { id: string; pos: [number, number, number]; node: React.ReactNode }
+// rank: when two labels would overlap on screen, the higher rank stays and the lower one is hidden.
+// Labels ranked NUDGE or above try a few spots around their anchor before giving up.
+interface Label { id: string; pos: [number, number, number]; node: React.ReactNode; rank: number }
+const NUDGE = 60;
 
 function useLabels(p: CitySceneProps): Label[] {
   const { world, active, layers, hubs, events, view } = p;
@@ -121,33 +124,33 @@ function useLabels(p: CitySceneProps): Label[] {
     if (!level) return [];
     const out: Label[] = [];
     for (const s of world.grid.streets)
-      out.push({ id: `st-${s.id}`, pos: s.dir === "ns" ? [s.at, 0.3, s.to - 10] : [s.to - 22, 0.3, s.at], node: <span className="map-street">{s.name}</span> });
+      out.push({ id: `st-${s.id}`, pos: s.dir === "ns" ? [s.at, 0.3, s.to - 10] : [s.to - 22, 0.3, s.at], node: <span className="map-street">{s.name}</span>, rank: 10 });
     if (layers.buildings)
       for (const b of level.buildings)
         if (b.use !== "housing" && b.use !== "workshop" && !(layers.alerts && events.some((e) => e.level === active && (e.place.kind === "exact" ? b.use === "pumphouse" : e.place.kind === "named" && e.place.building === b.id))))
-          out.push({ id: `b-${b.id}`, pos: [b.center[0], b.height + 2.5, b.center[1]], node: <span className="map-label map-label--minor">{b.name.replace(`L${level.n} `, "")}</span> });
+          out.push({ id: `b-${b.id}`, pos: [b.center[0], b.height + 2.5, b.center[1]], node: <span className="map-label map-label--minor">{b.name.replace(`L${level.n} `, "")}</span>, rank: 40 });
     for (const st of streetGraph(world.grid).stairs)
-      out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet map-label--minor">{st.name}</span> });
+      out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet map-label--minor">{st.name}</span>, rank: 30 });
     if (p.flood)
-      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span> });
+      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span>, rank: 70 });
     if (p.trace && layers.water) {
       const at = sourcePoint(world, active, p.trace.source);
-      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#7a5418" }}>Likely bad-water source (a guess)</span> });
+      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#7a5418" }}>Likely bad-water source (a guess)</span>, rank: 75 });
     }
     if (p.route) {
       const mid = p.route.points[Math.floor(p.route.points.length / 2)];
-      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label map-label--minor" style={{ borderColor: "#1f8a70", color: "#1f6a56" }}>Safe route · {p.route.minutes} min</span> });
+      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label map-label--minor" style={{ borderColor: "#1f8a70", color: "#1f6a56" }}>Safe route · {p.route.minutes} min</span>, rank: 65 });
     }
     if (layers.water && world.network.node.get(SOURCE_ID)?.level === active)
-      out.push({ id: "cistern", pos: [CORE.cistern[0], 8, CORE.cistern[1]], node: <span className="map-label">Cistern</span> });
+      out.push({ id: "cistern", pos: [CORE.cistern[0], 8, CORE.cistern[1]], node: <span className="map-label">Cistern</span>, rank: 50 });
     if (layers.sensors)
       for (const s of world.sensors.filter((x) => x.level === active))
-        out.push({ id: `s-${s.deviceId}`, pos: [s.x, s.y - 2.2, s.z], node: <span className="map-label map-label--quiet">Canary box · {s.deviceId}</span> });
+        out.push({ id: `s-${s.deviceId}`, pos: [s.x, s.y - 2.2, s.z], node: <span className="map-label map-label--quiet">Canary box · {s.deviceId}</span>, rank: 35 });
     if (layers.network) {
       for (const h of hubs.filter((x) => x.level === active)) {
         const status = !h.online ? "offline" : h.cut ? `link cut${h.queued ? ` · ${h.queued} waiting to send` : ""}` : "linked";
         out.push({
-          id: `hub-${h.hubId}`, pos: [h.x, 16, h.z],
+          id: `hub-${h.hubId}`, pos: [h.x, 16, h.z], rank: h.forgery || h.cut ? 95 : 80,
           node: (
             <span className="map-label" style={{ borderColor: h.cut ? "var(--danger)" : undefined }}>
               Hub {h.hubId.replace("hub-", "")} · <span style={{ color: !h.online ? "var(--faint)" : h.cut ? "var(--danger)" : "var(--ok)" }}>{status}</span>
@@ -160,7 +163,7 @@ function useLabels(p: CitySceneProps): Label[] {
       const [a, b] = hubs;
       if (view === "3d" && a && b && (a.cut || b.cut) && order.includes(a.level) && order.includes(b.level)) {
         const ya = (ai - order.indexOf(a.level)) * GHOST_GAP, yb = (ai - order.indexOf(b.level)) * GHOST_GAP;
-        out.push({ id: "link-cut", pos: [a.x, 13 + (ya + yb) / 2, a.z], node: <span className="map-label" style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>Link cut</span> });
+        out.push({ id: "link-cut", pos: [a.x, 13 + (ya + yb) / 2, a.z], node: <span className="map-label" style={{ color: "var(--danger)", borderColor: "var(--danger)" }}>Link cut</span>, rank: 100 });
       }
     }
     if (layers.alerts) {
@@ -171,13 +174,14 @@ function useLabels(p: CitySceneProps): Label[] {
         const pin = pinOf(e)!;
         const color = SEVERITY_COLOR[e.severity];
         out.push({
-          id: `pin-${dev}`, pos: [pin.x, pin.y + PIN_H + 3.4, pin.z],
+          id: `pin-${dev}`, pos: [pin.x, pin.y + PIN_H + 3.4, pin.z], rank: e.severity === "sos" ? 98 : 90,
           node: (
             <span className="map-label" style={{ borderColor: color }}>
               <span style={{ color }}>●</span> {pinTitle(e)}
               {list.length > 1 && <span className="text-[var(--faint)]"> · +{list.length - 1} more</span>}
-              {pin.named && <span className="block text-[10px] text-[var(--muted)]">Reported at {pin.named}</span>}
-              <span className="block text-[10px] text-[var(--muted)]">{e.demo ? "Demo data" : e.verified ? "Verified by hub" : "Not verified"}</span>
+              <span className="block text-[10px] text-[var(--muted)]">
+                {pin.named ? `${pin.named} · ` : ""}{e.demo ? "demo data" : e.verified ? "✓ verified" : "not verified"}
+              </span>
             </span>
           ),
         });
@@ -189,17 +193,40 @@ function useLabels(p: CitySceneProps): Label[] {
 
 function Projector({ labels, registry }: { labels: Label[]; registry: React.RefObject<Map<string, HTMLDivElement>> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
+  const ranked = useMemo(() => [...labels].sort((a, b) => b.rank - a.rank), [labels]);
+  const sizes = useRef(new Map<string, [number, number]>());
+  const frame = useRef(0);
   useFrame(({ camera, size }) => {
-    for (const l of labels) {
+    // Measure every few frames (all reads before any writes, so one layout at most).
+    if (frame.current++ % 15 === 0 || sizes.current.size !== labels.length) {
+      sizes.current.clear();
+      for (const l of labels) { const el = registry.current.get(l.id); if (el) sizes.current.set(l.id, [el.offsetWidth, el.offsetHeight]); }
+    }
+    const placed: [number, number, number, number][] = [];
+    const hits = (x1: number, y1: number, x2: number, y2: number) => placed.some(([a1, b1, a2, b2]) => x1 < a2 && x2 > a1 && y1 < b2 && y2 > b1);
+    for (const l of ranked) {
       const el = registry.current.get(l.id);
       if (!el) continue;
       v.set(l.pos[0], l.pos[1], l.pos[2]).project(camera);
-      const off = v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2;
-      el.style.visibility = off ? "hidden" : "visible";
-      if (off) continue;
-      const x = ((v.x + 1) / 2) * size.width, y = ((1 - v.y) / 2) * size.height;
-      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
-      el.style.zIndex = String(Math.round((1 - v.z) * 1e5));
+      const [w, h] = sizes.current.get(l.id) ?? [0, 0];
+      let spot: [number, number] | null = null;
+      if (!(v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) && w > 0) {
+        const x = ((v.x + 1) / 2) * size.width, y = ((1 - v.y) / 2) * size.height;
+        const tries: [number, number][] = l.rank >= NUDGE
+          ? [[0, 0], [0, -(h + 4)], [0, h + 4], [w * 0.6, -(h * 0.6)], [-w * 0.6, -(h * 0.6)], [w * 0.6, h * 0.6], [-w * 0.6, h * 0.6]]
+          : [[0, 0]];
+        const pad = 3;
+        for (const [dx, dy] of tries) {
+          const cx = x + dx, cy = y + dy;
+          const box: [number, number, number, number] = [cx - w / 2 - pad, cy - h / 2 - pad, cx + w / 2 + pad, cy + h / 2 + pad];
+          if (box[0] < 0 || box[2] > size.width || box[1] < 0 || box[3] > size.height) continue;
+          if (!hits(...box)) { placed.push(box); spot = [cx, cy]; break; }
+        }
+      }
+      if (!spot) { el.style.visibility = "hidden"; continue; }
+      el.style.visibility = "visible";
+      el.style.transform = `translate(${spot[0].toFixed(1)}px, ${spot[1].toFixed(1)}px) translate(-50%, -50%)`;
+      el.style.zIndex = String(l.rank);
     }
   });
   return null;
@@ -813,7 +840,7 @@ function CameraRig({ view, focus, resetKey, active }: { view: View; focus: CityS
 
   useEffect(() => {
     const target = focus ? new THREE.Vector3(focus.x, 0, focus.z) : new THREE.Vector3(0, 0, 0);
-    goal.current = { target, dist: (focus ? 110 : 390) * far, polar: view === "top" ? 0.0001 : focus ? 0.85 : 0.82 };
+    goal.current = { target, dist: (focus ? 110 : 440) * far, polar: view === "top" ? 0.0001 : focus ? 0.85 : 0.82 };
   }, [view, focus, resetKey, active, far]);
 
   useEffect(() => {
