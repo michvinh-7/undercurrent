@@ -16,6 +16,21 @@ Checks, per round and at the end:
 
 Real hubs and a real link simulation; the alerts and the cut timing are generated.
 Say "simulated cuts" wherever the number is shown.
+
+--real: the same claim on a real network, with the plug really pulled. Two hubs on
+two machines on the same Wi-Fi, already running and peered with each other's LAN
+address (HUB_PEERS=http://<other laptop's IP>:8001), both with a roster that has
+--key on it. Run this on the SENDING hub's machine: it posts to that hub (localhost,
+so it keeps working with Wi-Fi off) and watches the other hub over the network.
+While it runs, turn the sender's Wi-Fi off and on again, about 10 times, a few
+seconds each. It counts every outage it saw (the receiver unreachable for 2 s or
+more), how long the backlog took to cross after each reconnect, and at the end
+whether every alert arrived once and both hubs agree (same fingerprint).
+
+    hub/.venv/bin/python eval/run_sync_stress.py --real --sender http://localhost:8001 \
+        --receiver http://192.168.1.23:8002 --key hub/demo/canary-34.key --n 50
+
+Writes eval/results/sync_stress_real-network_<date>.*; RESULTS.md shows it first.
 """
 
 import argparse
@@ -36,6 +51,118 @@ from hub_procs import ROOT, crypto, signed_alert, start_hub, stop, wait_up  # no
 from stats import bootstrap_ci, fmt  # noqa: E402
 
 
+# ---------------------------------------------------------------- --real: two machines, a real cut
+
+def run_real(args) -> int:
+    key = crypto.key_from_b64(json.loads(Path(args.key).read_text())["seed"])
+    client = httpx.Client(timeout=args.probe_timeout)
+    sender_id = client.get(f"{args.sender}/health", timeout=5).json()["hub_id"]
+    level = int("".join(c for c in sender_id if c.isdigit()) or 1)
+    rng = random.Random(args.seed)
+
+    def receiver_ids() -> list[str] | None:
+        try:
+            return client.get(f"{args.receiver}/sync/ids").json()["ids"]
+        except httpx.HTTPError:
+            return None
+
+    first = receiver_ids()
+    if first is None:
+        raise SystemExit(f"can't reach the receiver at {args.receiver}: start it, and check both are on the same Wi-Fi")
+    rejected_before = [client.get(f"{u}/rejected?limit=1", timeout=5).json()["total"] for u in (args.sender, args.receiver)]
+
+    sent: list[str] = []
+    sent_at_back: list[tuple[float, set[str]]] = []  # (reconnect time, alerts to wait for)
+    outages, settles = [], []
+    down_since = None
+    next_post = time.time()
+    t_start = time.time()
+    end_by = None
+    print(f"sending {args.n} alerts to {sender_id}, one every {args.every:g} s. Turn this laptop's Wi-Fi off "
+          f"and on again during the run (about 10 times, a few seconds each).")
+    while True:
+        now = time.time()
+        if len(sent) < args.n and now >= next_post:
+            r = httpx.post(f"{args.sender}/events", json=signed_alert(sender_id, level, key, rng), timeout=5)
+            if r.status_code != 201:
+                raise SystemExit(f"the sender refused the alert: {r.status_code} {r.text} (is --key on its roster?)")
+            sent.append(r.json()["id"])
+            next_post = now + args.every
+        held = receiver_ids()
+        now = time.time()
+        if held is None:
+            down_since = down_since or now
+        else:
+            if down_since is not None:
+                if now - down_since >= args.min_outage:
+                    outages.append(round(now - down_since, 1))
+                    sent_at_back.append((now, set(sent)))
+                    print(f"  outage {len(outages)}: receiver unreachable for {outages[-1]} s, back now")
+                down_since = None
+            have = set(held)
+            for t_back, wanted in list(sent_at_back):
+                if wanted <= have:
+                    settles.append(round(now - t_back, 2))
+                    sent_at_back.remove((t_back, wanted))
+            if len(sent) == args.n and set(sent) <= have:
+                end_by = end_by or now
+                if not sent_at_back:
+                    break
+        if len(sent) == args.n and time.time() - t_start > args.n * args.every + args.settle_timeout:
+            print("  gave up waiting: is the Wi-Fi back on?")
+            break
+        time.sleep(0.25)
+
+    held = receiver_ids() or []
+    agree = False
+    deadline = time.time() + 15
+    while time.time() < deadline:  # the receiver may still be sending its own copy back
+        fps = [client.get(f"{u}/health", timeout=5).json().get("fingerprint") for u in (args.sender, args.receiver)]
+        if fps[0] and fps[0] == fps[1]:
+            agree = True
+            break
+        time.sleep(0.5)
+    verify = [client.get(f"{u}/events/verify", timeout=10).json() for u in (args.sender, args.receiver)]
+    rejected = [client.get(f"{u}/rejected?limit=1", timeout=5).json()["total"] - b
+                for u, b in zip((args.sender, args.receiver), rejected_before)]
+    delivered = len(set(sent) & set(held))
+    duplicates = sum(held.count(i) - 1 for i in set(sent) if held.count(i) > 1)
+    results = {
+        "split": args.label, "backend": "sync", "date": date.today().isoformat(),
+        "how": args.how,
+        "sender": sender_id, "alerts_sent": len(sent), "delivered_to_receiver": delivered,
+        "duplicates": duplicates, "outages": len(outages), "outage_s": outages,
+        "settle_s": settles, "settle_s_median": median(settles) if settles else None,
+        "fingerprints_agree": agree, "chains": verify, "sync_rejections": rejected,
+    }
+    ok = (delivered == len(sent) == args.n and duplicates == 0 and agree and len(outages) >= 1
+          and all(v["chain_intact"] for v in verify) and sum(rejected) == 0)
+    results["passed"] = ok
+    table = "\n".join([
+        f"## Sync with the plug really pulled ({date.today().isoformat()}, {args.label})",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Alerts delivered to the other hub | {delivered} of {len(sent)} |",
+        f"| Real outages (receiver unreachable 2 s or more) | {len(outages)} |",
+        f"| Duplicates | {duplicates} |",
+        f"| Both hubs agree (same fingerprint) | {'yes' if agree else 'NO'} |",
+        f"| Chains intact | {'yes' if all(v['chain_intact'] for v in verify) else 'NO'} |",
+        f"| Sync rejections (false forgeries) | {sum(rejected)} |",
+        f"| Backlog crossed after reconnect, median (s) | {results['settle_s_median']} |",
+        f"| How | {results['how']} |",
+    ])
+    stem = f"sync_stress_{args.label}_{date.today().isoformat()}"
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{stem}.json").write_text(json.dumps(results, indent=2))
+    (out / f"{stem}.md").write_text(table + "\n")
+    print("\n" + table + f"\n\nwrote {out / stem}.*")
+    if not outages:
+        print("No outage was seen: turn the Wi-Fi off for at least 2 s during the run, then run it again.")
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rounds", type=int, default=5)
@@ -47,7 +174,24 @@ def main():
     ap.add_argument("--interval", type=float, default=0.2, help="sync interval, seconds")
     ap.add_argument("--settle-timeout", type=float, default=180)
     ap.add_argument("--seed", type=int, default=0)
+    real = ap.add_argument_group("--real: two machines, the plug really pulled")
+    real.add_argument("--real", action="store_true")
+    real.add_argument("--sender", default="http://localhost:8001", help="the hub on THIS machine")
+    real.add_argument("--receiver", help="the other machine's hub, by its LAN address")
+    real.add_argument("--key", help="key file of a member on both hubs' roster (scripts/roster_tool.py new-key)")
+    real.add_argument("--n", type=int, default=50, help="alerts to send")
+    real.add_argument("--every", type=float, default=1.0, help="seconds between alerts")
+    real.add_argument("--min-outage", type=float, default=2.0, help="seconds unreachable that count as an outage")
+    real.add_argument("--probe-timeout", type=float, default=1.0)
+    real.add_argument("--label", default="real-network", help="file name label; RESULTS.md only reads real-network")
+    real.add_argument("--out", default=str(ROOT / "eval" / "results"))
+    real.add_argument("--how", default="two machines over Wi-Fi, link cut by turning the sender's Wi-Fi off",
+                      help="how the link was cut, as it should read in RESULTS.md")
     args = ap.parse_args()
+    if args.real:
+        if not (args.receiver and args.key):
+            ap.error("--real needs --receiver and --key")
+        sys.exit(run_real(args))
 
     rng = random.Random(args.seed)
     hub_ids = args.hubs.split(",")

@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (late night, after the sync fix and demo tools) by Michael
+**Last updated:** Wed 11/18 (early morning, after the live Directorate script and the fingerprint) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -80,6 +80,9 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
   - *4. Probe to the alert on the other hub: dry run with a simulated canary, **0.81 s** median (30 of 30 arrived). The real run waits on the box: `eval/run_probe_latency.py --real`.*
 - [x] Sync fix: a row deleted from a hub came back as a refusal every second, so the "forgeries blocked" counter climbed by 1 a second. Now the other hub puts the row back (only if this hub wrote exactly that event), and any refusal over sync is counted once and not resent. *(104 tests pass.)*
 - [x] Demo tools: `hub/scripts/roster_tool.py` (operator key, roster file, add or remove a member on a running hub) and `hub/scripts/demo_hubs.py` (start, reset and stop both hubs together). *Send me your public keys: Tisya the box's, Alanna the simulated senders'.*
+- [x] Live Directorate script, `hub/scripts/directorate.py`: forge, replay, tamper, edit, delete, cut and restore, each one real attack on the running hubs so the console reacts on screen; plus the stolen-phone moment (accepted → revoked → refused on both hubs). *Taheful: no new endpoints; run it in a terminal next to the console.*
+- [x] "Hubs agree" fingerprint: `fingerprint` in `GET /health`, and `agrees_with` in `GET /sync/status`. The two match after a cut and reconnect. *Taheful: show it on the console if you want.*
+- [ ] Number 3 with the plug really pulled: `eval/run_sync_stress.py --real` is ready (dry-run tested on one laptop). Needs two laptops on the same Wi-Fi on Wed. *(Keep the simulated 200 of 200 as the stress test.)*
 - [ ] Turn on `REQUIRE_SIGNED=1` once the phones sign.
 - [ ] Results slide; practice answering "how do you know it works?" *(Deck drafted with the practice answer in its notes; the real number 4 goes in Wed.)*
 

@@ -172,7 +172,10 @@ def status(args) -> int:
                 rejected = client.get(f"{url}/rejected?limit=1").json()["total"]
                 print(f"{h['hub_id']} {url}: {health['events']} events, chain intact {health['chain_intact']}, "
                       f"{rejected} refused, {sync['link']['queued']} waiting to send, "
-                      f"link {'cut' if sync['link'].get('cut') else 'up'}, {sync['restored']} rows restored")
+                      f"link {'cut' if sync['link'].get('cut') else 'up'}, {sync['restored']} rows restored, "
+                      f"fingerprint {sync['fingerprint']}")
+                agree = list(sync["agrees_with"].values())
+                print(f"  hubs agree: {'yes' if agree and all(agree) else 'no' if False in agree else 'unknown (link cut or peer silent)'}")
             except httpx.HTTPError as err:
                 print(f"{h['hub_id']} {url}: not answering ({err.__class__.__name__})")
     return 0

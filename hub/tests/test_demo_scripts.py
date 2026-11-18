@@ -175,3 +175,111 @@ def test_down_stops_both(demo):
     for url in demo["urls"]:
         with pytest.raises(httpx.HTTPError):
             httpx.get(f"{url}/health", timeout=1)
+
+
+# ---------------------------------------------------------------- directorate.py, live against real hubs
+
+import directorate  # noqa: E402
+
+
+def d(demo, *argv):
+    return directorate.main([*argv, "--dir", str(demo["run"])])
+
+
+def box_alerts(demo, n=2, hub_id="hub-L12", url=None):
+    url = url or demo["urls"][1]
+    sent = [alert(hub_id, demo["box"], level=12, note=f"n{i}") for i in range(n)]
+    for e in sent:
+        assert demo["client"].post(f"{url}/events", json=e).status_code == 201
+    return sent
+
+
+def counter(demo, url):
+    return demo["client"].get(f"{url}/rejected").json()["total"]
+
+
+def test_forge_replay_tamper_are_refused_and_each_moves_the_counter_once(demo, capsys):
+    l12 = demo["urls"][1]
+    box_alerts(demo)
+    before = counter(demo, l12)
+    assert d(demo, "forge") == 0
+    assert "unknown key" in capsys.readouterr().out
+    assert d(demo, "replay") == 0
+    assert "duplicate id" in capsys.readouterr().out
+    assert d(demo, "tamper") == 0
+    assert "bad signature" in capsys.readouterr().out
+    assert counter(demo, l12) == before + 3
+    reasons = [r["reason"] for r in demo["client"].get(f"{l12}/rejected").json()["rejected"][:3]]
+    assert reasons == ["bad signature", "replay: duplicate id", "unknown key"]
+
+
+def test_replay_with_nothing_to_replay_says_so(demo):
+    with pytest.raises(SystemExit, match="no signed alert"):
+        d(demo, "replay")
+
+
+def test_edit_is_named_at_the_exact_row(demo, capsys):
+    l12 = demo["urls"][1]
+    sent = box_alerts(demo, n=3)
+    assert d(demo, "edit") == 0
+    assert demo["client"].get(f"{l12}/events/verify").json()["first_bad_event"] == sent[-1]["id"]
+    assert sent[-1]["id"][:8] in capsys.readouterr().out
+    # a second edit, to an older record: the chain check reports the first bad record in order
+    assert d(demo, "edit", "--id", sent[0]["id"]) == 0
+    assert demo["client"].get(f"{l12}/events/verify").json()["first_bad_event"] == sent[0]["id"]
+
+
+def test_delete_is_flagged_then_put_back_without_moving_the_counter(demo, capsys):
+    l34, l12 = demo["urls"]
+    sent = box_alerts(demo, n=3)
+    assert wait_for(lambda: {e["id"] for e in sent} <= set(demo["client"].get(f"{l34}/sync/ids").json()["ids"]))
+    before = counter(demo, l12)
+    assert d(demo, "delete") == 0
+    out = capsys.readouterr().out
+    assert "names it as missing" in out and "put it back" in out
+    assert counter(demo, l12) == before and demo["client"].get(f"{l12}/events/verify").json()["chain_intact"]
+
+
+def test_cut_holds_alerts_restore_delivers_and_the_hubs_agree(demo, capsys):
+    l34, l12 = demo["urls"]
+    c = demo["client"]
+    box_alerts(demo, n=1, hub_id="hub-L34", url=l34)
+    assert wait_for(lambda: c.get(f"{l34}/sync/status").json()["agrees_with"] == {l12: True})
+    assert d(demo, "cut") == 0
+    held = box_alerts(demo, n=2, hub_id="hub-L34", url=l34)
+    time.sleep(2)
+    assert not {e["id"] for e in held} & set(c.get(f"{l12}/sync/ids").json()["ids"])
+    assert c.get(f"{l34}/sync/status").json()["agrees_with"] == {l12: None}
+    assert c.get(f"{l34}/health").json()["fingerprint"] != c.get(f"{l12}/health").json()["fingerprint"]
+    assert d(demo, "restore") == 0
+    assert wait_for(lambda: c.get(f"{l34}/sync/status").json()["agrees_with"] == {l12: True})
+    assert c.get(f"{l34}/health").json()["fingerprint"] == c.get(f"{l12}/health").json()["fingerprint"]
+    capsys.readouterr()
+    assert d(demo, "status") == 0
+    out = capsys.readouterr().out
+    assert out.count("agrees") == 2
+
+
+def test_revoke_demo_accepted_then_refused_on_both_hubs(demo, tmp_path, capsys):
+    phone = tmp_path / "phone.key"
+    roster_tool.main(["new-key", "--out", str(phone)])
+    l34, l12 = demo["urls"]
+    roster_tool.main(["add", str(phone), "--hub", l12, "--operator", str(demo["op"])])
+    pub = json.loads(phone.read_text())["pub"]
+    assert wait_for(lambda: any(m["pub"] == pub for m in demo["client"].get(f"{l34}/roster").json()["members"]))
+    capsys.readouterr()
+    assert d(demo, "revoke-demo", "--member", str(phone), "--operator", str(demo["op"])) == 0
+    out = capsys.readouterr().out
+    assert "MEMBER" in out and "stored" in out
+    assert out.count("refused, unknown key") == 2
+
+
+def test_revoke_demo_needs_the_phone_on_the_roster_first(demo, tmp_path):
+    phone = tmp_path / "phone.key"
+    roster_tool.main(["new-key", "--out", str(phone)])
+    assert d(demo, "revoke-demo", "--member", str(phone), "--operator", str(demo["op"])) == 1
+
+
+def test_no_demo_hubs_running_says_how_to_start_them(tmp_path):
+    with pytest.raises(SystemExit, match="demo_hubs.py up"):
+        directorate.main(["forge", "--dir", str(tmp_path / "nothing")])

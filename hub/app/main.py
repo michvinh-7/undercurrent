@@ -60,7 +60,7 @@ app.include_router(make_router(syncer))  # GET /sync/ids, POST /sync/events, GET
 @app.get("/health")
 def health():
     intact, _ = log.verify()
-    return {"hub_id": HUB_ID, "events": log.count(), "chain_intact": intact}
+    return {"hub_id": HUB_ID, "events": log.count(), "chain_intact": intact, "fingerprint": log.fingerprint()}
 
 
 @app.post("/events", response_model=Event, status_code=201)
