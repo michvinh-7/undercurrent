@@ -11,9 +11,11 @@ import { summary, timeAgo } from "@/lib/format";
 import { useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import { adaptEvents, SEVERITY_LABEL, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
 import {
-  addLevel, buildingById, createWorld, FACILITY_USES, levelOf, MAX_LEVEL, MIN_LEVEL, nameOf, scenariosFor,
+  addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, safeRoute, FACILITY_USES, levelOf, MAX_LEVEL, MIN_LEVEL, nameOf, scenariosFor,
   solveWater, USE_LABEL, type CityWorld, type Failure,
 } from "./model";
+import { narrate, type Story } from "./narrate";
+import { streetGraph } from "./model";
 import CityScene, { pinTitle, SEVERITY_COLOR, type HubView, type Layers, type LayerId, type Selection, type View } from "./scene/CityScene";
 
 const LAYER_LIST: { id: LayerId; label: string }[] = [
@@ -97,13 +99,58 @@ export default function CityApp() {
   const level = levelOf(world, active) ?? world.levels[0];
   const sums = useMemo(() => new Map(world.levels.map((l) => [l.n, summarize(events, l.n)])), [world, events]);
 
+  // Flooding: only where a Canary box with a known mount reported water (last 24 h).
+  const [spread, setSpread] = useState(false);
+  const floodEvent = useMemo(() => events.find((e) =>
+    e.level === level.n && e.place.kind === "exact" && e.event.type === "hazard" &&
+    (e.event.payload as { kind?: string })?.kind === "flooding" && Date.now() - e.time < 24 * 3600e3), [events, level.n]);
+  const flood = useMemo(() => {
+    if (!floodEvent || floodEvent.place.kind !== "exact" || !layers.alerts) return null;
+    const at: [number, number] = [floodEvent.place.x, floodEvent.place.z];
+    const radius = spread ? 45 : 16;
+    return { at, radius, blocked: floodedEdges(world.grid, at, radius), spread };
+  }, [floodEvent, world.grid, spread, layers.alerts]);
+  const cut = useMemo(() => (flood ? cutOffBuildings(world.grid, level, flood.blocked) : new Set<string>()), [flood, world.grid, level]);
+  const route = useMemo(() => {
+    if (!flood) return null;
+    const care = destinations(level, ["hospital", "clinic"]);
+    return safeRoute(world.grid, flood.at, care.length ? care : destinations(level, ["shelter"]), flood.blocked);
+  }, [flood, level, world.grid]);
+
+  const story: Story = useMemo(() => {
+    const streetNames = flood ? [...new Set(streetNamesFor(world, [...flood.blocked]))] : [];
+    const dry = [...water.dry.keys()].map((id) => buildingById(world, id)!).filter(Boolean);
+    const hub = hubs.find((h) => h.level === level.n), other = hubs.find((h) => h.level !== level.n);
+    const counts = world.levels.filter((l) => l.n !== level.n).map((l) => ({ level: l.n, count: sums.get(l.n)?.total ?? 0 })).sort((a, b) => b.count - a.count)[0];
+    return narrate({
+      level: level.n, levelName: level.name, buildings: level.buildings.filter((b) => b.use !== "pumphouse").length,
+      flood: flood && floodEvent ? {
+        where: nameOf(world, world.sensors.find((x) => x.deviceId === (floodEvent.place as { deviceId: string }).deviceId)?.building ?? "") || "the sensor",
+        ago: timeAgo(floodEvent.event.created_at), verified: floodEvent.verified, demo: floodEvent.demo,
+        blockedStreets: streetNames, cutOff: [...cut].filter((id) => !id.endsWith("/pump")).length, spread,
+        route: route ? { to: route.to, minutes: route.minutes, via: route.via } : null,
+      } : null,
+      sim: sim && (sim.failure.nodes?.length || sim.failure.pipes?.length) ? {
+        label: sim.label, dry: dry.length, people: dry.reduce((t, b) => t + b.residents, 0),
+        levels: [...new Set(dry.map((b) => b.level))].sort((a, b) => a - b),
+        facilities: dry.filter((b) => FACILITY_USES.includes(b.use) && b.use !== "pumphouse").map((b) => b.name),
+      } : null,
+      link: hub && other ? { other: other.level, cut: hub.cut, queued: hub.queued, online: hub.online } : null,
+      forgery: hubs.find((h) => h.forgery)?.forgery ?? null,
+      sosHere: events.filter((e) => e.level === level.n && e.severity === "sos").length,
+      reportsHere: sums.get(level.n)?.total ?? 0,
+      reportsElsewhere: counts && counts.count > 0 ? counts : null,
+      demo,
+    });
+  }, [world, level, flood, floodEvent, cut, route, spread, sim, water, hubs, events, sums, demo]);
+
   return (
     <div className="theme-paper relative h-[100dvh] w-full overflow-hidden">
       <div className="absolute inset-x-0 top-0 bottom-[40dvh] md:bottom-0">
         <CityScene
           world={world} active={level.n} view={view} layers={layers} water={water} selection={selection}
           onSelect={select} onLevel={goLevel} events={events} fresh={fresh} hubs={hubs} packetKey={packetKey}
-          focus={focus} resetKey={resetKey}
+          focus={focus} resetKey={resetKey} flood={flood} route={route} cut={cut}
         />
       </div>
 
@@ -125,7 +172,7 @@ export default function CityApp() {
       </div>
 
       <aside className="absolute inset-x-0 bottom-0 z-40 flex h-[40dvh] flex-col gap-2 overflow-y-auto border-t border-[var(--border)] bg-[var(--background)] p-2 md:h-auto md:border-0 md:bg-transparent md:inset-x-auto md:bottom-auto md:right-3 md:top-[64px] md:max-h-[calc(100dvh-80px)] md:w-[330px] md:p-0">
-        <MobileStatus world={world} level={level.n} events={events} water={water} />
+        <div className="md:hidden"><Bubble story={story} flood={!!flood} spread={spread} setSpread={setSpread} /></div>
         {selection ? (
           <Inspector
             world={world} selection={selection} events={events} water={water} net={net} hubs={hubs}
@@ -136,6 +183,10 @@ export default function CityApp() {
         <div className="order-last md:order-none"><WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} /></div>
         <Feed events={events} fresh={fresh} demo={demo} onPick={(e) => { select({ type: "event", id: e.id }); if (e.place.kind === "exact") setFocus({ x: e.place.x, z: e.place.z, key: Date.now() }); }} onDemoAlert={() => net.actions.demoSensorAlert(34)} />
       </aside>
+
+      <div className="absolute bottom-14 left-3 z-40 hidden w-[380px] md:block">
+        <Bubble story={story} flood={!!flood} spread={spread} setSpread={setSpread} />
+      </div>
 
       <div className="absolute bottom-3 left-3 z-40 hidden flex-wrap gap-1.5 md:flex">
         {LAYER_LIST.map((l) => (
@@ -512,5 +563,46 @@ function Feed({ events, fresh, demo, onPick, onDemoAlert }: { events: MapEvent[]
         ))}
       </ul>
     </Card>
+  );
+}
+
+function streetNamesFor(world: CityWorld, edgeIds: string[]): string[] {
+  const g = streetGraph(world.grid);
+  return edgeIds.map((id) => g.edges.find((e) => e.id === id)?.street).filter((x): x is string => !!x);
+}
+
+// --- The "What's happening" bubble -------------------------------------------------------------
+
+const TONE: Record<Story["tone"], { bar: string; label: string }> = {
+  calm: { bar: "var(--ok)", label: "All clear" },
+  caution: { bar: "var(--warn)", label: "Heads up" },
+  alert: { bar: "var(--danger)", label: "Alert" },
+  sim: { bar: "var(--sim)", label: "Simulation" },
+};
+
+function Bubble({ story, flood, spread, setSpread }: { story: Story; flood: boolean; spread: boolean; setSpread: (b: boolean) => void }) {
+  const t = TONE[story.tone];
+  return (
+    <section
+      key={story.title}
+      role="status"
+      aria-live="polite"
+      className="bubble-in relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] py-3 pl-4 pr-3.5 shadow-[0_6px_24px_rgb(0_0_0/0.08)]"
+    >
+      <span className="absolute inset-y-0 left-0 w-1" style={{ background: t.bar }} />
+      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: t.bar }}>
+        <span className="size-1.5 rounded-full" style={{ background: t.bar }} /> What&apos;s happening · {t.label}
+      </p>
+      <h2 className="mt-1 text-[15px] font-semibold leading-snug">{story.title}</h2>
+      {story.lines.map((l) => <p key={l} className="mt-1 text-[13px] leading-snug text-[var(--muted)]">{l}</p>)}
+      <p className="mt-2 text-[11px] leading-snug text-[var(--faint)]">{story.source}</p>
+      <div className="flex">
+        {flood && (
+          <button onClick={() => setSpread(!spread)} className="mt-2 rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-[11px] hover:bg-[var(--panel-2)]">
+            {spread ? "Back to the reading" : "What if it keeps rising?"}
+          </button>
+        )}
+      </div>
+    </section>
   );
 }

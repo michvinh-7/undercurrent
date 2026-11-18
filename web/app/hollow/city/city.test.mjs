@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createWorld, addLevel, solveWater, scenariosFor, insideOutline, pumpId, riserId, INITIAL_LEVELS } from "./model.ts";
 import { adaptEvent, adaptEvents, summarize } from "./adapter.ts";
+import { streetGraph, floodedEdges, safeRoute, cutOffBuildings, destinations, CORE } from "./model.ts";
+import { narrate } from "./narrate.ts";
 
 const world = createWorld();
 const opts = { isVerified: (e) => !!e.sig, demo: false };
@@ -138,4 +140,48 @@ test("adding a level doesn't change event placement for existing levels", () => 
   const events = [ev({ source: "sensor", device_id: "canary-34" }), ev({ id: "x", level: 12 })];
   const a = adaptEvents(events, world, opts), b = adaptEvents(events, addLevel(world, 36), opts);
   assert.deepEqual(b.map((m) => [m.id, m.level, m.place]), a.map((m) => [m.id, m.level, m.place]));
+});
+
+const L34 = world.levels.find((l) => l.n === 34);
+const flood = [CORE.pump[0] - 2.4, CORE.pump[1] - 3.2];
+
+test("streets: one graph for every level, with two stairwells", () => {
+  const g = streetGraph(world.grid);
+  assert.ok(g.edges.length > 20);
+  assert.equal(g.stairs.length, 2);
+  for (const e of g.edges) assert.ok(g.pos.has(e.a) && g.pos.has(e.b), e.id);
+});
+
+test("a flood at the lift station blocks nearby segments only", () => {
+  const b = floodedEdges(world.grid, flood, 16);
+  assert.ok(b.size >= 1 && b.size <= 6, `${b.size}`);
+});
+
+test("safe route never uses a blocked segment and reaches the hospital", () => {
+  const blocked = floodedEdges(world.grid, flood, 16);
+  const r = safeRoute(world.grid, flood, destinations(L34, ["hospital"]), blocked);
+  assert.ok(r && r.to === "Hospital" && r.minutes >= 1);
+  const g = streetGraph(world.grid);
+  const pts = r.points.slice(2, -2).map((p) => p.join());
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const e = g.edges.find((x) => [g.pos.get(x.a).join(), g.pos.get(x.b).join()].sort().join("|") === [pts[i], pts[i + 1]].sort().join("|"));
+    assert.ok(e && !blocked.has(e.id), "route walks a blocked street");
+  }
+});
+
+test("a small flood cuts off only the lift station standing in it; a rising one cuts off more", () => {
+  assert.deepEqual([...cutOffBuildings(world.grid, L34, floodedEdges(world.grid, flood, 16))], ["L34/pump"]);
+  assert.ok(cutOffBuildings(world.grid, L34, floodedEdges(world.grid, flood, 70)).size > 0);
+});
+
+test("narrator: calm, flood, link cut, simulation, forgery — and never claims more than it's given", () => {
+  const base = { level: 34, levelName: "Pump room", buildings: 68, flood: null, sim: null, link: { other: 12, cut: false, queued: 0, online: true }, forgery: null, sosHere: 0, reportsHere: 0, reportsElsewhere: null, demo: false };
+  assert.equal(narrate(base).tone, "calm");
+  const f = narrate({ ...base, flood: { where: "the L34 lift station", ago: "2 min ago", verified: false, demo: false, blockedStreets: ["Central Way"], cutOff: 0, spread: false, route: { to: "Hospital", minutes: 3, via: ["Pumpwell St"] } } });
+  assert.equal(f.tone, "alert");
+  assert.match(f.source, /not verified/);
+  assert.match(f.source, /assumed/);
+  assert.match(narrate({ ...base, link: { other: 12, cut: true, queued: 2, online: true } }).lines[0], /2 reports are waiting/);
+  assert.match(narrate({ ...base, sim: { label: "Lift station 34 stops", dry: 68, people: 557, levels: [34], facilities: [] } }).source, /Simulated/);
+  assert.equal(narrate({ ...base, forgery: "unknown key" }).tone, "alert");
 });
