@@ -28,6 +28,7 @@ export interface HubState {
   url: string;
   hubId: string | null;
   online: boolean;
+  misses: number; // consecutive failed polls; offline only after 2, so one slow answer doesn't flap
   link: LinkStatus | null;
   rejectedTotal: number;
   rejected: RejectedEvent[];
@@ -61,13 +62,17 @@ async function pollHub(prev: HubState): Promise<HubState> {
   // so a burst of parallel reads can trip it. A failed read keeps the last good value.
   const get = <T,>(path: string) => getJson<T>(`${u}${path}`).catch(() => null);
   const h = await get<{ hub_id: string }>("/health");
-  if (!h) return { ...prev, online: false, link: null };
+  if (!h) {
+    const misses = prev.misses + 1;
+    return misses >= 2 ? { ...prev, misses, online: false, link: null } : { ...prev, misses };
+  }
   const link = await get<LinkStatus>("/link");
   const rj = await get<{ total: number; rejected: RejectedEvent[] }>("/rejected?limit=20");
   const verify = await get<VerifyReport>("/events/verify");
   return {
     ...prev,
     online: true,
+    misses: 0,
     hubId: h.hub_id,
     link: link ?? prev.link,
     rejectedTotal: rj?.total ?? prev.rejectedTotal,
@@ -77,7 +82,7 @@ async function pollHub(prev: HubState): Promise<HubState> {
 }
 
 const emptyHub = (role: HubState["role"], url: string): HubState => ({
-  role, url, hubId: null, online: false, link: null, rejectedTotal: 0, rejected: [], verify: null,
+  role, url, hubId: null, online: false, misses: 0, link: null, rejectedTotal: 0, rejected: [], verify: null,
 });
 
 /** A cell message: its payload is ciphertext only members can open. */
@@ -95,6 +100,9 @@ export function useUndercurrent() {
   const [hubs, setHubs] = useState<HubState[]>([]);
   const [roster, setRoster] = useState<RosterStatus | null>(null);
   const everLive = useRef(false);
+  // When the stream first opened. Everything it sends in the first moments is the stored
+  // backlog; events that arrive later are new (including alerts that waited out a cut).
+  const [openedAt, setOpenedAt] = useState(0);
 
   // Live event stream from the primary hub (it holds both hubs' events once synced).
   useEffect(() => {
@@ -103,15 +111,25 @@ export function useUndercurrent() {
     setHubs(peer ? [emptyHub("primary", primary), emptyHub("peer", peer)] : [emptyHub("primary", primary)]);
     if (forceDemo.current) {
       setMode("demo");
+      setOpenedAt(Date.now());
       return;
     }
     const es = new EventSource(`${primary}/events/stream`);
-    const giveUp = setTimeout(() => !everLive.current && setMode("demo"), OFFLINE_AFTER_MS);
+    const giveUp = setTimeout(() => {
+      if (everLive.current) return;
+      setMode("demo");
+      setOpenedAt(Date.now());
+    }, OFFLINE_AFTER_MS);
     es.onopen = () => {
+      if (!everLive.current) setOpenedAt(Date.now());
       everLive.current = true;
       setMode("live");
     };
-    es.onerror = () => setMode(everLive.current ? "connecting" : "demo"); // EventSource retries by itself
+    es.onerror = () => {
+      if (everLive.current) return setMode("connecting"); // EventSource retries by itself
+      setMode("demo");
+      setOpenedAt((t) => t || Date.now());
+    };
     es.onmessage = (m) => {
       const e = JSON.parse(m.data) as HollowEvent;
       setEvents((cur) => new Map(cur).set(e.id, e));
@@ -169,9 +187,9 @@ export function useUndercurrent() {
     if (live) return hubs;
     if (!demo) return [];
     return [
-      { role: "primary", url: hubUrls().primary, hubId: "hub-L12", online: true, link: demoLink, rejectedTotal: demo.rejected.total,
+      { role: "primary", url: hubUrls().primary, hubId: "hub-L12", online: true, misses: 0, link: demoLink, rejectedTotal: demo.rejected.total,
         rejected: demo.rejected.rejected, verify: demo.verify },
-      { role: "peer", url: hubUrls().peer ?? "demo", hubId: "hub-L34", online: true, link: demo.link, rejectedTotal: 0, rejected: [],
+      { role: "peer", url: hubUrls().peer ?? "demo", hubId: "hub-L34", online: true, misses: 0, link: demo.link, rejectedTotal: 0, rejected: [],
         verify: demo.verify },
     ];
   }, [live, hubs, demo]);
@@ -273,9 +291,13 @@ export function useUndercurrent() {
     setArrived((cur) => new Map(cur).set(e.id, now));
   }, [live]);
 
+  /** True for events that arrived after the initial backlog: new alerts, and ones released by a restored link. */
+  const isFresh = useCallback((id: string) => openedAt > 0 && (arrived.get(id) ?? 0) - openedAt > 1500, [arrived, openedAt]);
+
   return {
     mode,
     live,
+    isFresh,
     events: eventList,
     arrived,
     hubs: hubStates,

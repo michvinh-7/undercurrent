@@ -9,7 +9,7 @@
 // Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
 import { isEncrypted, isSensor, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
@@ -34,10 +34,6 @@ export default function Console() {
   const net = useUndercurrent();
   const now = useNow();
   const [directorate, setDirectorate] = useState(false);
-  const mountedAt = useRef(0);
-  useEffect(() => {
-    mountedAt.current = Date.now();
-  }, []);
 
   const queue = useMemo(() => net.events.filter((e) => e.type !== "roster").sort(byPriority), [net.events]);
   const primary = net.hubs.find((h) => h.role === "primary");
@@ -74,7 +70,7 @@ export default function Console() {
           <ol className="mt-3 space-y-2">
             {queue.map((e) => {
               const t = net.arrived.get(e.id);
-              const isNew = t !== undefined && t - mountedAt.current > 2000 && now - t < NEW_MS;
+              const isNew = t !== undefined && net.isFresh(e.id) && now - t < NEW_MS;
               return (
                 <QueueItem
                   key={e.id}
