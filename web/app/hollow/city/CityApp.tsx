@@ -9,14 +9,17 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { summary, timeAgo } from "@/lib/format";
 import { useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
-import { adaptEvents, SEVERITY_LABEL, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
+import { adaptEvents, checkinStatus, isLungReport, isWaterReport, peopleIn, pinOf, SEVERITY_LABEL, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
 import {
-  addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, safeRoute, FACILITY_USES, levelOf, MAX_LEVEL, MIN_LEVEL, nameOf, scenariosFor,
+  addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, levelInlet, safeRoute, streetMain, traceSource, upstream, FACILITY_USES, levelOf, MAX_LEVEL, MIN_LEVEL, nameOf, pumpId, scenariosFor,
   solveWater, USE_LABEL, type CityWorld, type Failure,
 } from "./model";
 import { narrate, type Story } from "./narrate";
 import { streetGraph } from "./model";
 import CityScene, { pinTitle, SEVERITY_COLOR, type HubView, type Layers, type LayerId, type Selection, type View } from "./scene/CityScene";
+
+const EMPTY: ReadonlySet<string> = new Set();
+const isCare = (u: string) => u === "hospital" || u === "clinic";
 
 const LAYER_LIST: { id: LayerId; label: string }[] = [
   { id: "buildings", label: "Buildings" },
@@ -77,7 +80,8 @@ export default function CityApp() {
     if (!follow || SEVERITY_RANK[latest.severity] < SEVERITY_RANK.hazard || !latest.onMap || latest.level === null) return;
     setActive(latest.level);
     setSelection({ type: "event", id: latest.id });
-    if (latest.place.kind === "exact") setFocus({ x: latest.place.x, z: latest.place.z, key: Date.now() });
+    const pin = pinOf(latest);
+    if (pin) setFocus({ x: pin.x, z: pin.z, key: Date.now() });
   }, [events, fresh, follow]);
 
   const goLevel = (n: number) => {
@@ -111,11 +115,39 @@ export default function CityApp() {
     return { at, radius, blocked: floodedEdges(world.grid, at, radius), spread };
   }, [floodEvent, world.grid, spread, layers.alerts]);
   const cut = useMemo(() => (flood ? cutOffBuildings(world.grid, level, flood.blocked) : new Set<string>()), [flood, world.grid, level]);
+  // The way to care: from a clicked building, or out of the flood.
+  const selBuilding = selection?.type === "building" ? buildingById(world, selection.id) : undefined;
   const route = useMemo(() => {
-    if (!flood) return null;
+    const fromBuilding = selBuilding && selBuilding.level === level.n && !isCare(selBuilding.use);
+    const from = fromBuilding ? selBuilding!.center : flood?.at;
+    if (!from) return null;
     const care = destinations(level, ["hospital", "clinic"]);
-    return safeRoute(world.grid, flood.at, care.length ? care : destinations(level, ["shelter"]), flood.blocked);
-  }, [flood, level, world.grid]);
+    const r = safeRoute(world.grid, from, care.length ? care : destinations(level, ["shelter"]), flood?.blocked ?? new Set());
+    return r ? { ...r, kind: care.length ? ("care" as const) : ("shelter" as const) } : null;
+  }, [flood, level, world.grid, selBuilding]);
+
+  // Bad water: trace every report up the pipes and look for the element they share.
+  const trace = useMemo(() => {
+    const chains = events.filter((e) => isWaterReport(e) && e.onMap && e.level !== null).map((e) => {
+      const n = e.level!;
+      if (e.place.kind === "named" && e.place.building) { const t = world.network.tapOf.get(e.place.building); return t ? upstream(world, t.pipe) : []; }
+      if (e.place.kind === "named" && e.place.street) { const m = streetMain(world, n, e.place.street); if (m) return upstream(world, m); }
+      const inlet = levelInlet(world, n);
+      return inlet ? [pumpId(n), ...upstream(world, inlet)] : [];
+    });
+    return { chains: chains.length, result: traceSource(world, chains) };
+  }, [events, world]);
+  const showTrace = layers.water && trace.result ? trace.result : null;
+
+  // Nearest care for this level, in words (another level if this one has none).
+  const care = useMemo(() => {
+    const here = destinations(level, ["hospital", "clinic"]);
+    if (here.length) return `the ${here[0].name} on this level`;
+    const other = world.levels.filter((l) => l.n !== level.n && destinations(l, ["hospital", "clinic"]).length).sort((a, b) => Math.abs(a.n - level.n) - Math.abs(b.n - level.n))[0];
+    if (!other) return null;
+    const d = other.n - level.n;
+    return `the ${destinations(other, ["hospital", "clinic"])[0].name} on L${other.n}, ${Math.abs(d)} level${Math.abs(d) === 1 ? "" : "s"} ${d < 0 ? "up" : "down"}`;
+  }, [level, world]);
 
   const story: Story = useMemo(() => {
     const streetNames = flood ? [...new Set(streetNamesFor(world, [...flood.blocked]))] : [];
@@ -141,8 +173,19 @@ export default function CityApp() {
       reportsHere: sums.get(level.n)?.total ?? 0,
       reportsElsewhere: counts && counts.count > 0 ? counts : null,
       demo,
+      selected: selBuilding && selBuilding.level === level.n ? {
+        name: selBuilding.use === "housing" || selBuilding.use === "workshop" ? `${USE_LABEL[selBuilding.use]} on L${level.n}` : selBuilding.name,
+        care: route && !isCare(selBuilding.use) ? { to: route.to, minutes: route.minutes, via: route.via, kind: route.kind } : null,
+        isCare: isCare(selBuilding.use),
+        avoidsFlood: !!flood && flood.blocked.size > 0, atRisk: !!showTrace?.atRisk.has(selBuilding.id), dry: water.dry.has(selBuilding.id),
+      } : null,
+      water: showTrace && [...showTrace.atRisk].some((id) => id.startsWith(`L${level.n}/`)) ? { source: nameOf(world, showTrace.source), reports: showTrace.reports, atRisk: showTrace.atRisk.size } : null,
+      waterReports: trace.result ? 0 : trace.chains,
+      lungs: (() => { const l = events.filter((e) => e.level === level.n && isLungReport(e)); return l.length ? { reports: l.length, people: l.reduce((t, e) => t + peopleIn(e), 0) } : null; })(),
+      checkins: (() => { const c = events.filter((e) => e.level === level.n).map(checkinStatus).filter(Boolean); return { ok: c.filter((x) => x === "ok").length, help: c.filter((x) => x === "need_help").length }; })(),
+      care,
     });
-  }, [world, level, flood, floodEvent, cut, route, spread, sim, water, hubs, events, sums, demo]);
+  }, [world, level, flood, floodEvent, cut, route, spread, sim, water, hubs, events, sums, demo, selBuilding, showTrace, trace, care]);
 
   return (
     <div className="theme-paper relative h-[100dvh] w-full overflow-hidden">
@@ -151,6 +194,7 @@ export default function CityApp() {
           world={world} active={level.n} view={view} layers={layers} water={water} selection={selection}
           onSelect={select} onLevel={goLevel} events={events} fresh={fresh} hubs={hubs} packetKey={packetKey}
           focus={focus} resetKey={resetKey} flood={flood} route={route} cut={cut}
+          trace={showTrace ? { pipes: showTrace.pipes, source: showTrace.source } : null} risk={showTrace?.atRisk ?? EMPTY}
         />
       </div>
 
@@ -181,7 +225,7 @@ export default function CityApp() {
           />
         ) : null}
         <div className="order-last md:order-none"><WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} /></div>
-        <Feed events={events} fresh={fresh} demo={demo} onPick={(e) => { select({ type: "event", id: e.id }); if (e.place.kind === "exact") setFocus({ x: e.place.x, z: e.place.z, key: Date.now() }); }} onDemoAlert={() => net.actions.demoSensorAlert(34)} />
+        <Feed events={events} fresh={fresh} demo={demo} onPick={(e) => { select({ type: "event", id: e.id }); const pin = pinOf(e); if (pin) setFocus({ x: pin.x, z: pin.z, key: Date.now() }); }} onDemoAlert={() => net.actions.demoSensorAlert(34)} />
       </aside>
 
       <div className="absolute bottom-14 left-3 z-40 hidden w-[380px] md:block">
@@ -219,7 +263,8 @@ function positionOf(world: CityWorld, s: Selection, events: MapEvent[]): { level
     case "event": {
       const e = events.find((x) => x.id === s.id);
       if (!e || e.level === null || !e.onMap) return null;
-      return e.place.kind === "exact" ? { level: e.level, x: e.place.x, z: e.place.z } : { level: e.level };
+      const pin = pinOf(e);
+      return pin ? { level: e.level, x: pin.x, z: pin.z } : { level: e.level };
     }
   }
 }
@@ -319,7 +364,7 @@ function LevelCard({ world, level, events, water, hubs, sim, onEvent }: {
   sim: { label: string } | null; onEvent: (id: string) => void;
 }) {
   const { l, here, dry, served } = levelFacts(world, level, events, water);
-  const pinned = here.filter((e) => e.place.kind === "exact");
+  const pinned = here.filter((e) => pinOf(e));
   const loose = here.filter((e) => e.place.kind === "level");
   const hub = hubs.find((h) => h.level === level);
   const other = hubs.find((h) => h.level !== level);
@@ -339,6 +384,15 @@ function LevelCard({ world, level, events, water, hubs, sim, onEvent }: {
             {!hub.online ? `Hub ${level} offline` : hub.cut ? `Link to L${other.level} cut${hub.queued ? ` · ${hub.queued} waiting to send` : ""}` : `Hub linked to L${other.level}`}
           </Fact>
         )}
+        {(() => {
+          const c = here.map(checkinStatus).filter(Boolean);
+          const help = c.filter((x) => x === "need_help").length;
+          return c.length ? <Fact color={help ? "var(--danger)" : "var(--ok)"}>Check-ins: {c.length - help} safe{help ? `, ${help} asking for help` : ""}</Fact> : null;
+        })()}
+        {(() => {
+          const l = here.filter(isLungReport);
+          return l.length ? <Fact color="var(--warn)">{l.reduce((t, e) => t + peopleIn(e), 0)} people coughing or short of breath ({l.length} report{l.length === 1 ? "" : "s"})</Fact> : null;
+        })()}
       </ul>
       {sim && dry.length > 0 && <p className="mt-2 text-xs text-[var(--muted)]">Because: {sim.label} (simulated).</p>}
       {loose.length > 0 && (
@@ -393,6 +447,9 @@ function Legend() {
         <Swatch c="#5f7d6b">Shelters</Swatch>
         <Swatch c="#3b82c4">Pipe carrying water; arrows show which way it flows</Swatch>
         <Swatch c="#c98f2e">Building cut off from water (simulated)</Swatch>
+        <Swatch c="#b9975a">Gets water through the likely bad-water source (a guess)</Swatch>
+        <Swatch c="#7d7a74">No dry way to the stairs during a flood</Swatch>
+        <Swatch c="#1f8a70">Safest walking route</Swatch>
         <Swatch c="#c2412d" round>Pin: a sensor alert at a known spot. Faded = not verified.</Swatch>
       </ul>
       <p className="mt-2 text-[var(--muted)]">
@@ -496,6 +553,7 @@ function Inspector({ world, selection, events, water, net, hubs, onClose, onFocu
   const tampered = net.chain?.first_bad_event === e.id;
   const where = e.place.kind === "exact"
     ? `At ${e.place.deviceId} (its mount is known)`
+    : e.place.kind === "named" ? `${e.place.name} (named in the report)`
     : e.place.kind === "level" ? `Somewhere on L${e.level}; the report doesn't say where${e.onMap ? "" : " (level not on the map yet)"}` : "Unknown: no level given";
   return (
     <Card title={<><span style={{ color: SEVERITY_COLOR[e.severity] }}>●</span> {pinTitle(e)}</>} right={close}>
@@ -595,6 +653,14 @@ function Bubble({ story, flood, spread, setSpread }: { story: Story; flood: bool
       </p>
       <h2 className="mt-1 text-[15px] font-semibold leading-snug">{story.title}</h2>
       {story.lines.map((l) => <p key={l} className="mt-1 text-[13px] leading-snug text-[var(--muted)]">{l}</p>)}
+      {story.also && (
+        <div className="mt-2 border-t border-[var(--border)] pt-1.5">
+          <p className="text-[11px] font-medium text-[var(--muted)]">Also on this level</p>
+          <ul className="mt-0.5 space-y-0.5">
+            {story.also.map((t) => <li key={t} className="text-[12px] leading-snug">· {t}</li>)}
+          </ul>
+        </div>
+      )}
       <p className="mt-2 text-[11px] leading-snug text-[var(--faint)]">{story.source}</p>
       <div className="flex">
         {flood && (

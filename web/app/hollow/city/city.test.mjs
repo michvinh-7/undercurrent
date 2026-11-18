@@ -5,6 +5,8 @@ import { createWorld, addLevel, solveWater, scenariosFor, insideOutline, pumpId,
 import { adaptEvent, adaptEvents, summarize } from "./adapter.ts";
 import { streetGraph, floodedEdges, safeRoute, cutOffBuildings, destinations, CORE } from "./model.ts";
 import { narrate } from "./narrate.ts";
+import { matchPlace, isWaterReport, isLungReport } from "./adapter.ts";
+import { streetMain, levelInlet, upstream, traceSource, pumpId as pid } from "./model.ts";
 
 const world = createWorld();
 const opts = { isVerified: (e) => !!e.sig, demo: false };
@@ -184,4 +186,36 @@ test("narrator: calm, flood, link cut, simulation, forgery — and never claims 
   assert.match(narrate({ ...base, link: { other: 12, cut: true, queued: 2, online: true } }).lines[0], /2 reports are waiting/);
   assert.match(narrate({ ...base, sim: { label: "Lift station 34 stops", dry: 68, people: 557, levels: [34], facilities: [] } }).source, /Simulated/);
   assert.equal(narrate({ ...base, forgery: "unknown key" }).tone, "alert");
+});
+
+test("location text: a street or a named facility, never a near-miss", () => {
+  assert.equal(matchPlace("Pumpwell St", world, 34).street, "Pumpwell St");
+  assert.equal(matchPlace("pumpwell street, near the school", world, 34).street, "Pumpwell St");
+  assert.equal(matchPlace("by the Hospital", world, 34).building, world.levels.find((l) => l.n === 34).buildings.find((b) => b.use === "hospital").id);
+  assert.equal(matchPlace("North relay corridor", world, 12), null, "'North' alone isn't North Gallery");
+  assert.equal(matchPlace("Pump room", world, 34), null);
+  assert.equal(matchPlace(42, world, 34), null);
+});
+
+test("adapter: a report naming a street is placed there; the same text with no match stays level-only", () => {
+  assert.equal(adaptEvent(ev({ payload: { kind: "bad_water", severity: "low", location: "Pumpwell St" } }), world, opts).place.kind, "named");
+  assert.equal(adaptEvent(ev({ payload: { kind: "bad_water", severity: "low", location: "somewhere wet" } }), world, opts).place.kind, "level");
+});
+
+test("bad water: reports on one street trace to that street's main; spread-out reports trace to the lift station", () => {
+  const main = streetMain(world, 34, "Pumpwell St");
+  const t = traceSource(world, [upstream(world, main), upstream(world, main)]);
+  assert.equal(t.source, main);
+  assert.ok(t.atRisk.size > 0 && [...t.atRisk].every((id) => id.startsWith("L34/")));
+  const levelOnly = [pid(34), ...upstream(world, levelInlet(world, 34))];
+  assert.equal(traceSource(world, [upstream(world, main), levelOnly]).source, pid(34));
+  assert.equal(traceSource(world, [upstream(world, main)]), null, "one report is not enough");
+});
+
+test("classifiers: stomach → water, cough → lungs", () => {
+  const m = (payload, type = "case") => adaptEvent(ev({ type, payload }), world, opts);
+  assert.ok(isWaterReport(m({ symptoms: ["Vomiting"] })));
+  assert.ok(isWaterReport(m({ kind: "bad_water", severity: "low" }, "hazard")));
+  assert.ok(isLungReport(m({ symptoms: ["coughing", "fever"] })));
+  assert.ok(!isLungReport(m({ symptoms: ["rash"] })));
 });

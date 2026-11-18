@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* One token set for the console, the Directorate view and the Hollow map.
-   The map reads the same values (web/app/hollow/scene/colors.ts mirrors them). */
+   The Hollow map uses its own light theme (.theme-paper below). */
 :root {
   --background: #07080c;
   --panel: #10121a;
@@ -127,6 +127,7 @@ body {
 @media (max-width: 640px) {
   .theme-paper .map-street { display: none; }
   .theme-paper .map-label { font-size: 10px; padding: 2px 5px; }
+  .theme-paper .map-label--minor, .theme-paper .map-label .block { display: none; }
 }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .bubble-in { animation: bubble-in 260ms ease-out; }

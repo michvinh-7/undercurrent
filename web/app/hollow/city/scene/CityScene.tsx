@@ -9,7 +9,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
-import type { MapEvent, Severity } from "../adapter";
+import { pinOf, type MapEvent, type Severity } from "../adapter";
 import { Line } from "@react-three/drei";
 import { CEILING, CISTERN_RADIUS, CORE, pumpId, SOURCE_ID, streetGraph, type CityWorld, type Level, type Route, type WaterState, type WPipe, type XZ } from "../model";
 import { buildingAt, gridGeometry, levelGeometry, P, paintBuildings, shapeOf } from "./geometry";
@@ -52,6 +52,10 @@ export interface CitySceneProps {
   route: Route | null;
   /** Buildings with no dry way to the stairs. */
   cut: ReadonlySet<string>;
+  /** Bad water traced to a likely source: the pipes downstream of it. */
+  trace: { pipes: ReadonlySet<string>; source: string } | null;
+  /** Buildings fed through the likely source. */
+  risk: ReadonlySet<string>;
 }
 
 const GHOST_GAP = 46;
@@ -120,15 +124,19 @@ function useLabels(p: CitySceneProps): Label[] {
       out.push({ id: `st-${s.id}`, pos: s.dir === "ns" ? [s.at, 0.3, s.to - 10] : [s.to - 22, 0.3, s.at], node: <span className="map-street">{s.name}</span> });
     if (layers.buildings)
       for (const b of level.buildings)
-        if (b.use !== "housing" && b.use !== "workshop" && !(layers.alerts && b.use === "pumphouse" && events.some((e) => e.level === active && e.place.kind === "exact")))
-          out.push({ id: `b-${b.id}`, pos: [b.center[0], b.height + 2.5, b.center[1]], node: <span className="map-label">{b.name.replace(`L${level.n} `, "")}</span> });
+        if (b.use !== "housing" && b.use !== "workshop" && !(layers.alerts && events.some((e) => e.level === active && (e.place.kind === "exact" ? b.use === "pumphouse" : e.place.kind === "named" && e.place.building === b.id))))
+          out.push({ id: `b-${b.id}`, pos: [b.center[0], b.height + 2.5, b.center[1]], node: <span className="map-label map-label--minor">{b.name.replace(`L${level.n} `, "")}</span> });
     for (const st of streetGraph(world.grid).stairs)
-      out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet">{st.name}</span> });
+      out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet map-label--minor">{st.name}</span> });
     if (p.flood)
-      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span> });
+      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span> });
+    if (p.trace && layers.water) {
+      const at = sourcePoint(world, active, p.trace.source);
+      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#7a5418" }}>Likely bad-water source (a guess)</span> });
+    }
     if (p.route) {
       const mid = p.route.points[Math.floor(p.route.points.length / 2)];
-      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label" style={{ borderColor: "#1f8a70", color: "#1f6a56" }}>Safe route · {p.route.minutes} min</span> });
+      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label map-label--minor" style={{ borderColor: "#1f8a70", color: "#1f6a56" }}>Safe route · {p.route.minutes} min</span> });
     }
     if (layers.water && world.network.node.get(SOURCE_ID)?.level === active)
       out.push({ id: "cistern", pos: [CORE.cistern[0], 8, CORE.cistern[1]], node: <span className="map-label">Cistern</span> });
@@ -157,17 +165,18 @@ function useLabels(p: CitySceneProps): Label[] {
     }
     if (layers.alerts) {
       const seen = new Map<string, MapEvent[]>();
-      for (const e of events) if (e.level === active && e.place.kind === "exact") (seen.get(e.place.deviceId) ?? seen.set(e.place.deviceId, []).get(e.place.deviceId)!).push(e);
+      for (const e of events) { const pin = e.level === active ? pinOf(e) : null; if (pin) (seen.get(pin.key) ?? seen.set(pin.key, []).get(pin.key)!).push(e); }
       for (const [dev, list] of seen) {
         const e = list[0];
-        if (e.place.kind !== "exact") continue;
+        const pin = pinOf(e)!;
         const color = SEVERITY_COLOR[e.severity];
         out.push({
-          id: `pin-${dev}`, pos: [e.place.x, e.place.y + PIN_H + 3.4, e.place.z],
+          id: `pin-${dev}`, pos: [pin.x, pin.y + PIN_H + 3.4, pin.z],
           node: (
             <span className="map-label" style={{ borderColor: color }}>
               <span style={{ color }}>●</span> {pinTitle(e)}
               {list.length > 1 && <span className="text-[var(--faint)]"> · +{list.length - 1} more</span>}
+              {pin.named && <span className="block text-[10px] text-[var(--muted)]">Reported at {pin.named}</span>}
               <span className="block text-[10px] text-[var(--muted)]">{e.demo ? "Demo data" : e.verified ? "Verified by hub" : "Not verified"}</span>
             </span>
           ),
@@ -175,7 +184,7 @@ function useLabels(p: CitySceneProps): Label[] {
       }
     }
     return out;
-  }, [world, active, layers, hubs, events, view, p.flood, p.route]);
+  }, [world, active, layers, hubs, events, view, p.flood, p.route, p.trace]);
 }
 
 function Projector({ labels, registry }: { labels: Label[]; registry: React.RefObject<Map<string, HTMLDivElement>> }) {
@@ -248,7 +257,7 @@ function ActiveLevel(p: CitySceneProps & { level: Level }) {
   useSlide(ref, 0);
 
   // Status only repaints vertex colors.
-  useEffect(() => { paintBuildings(g.buildings, p.water.dry, p.cut); }, [g, p.water, p.cut]);
+  useEffect(() => { paintBuildings(g.buildings, p.water.dry, p.cut, p.risk); }, [g, p.water, p.cut, p.risk]);
 
   const selectedBuilding = p.selection?.type === "building" ? level.buildings.find((b) => b.id === p.selection!.id) : undefined;
 
@@ -305,6 +314,7 @@ function ActiveLevel(p: CitySceneProps & { level: Level }) {
       <Stairs world={world} />
       {p.flood && <Flood world={world} flood={p.flood} />}
       {p.route && <SafeRoute route={p.route} />}
+      {p.trace && p.layers.water && <SourceMarker world={world} level={level.n} id={p.trace.source} />}
       {p.layers.sensors && <Sensors {...p} />}
       {p.layers.alerts && <Pins {...p} />}
     </group>
@@ -390,6 +400,33 @@ function Flood({ world, flood }: { world: CityWorld; flood: NonNullable<CityScen
   );
 }
 
+/** Where the trace points. Drawn only if the source is on this level. */
+export function sourcePoint(world: CityWorld, level: number, id: string): XZ | null {
+  const n = world.network.node.get(id);
+  if (n) return n.level === level ? [n.x, n.z] : null;
+  const p = world.network.pipe.get(id);
+  if (!p || p.level !== level) return null;
+  const a = world.network.node.get(p.from)!, b = world.network.node.get(p.to)!;
+  return [(a.x + b.x) / 2, (a.z + b.z) / 2];
+}
+
+function SourceMarker({ world, level, id }: { world: CityWorld; level: number; id: string }) {
+  const at = sourcePoint(world, level, id);
+  if (!at) return null;
+  return (
+    <group position={[at[0], 0, at[1]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]} raycast={() => null}>
+        <ringGeometry args={[4.2, 5.2, 40]} />
+        <meshBasicMaterial color={P.risk} transparent opacity={0.9} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 1.6, 0]} raycast={() => null}>
+        <sphereGeometry args={[1.1, 16, 12]} />
+        <meshStandardMaterial color={P.risk} />
+      </mesh>
+    </group>
+  );
+}
+
 function SafeRoute({ route }: { route: Route }) {
   const pts = useMemo(() => route.points.map(([x, z]) => new THREE.Vector3(x, 0.9, z)), [route]);
   const line = useRef<{ material: { dashOffset: number } } | null>(null);
@@ -441,7 +478,7 @@ function Water(p: CitySceneProps & { level: Level }) {
       placeSegment(m, a, b, r);
       shell.current!.setMatrixAt(i, m);
       const sel = p.selection?.type === "pipe" && p.selection.id === x.id;
-      shell.current!.setColorAt(i, c.set(water.failed.has(x.id) ? P.failed : sel ? P.select : P.pipe));
+      shell.current!.setColorAt(i, c.set(water.failed.has(x.id) ? P.failed : sel ? P.select : p.trace?.pipes.has(x.id) ? P.risk : P.pipe));
       placeSegment(m, a, b, r * 0.62);
       core.current!.setMatrixAt(i, water.flowing.has(x.id) ? m : zero);
     });
@@ -449,7 +486,7 @@ function Water(p: CitySceneProps & { level: Level }) {
     if (shell.current!.instanceColor) shell.current!.instanceColor.needsUpdate = true;
     core.current!.instanceMatrix.needsUpdate = true;
     shell.current!.computeBoundingSphere();
-  }, [pipes, ends, water, p.selection]);
+  }, [pipes, ends, water, p.selection, p.trace]);
 
   const junctions = useMemo(() => net.nodes.filter((n) => n.level === level.n && n.kind === "junction"), [net, level.n]);
   const jRef = useRef<THREE.InstancedMesh>(null);
@@ -692,8 +729,9 @@ function Pins(p: CitySceneProps & { level: Level }) {
   const pins = useMemo(() => {
     const at = new Map<string, MapEvent[]>();
     for (const e of p.events) {
-      if (e.level !== p.level.n || e.place.kind !== "exact") continue;
-      const k = e.place.deviceId;
+      const pin = e.level === p.level.n ? pinOf(e) : null;
+      if (!pin) continue;
+      const k = pin.key;
       (at.get(k) ?? at.set(k, []).get(k)!).push(e);
     }
     return [...at.values()];
@@ -702,10 +740,9 @@ function Pins(p: CitySceneProps & { level: Level }) {
     <>
       {pins.map((list) => {
         const top = list[0];
-        if (top.place.kind !== "exact") return null;
         return (
           <Pin
-            key={top.place.deviceId}
+            key={pinOf(top)!.key}
             e={top}
             count={list.length}
             fresh={p.fresh.has(top.id)}
@@ -732,8 +769,9 @@ function Pin({ e, count, fresh, selected, onSelect }: { e: MapEvent; count: numb
     m.scale.setScalar(1 + t * 9);
     (m.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - t);
   });
-  if (e.place.kind !== "exact") return null;
-  const { x, y, z } = e.place;
+  const pin = pinOf(e);
+  if (!pin) return null;
+  const { x, y, z } = pin;
   const h = PIN_H;
   return (
     <group position={[x, 0, z]} onClick={(ev) => { ev.stopPropagation(); onSelect(); }}>

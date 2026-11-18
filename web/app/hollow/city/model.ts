@@ -630,3 +630,49 @@ export function cutOffBuildings(grid: Grid, level: Level, blocked: ReadonlySet<s
 
 export const destinations = (level: Level, uses: BuildingUse[]): Destination[] =>
   level.buildings.filter((b) => uses.includes(b.use)).map((b) => ({ id: b.id, name: b.name.replace(`L${level.n} `, ""), at: b.center }));
+
+// --- Tracing bad water up the pipes ----------------------------------------------------------
+
+/** Pipe and node ids from a pipe up to the cistern, downstream first. */
+export function upstream(world: CityWorld, pipeId: string): string[] {
+  const out: string[] = [];
+  const net = world.network;
+  for (let p = net.pipe.get(pipeId), guard = 0; p && guard < 10000; guard++) {
+    out.push(p.id, p.from);
+    const up = net.feeds.get(p.from);
+    p = up ? net.pipe.get(up) : undefined;
+  }
+  return out;
+}
+
+/** Where a level's water comes in: the pipe feeding its lift station. */
+export const levelInlet = (world: CityWorld, n: number) => world.network.feeds.get(pumpId(n)) ?? null;
+
+/** The main closest to the supply among those under a named street on a level. */
+export function streetMain(world: CityWorld, n: number, street: string): string | null {
+  const mains = world.network.pipes.filter((p) => p.level === n && p.kind === "main" && p.label === `Main under ${street}`);
+  if (!mains.length) return null;
+  return mains.sort((a, b) => upstream(world, a.id).length - upstream(world, b.id).length)[0].id;
+}
+
+export interface Trace {
+  /** Likely source: the most downstream element every chain passes through. */
+  source: string;
+  reports: number;
+  /** Buildings fed through the source. */
+  atRisk: Set<string>;
+  /** Pipes downstream of the source. */
+  pipes: Set<string>;
+}
+
+/** Needs at least two reports: one report can't point to a shared source. */
+export function traceSource(world: CityWorld, chains: string[][]): Trace | null {
+  const usable = chains.filter((c) => c.length);
+  if (usable.length < 2) return null;
+  const shared = usable[0].find((id) => usable.every((c) => c.includes(id)));
+  if (!shared) return null;
+  const pipes = new Set<string>(), atRisk = new Set<string>();
+  for (const p of world.network.pipes) if (upstream(world, p.id).includes(shared)) pipes.add(p.id);
+  for (const t of world.network.taps) if (pipes.has(t.pipe)) atRisk.add(t.building);
+  return { source: shared, reports: usable.length, atRisk, pipes };
+}
