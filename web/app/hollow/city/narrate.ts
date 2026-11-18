@@ -47,6 +47,24 @@ export interface NarrateInput {
   checkins?: { ok: number; help: number } | null;
   /** Where the nearest care is for this level, in words. */
   care?: string | null;
+  /** Live sensor alerts other than flooding (bad air, heat, blackout), most urgent first. */
+  sensors?: SensorFacts[];
+}
+
+export interface SensorFacts {
+  kind: "bad_air" | "heat" | "blackout";
+  /** Where the box is, e.g. "the L34 Market". */
+  where: string;
+  ago: string;
+  reading: string | null;
+  /** Minutes until it's expected; null when it's happening now. */
+  expectedIn: number | null;
+  verified: boolean;
+  demo: boolean;
+  /** A test alert made on this page, not from a hub. */
+  test: boolean;
+  /** A route around it, when there is one. */
+  route?: { to: string; minutes: number } | null;
 }
 
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
@@ -70,6 +88,7 @@ function peel(r: NarrateInput): NarrateInput | null {
   if (r.selected) return { ...r, selected: null };
   if (r.sim && r.sim.dry > 0) return { ...r, sim: null };
   if (r.flood) return { ...r, flood: null };
+  if (r.sensors?.length) return { ...r, sensors: r.sensors.slice(1) };
   if (r.water) return { ...r, water: null };
   if (r.link?.cut) return { ...r, link: { ...r.link, cut: false } };
   if (r.sosHere > 0) return { ...r, sosHere: 0 };
@@ -130,6 +149,8 @@ function narrateOne(s: NarrateInput): Story {
     };
   }
 
+  if (s.sensors?.length) return sensorStory(s, s.sensors[0]);
+
   if (s.water)
     return {
       tone: "caution",
@@ -186,5 +207,41 @@ function narrateOne(s: NarrateInput): Story {
       "Click your building to see the way to the nearest care.",
     ],
     source: s.demo ? "Demo data: no hub connected" : "Live from the hubs",
+  };
+}
+
+function sensorStory(s: NarrateInput, f: SensorFacts): Story {
+  const source = `Canary box reading ${f.ago}${f.test ? " · test alert made on this page, not from a hub" : f.demo ? " · demo data" : f.verified ? " · verified by the hub" : " · not verified"}`;
+  const reading = f.reading ? ` (${f.reading})` : "";
+  if (f.kind === "blackout") {
+    const soon = f.expectedIn !== null;
+    return {
+      tone: "alert",
+      title: soon ? `Blackout expected on L${s.level} in about ${plural(f.expectedIn!, "minute")}.` : `Power is out around ${f.where}.`,
+      lines: [
+        soon ? "Charge lamps and phones now. Fill water containers while the pumps still run." : "Darkened buildings have no power. Stay put unless the air feels wrong.",
+        ...(s.care ? [`If someone relies on powered air or medical equipment, move them toward ${s.care}${soon ? " before it hits" : ""}.`] : []),
+      ],
+      source: `${source}${soon ? " · a warning: it hasn't happened yet" : ""}`,
+    };
+  }
+  if (f.kind === "bad_air")
+    return {
+      tone: "alert",
+      title: `Bad air near ${f.where}${reading}.`,
+      lines: [
+        "Stay out of the hazy area and keep children and anyone coughing away from it.",
+        f.route ? `The green path to the ${f.route.to} goes around it: about ${plural(f.route.minutes, "minute")}.` : "If you feel dizzy or short of breath, report it.",
+      ],
+      source,
+    };
+  return {
+    tone: "caution",
+    title: `${f.where.charAt(0).toUpperCase()}${f.where.slice(1)} is running hot${reading}.`,
+    lines: [
+      "Drink water, rest through the hottest hours, and check on older neighbours.",
+      ...(f.expectedIn !== null ? [`The box expects it to get worse in about ${plural(f.expectedIn, "minute")}.`] : []),
+    ],
+    source,
   };
 }

@@ -22,10 +22,26 @@ export const Btn = ({ onClick, children, tone }: { onClick: () => void; children
 
 export const SimTag = () => <span className="ml-1 rounded bg-[color-mix(in_oklab,var(--sim)_14%,transparent)] px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-[var(--sim)]">Simulated</span>;
 
+// The mark tells the state by shape as well as color: ✓ fine, ! needs attention, – nothing to say.
+const GOOD = ["var(--ok)"];
+const BAD = ["var(--danger)", "#c2412d", "#cf6a2c"];
+const WARN = ["var(--warn)", "#c98a1b"];
+function markOf(color: string): string {
+  if (GOOD.includes(color)) return "✓";
+  if (BAD.includes(color) || WARN.includes(color)) return "!";
+  return "–";
+}
+
 export function Fact({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <span className="mt-[7px] size-2 shrink-0 rounded-full" style={{ background: color }} />
+      <span
+        aria-hidden
+        className={`mt-[3px] flex size-3.5 shrink-0 items-center justify-center text-[9px] font-bold leading-none text-white ${WARN.includes(color) ? "rounded-[3px]" : "rounded-full"}`}
+        style={{ background: color }}
+      >
+        {markOf(color)}
+      </span>
       <span>{children}</span>
     </li>
   );

@@ -9,6 +9,7 @@ import { Swatch } from "./ui";
 
 const LAYER_LIST: { id: LayerId; label: string }[] = [
   { id: "buildings", label: "Buildings" },
+  { id: "xray", label: "X-ray" },
   { id: "water", label: "Water" },
   { id: "network", label: "Hubs & link" },
   { id: "alerts", label: "Alerts" },
@@ -32,7 +33,7 @@ export function PaneToggle({ side, open, onClick }: { side: "left" | "right"; op
 export function MapKey() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="absolute bottom-3 right-3 z-[var(--z-map-ui)] flex flex-col items-end gap-2">
+    <div className="absolute bottom-14 right-3 z-[var(--z-map-ui)] flex flex-col items-end gap-2 lg:bottom-3">
       {open && (
         <div className="z-[var(--z-popover)] max-h-[60vh] w-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3.5 text-xs shadow-lg">
           <LegendBody />

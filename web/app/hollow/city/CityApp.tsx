@@ -13,9 +13,14 @@ import {
   addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, levelInlet, safeRoute, streetGraph, streetMain, traceSource, upstream,
   FACILITY_USES, levelOf, nameOf, pumpId, solveWater, USE_LABEL, type CityWorld, type Failure,
 } from "./model";
-import { narrate, type Story } from "./narrate";
-import CityScene, { type HubView, type Layers, type Selection, type View } from "./scene/CityScene";
-import Feed from "./panels/Feed";
+import { narrate, type SensorFacts, type Story } from "./narrate";
+import { activeSensorAlerts, buildingsNear, SENSOR_LOOK, type SensorAlert } from "./sensors";
+import { isPreset, testEvent, type TestPreset } from "./panels/TestAlerts";
+import type { HollowEvent } from "@/lib/types";
+import CityScene, { sourcePoint, type HubView, type Layers, type Selection, type View, type Zone } from "./scene/CityScene";
+import Briefs from "./panels/Briefs";
+import Feed, { type FeedFilter } from "./panels/Feed";
+import TestAlerts from "./panels/TestAlerts";
 import Inspector from "./panels/Inspector";
 import { LayerBar, MapBanners, MapKey, PaneToggle } from "./panels/MapChrome";
 import { LevelStatus, NowCard } from "./panels/NowCard";
@@ -32,13 +37,15 @@ export default function CityApp() {
   const [world, setWorld] = useState<CityWorld>(() => createWorld());
   const [active, setActive] = useState(34);
   const [view, setView] = useState<View>("3d");
-  const [layers, setLayers] = useState<Layers>({ buildings: true, water: true, network: true, alerts: true, sensors: false });
+  const [layers, setLayers] = useState<Layers>({ buildings: true, xray: false, water: true, network: true, alerts: true, sensors: false });
   const [selection, setSelection] = useState<Selection | null>(null);
   const [focus, setFocus] = useState<{ x: number; z: number; key: number } | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [sim, setSim] = useState<{ label: string; failure: Failure } | null>(null);
   const [follow, setFollow] = useState(true);
-  const [tab, setTab] = useState<Tab>("feed");
+  const [tab, setTab] = useState<Tab>("briefs");
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
+  const [query, setQuery] = useState("");
   const [panes, setPanes] = useState({ left: true, right: true });
   useEffect(() => {
     try { const v = JSON.parse(localStorage.getItem("hollow.panes") ?? "null"); if (v && typeof v.left === "boolean") setPanes(v); } catch { /* private window: keep defaults */ }
@@ -51,8 +58,25 @@ export default function CityApp() {
 
   const water = useMemo(() => solveWater(world, sim?.failure ?? {}), [world, sim]);
   const demo = net.mode === "demo";
-  const events = useMemo(() => adaptEvents(net.events, world, { isVerified: net.isVerified, demo }), [net.events, net.isVerified, world, demo]);
-  const fresh = useMemo(() => new Set(events.filter((e) => net.isFresh(e.id)).map((e) => e.id)), [events, net]);
+  // Test alerts made on this page (sensor kinds the hardware doesn't send yet). Never sent to a hub.
+  const [tests, setTests] = useState<HollowEvent[]>([]);
+  const events = useMemo(() => adaptEvents([...net.events, ...tests], world, { isVerified: net.isVerified, demo }), [net.events, tests, net.isVerified, world, demo]);
+  const fresh = useMemo(() => {
+    const now = Date.now();
+    return new Set(events.filter((e) => net.isFresh(e.id) || (e.test && now - e.time < 8000)).map((e) => e.id));
+  }, [events, net]);
+  // ?test=bad_air,blackout_soon preloads test alerts (for checking and filming). Presets: see TestAlerts.
+  useEffect(() => {
+    const list = new URLSearchParams(window.location.search).get("test");
+    if (!list) return;
+    const now = Date.now();
+    setTests(list.split(",").filter((p): p is TestPreset => isPreset(p)).map((p, i) => testEvent(p, now - i * 1000)));
+  }, []);
+  const sendTest = (preset: TestPreset) => {
+    const e = testEvent(preset);
+    setTests((t) => [...t.filter((x) => x.device_id !== e.device_id || (x.payload as { kind?: string }).kind !== (e.payload as { kind?: string }).kind), e]);
+    if (e.level >= 1 && world.levels.some((l) => l.n === e.level)) setActive(e.level);
+  };
 
   // Hubs on the map, with a short-lived "forgery refused" note when the counter rises.
   const [forgery, setForgery] = useState<{ hubId: string | null; reason: string } | null>(null);
@@ -124,16 +148,38 @@ export default function CityApp() {
     return { at, radius, blocked: floodedEdges(world.grid, at, radius), spread };
   }, [floodEvent, world.grid, spread, layers.alerts]);
   const cut = useMemo(() => (flood ? cutOffBuildings(world.grid, level, flood.blocked) : new Set<string>()), [flood, world.grid, level]);
-  // The way to care: from a clicked building, or out of the flood.
+
+  // Other sensor alerts on this level (bad air, heat, blackout): see sensors.ts for the rules.
+  const alerts: SensorAlert[] = useMemo(() => (layers.alerts ? activeSensorAlerts(events, level.n).filter((a) => a.kind !== "flooding") : []), [events, level.n, layers.alerts]);
+  const zones: Zone[] = useMemo(() => alerts.filter((a) => a.at).map((a) => {
+    const kind = a.kind as Zone["kind"];
+    const label = kind === "bad_air" ? `Bad air${a.reading ? ` · ${a.reading}` : ""}`
+      : kind === "heat" ? `Hot${a.reading ? ` · ${a.reading}` : ""}`
+      : a.expectedIn !== null ? `⚡ Blackout in ~${a.expectedIn} min` : "⚡ No power";
+    return { id: a.event.id, kind, at: a.at!, radius: SENSOR_LOOK[kind].radius, label, color: SENSOR_LOOK[kind].color, warning: a.expectedIn !== null };
+  }), [alerts]);
+  const dark = useMemo(() => {
+    const out = new Set<string>();
+    for (const a of alerts) if (a.kind === "blackout" && a.expectedIn === null) for (const id of buildingsNear(level.buildings, a.at, SENSOR_LOOK.blackout.radius)) out.add(id);
+    return out;
+  }, [alerts, level]);
+  const badAir = alerts.find((a) => a.kind === "bad_air" && a.at);
+  const blocked = useMemo(() => {
+    const out = new Set(flood?.blocked ?? []);
+    for (const a of alerts) if (a.at && SENSOR_LOOK[a.kind].blocksStreets) for (const id of floodedEdges(world.grid, a.at, SENSOR_LOOK[a.kind].radius)) out.add(id);
+    return out;
+  }, [flood, alerts, world.grid]);
+
+  // The way to care: from a clicked building, or out of the flood (or bad air), around anything unsafe.
   const selBuilding = selection?.type === "building" ? buildingById(world, selection.id) : undefined;
   const route = useMemo(() => {
     const fromBuilding = selBuilding && selBuilding.level === level.n && !isCare(selBuilding.use);
-    const from = fromBuilding ? selBuilding!.center : flood?.at;
+    const from = fromBuilding ? selBuilding!.center : flood?.at ?? badAir?.at;
     if (!from) return null;
     const care = destinations(level, ["hospital", "clinic"]);
-    const r = safeRoute(world.grid, from, care.length ? care : destinations(level, ["shelter"]), flood?.blocked ?? new Set());
+    const r = safeRoute(world.grid, from, care.length ? care : destinations(level, ["shelter"]), blocked);
     return r ? { ...r, kind: care.length ? ("care" as const) : ("shelter" as const) } : null;
-  }, [flood, level, world.grid, selBuilding]);
+  }, [flood, badAir, blocked, level, world.grid, selBuilding]);
 
   // Bad water: trace every report up the pipes and look for the element they share.
   const trace = useMemo(() => {
@@ -193,8 +239,15 @@ export default function CityApp() {
       lungs: (() => { const l = events.filter((e) => e.level === level.n && isLungReport(e)); return l.length ? { reports: l.length, people: l.reduce((t, e) => t + peopleIn(e), 0) } : null; })(),
       checkins: (() => { const c = events.filter((e) => e.level === level.n).map(checkinStatus).filter(Boolean); return { ok: c.filter((x) => x === "ok").length, help: c.filter((x) => x === "need_help").length }; })(),
       care,
+      sensors: [...alerts].sort((a, b) => sensorRank(a) - sensorRank(b)).map((a): SensorFacts => ({
+        kind: a.kind as SensorFacts["kind"],
+        where: (a.event.event.device_id && nameOf(world, world.sensors.find((m) => m.deviceId === a.event.event.device_id)?.building ?? "")) || `L${level.n}`,
+        ago: timeAgo(a.event.event.created_at), reading: a.reading, expectedIn: a.expectedIn,
+        verified: a.event.verified, demo: a.event.demo, test: a.event.test,
+        route: a.kind === "bad_air" && route && !flood && !selBuilding ? { to: route.to, minutes: route.minutes } : null,
+      })),
     });
-  }, [world, level, flood, floodEvent, cut, route, spread, sim, water, hubs, events, sums, demo, selBuilding, showTrace, trace, care]);
+  }, [world, level, flood, floodEvent, cut, route, spread, sim, water, hubs, events, sums, demo, selBuilding, showTrace, trace, care, alerts]);
 
   const feedPick = (e: MapEvent) => { select({ type: "event", id: e.id }); const pin = pinOf(e); if (pin) setFocus({ x: pin.x, z: pin.z, key: Date.now() }); };
   const simOn = !!(sim && (sim.failure.nodes?.length || sim.failure.pipes?.length));
@@ -204,12 +257,41 @@ export default function CityApp() {
       <LevelStatus world={world} level={level.n} events={events} water={water} hubs={hubs} sim={sim} />
     </NowCard>
   );
+  // Where the bad-water trace points, for the Briefs (question 4).
+  const traceLevel = showTrace ? [...showTrace.atRisk][0]?.match(/^L(\d+)\//)?.[1] : undefined;
+  const briefInput = {
+    events, levels: world.levels.map((l) => l.n), forgeriesBlocked: net.forgeriesBlocked,
+    water: showTrace && traceLevel ? { source: nameOf(world, showTrace.source).replace(/^./, (c) => c.toLowerCase()), reports: showTrace.reports, atRisk: showTrace.atRisk.size, level: Number(traceLevel) } : null,
+  };
+  const briefActions = {
+    goTo: (n: number, e?: MapEvent) => {
+      setActive(n);
+      if (e) feedPick(e); else { setSelection(null); setFocus(null); }
+    },
+    openFeed: (f: FeedFilter) => { setFeedFilter(f); setTab("feed"); },
+    test: sendTest,
+    showWater: () => {
+      if (!briefInput.water || !showTrace) return;
+      setLayers((l) => ({ ...l, water: true }));
+      setActive(briefInput.water.level);
+      setSelection(null);
+      const at = sourcePoint(world, briefInput.water.level, showTrace.source);
+      if (at) setFocus({ x: at[0], z: at[1], key: Date.now() });
+    },
+  };
+
   const tabs = (
     <SideTabs
       tab={tab} setTab={setTab} hasSelection={!!selection} simOn={simOn} count={events.length}
+      briefs={<Briefs input={briefInput} actions={briefActions} />}
       selected={selection && <Inspector world={world} selection={selection} events={events} water={water} net={net} hubs={hubs} onClose={() => select(null)} onFocus={() => focusOn(selection)} onSim={(label, failure) => { setSim({ label, failure }); }} sim={sim} />}
-      whatIf={<WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} />}
-      feed={<Feed events={events} fresh={fresh} demo={demo} onPick={feedPick} onDemoAlert={() => net.actions.demoSensorAlert(34)} />}
+      whatIf={
+        <div className="flex flex-col gap-3">
+          <WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} />
+          <TestAlerts onSend={sendTest} onClear={() => setTests([])} count={tests.length} />
+        </div>
+      }
+      feed={<Feed events={events} fresh={fresh} demo={demo} onPick={feedPick} onDemoAlert={() => net.actions.demoSensorAlert(34)} filter={feedFilter} setFilter={setFeedFilter} query={query} setQuery={setQuery} />}
     />
   );
 
@@ -238,7 +320,7 @@ export default function CityApp() {
           <CityScene
             world={world} active={level.n} view={view} layers={layers} water={water} selection={selection}
             onSelect={select} onLevel={goLevel} events={events} fresh={fresh} hubs={hubs} packetKey={packetKey}
-            focus={focus} resetKey={resetKey} flood={flood} route={route} cut={cut}
+            focus={focus} resetKey={resetKey} flood={flood} route={route} cut={cut} zones={zones} dark={dark}
             trace={showTrace ? { pipes: showTrace.pipes, source: showTrace.source } : null} risk={showTrace?.atRisk ?? EMPTY}
           />
 
@@ -264,6 +346,12 @@ export default function CityApp() {
       </div>
     </div>
   );
+}
+
+/** Which sensor story leads: a coming blackout first (there's still time to act), then bad air, then the rest. */
+function sensorRank(a: SensorAlert): number {
+  if (a.kind === "blackout" && a.expectedIn !== null) return 0;
+  return a.kind === "bad_air" ? 1 : a.kind === "blackout" ? 2 : 3;
 }
 
 /** Where a selection lives, so the map can switch level and frame it. */

@@ -4,6 +4,7 @@
 import { checkinStatus, isLungReport, peopleIn, pinOf, summarize, type MapEvent } from "../adapter";
 import { levelOf, type CityWorld, type solveWater } from "../model";
 import type { Story } from "../narrate";
+import { DIRECTORATE_LUNG_CASES } from "../directorate";
 import { SEVERITY_COLOR, type HubView } from "../scene/CityScene";
 import { Fact, SimTag } from "./ui";
 
@@ -84,7 +85,12 @@ export function LevelStatus({ world, level, events, water, hubs, sim }: {
           {here.length ? <>{here.length} report{here.length === 1 ? "" : "s"}{pinned.length ? `, ${pinned.length} at a sensor` : ""}</> : "No reports from this level"}
         </Fact>
         {checks.length > 0 && <Fact color={help ? "var(--danger)" : "var(--ok)"}>Check-ins: {checks.length - help} safe{help ? `, ${help} asking for help` : ""}</Fact>}
-        {lungs.length > 0 && <Fact color="var(--warn)">{lungs.reduce((t, e) => t + peopleIn(e), 0)} people coughing or short of breath</Fact>}
+        {lungs.length > 0 && (
+          <Fact color="var(--warn)">
+            {lungs.reduce((t, e) => t + peopleIn(e), 0)} people coughing or short of breath
+            <span className="block text-xs text-[var(--directorate)]">Directorate says {DIRECTORATE_LUNG_CASES[level] ?? 0} (demo figure)</span>
+          </Fact>
+        )}
       </ul>
       {sim && dry.length > 0 && <p className="mt-2 text-xs text-[var(--muted)]">Because: {sim.label} (simulated).</p>}
     </>

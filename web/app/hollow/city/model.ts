@@ -401,9 +401,33 @@ function derive(seed: number, grid: Grid, levels: Level[]): CityWorld {
     seed, grid, levels: sorted,
     network: buildNetwork(grid, sorted),
     hubs: HUB_LEVELS.filter((n) => have.has(n)).map((n) => ({ hubId: `hub-L${n}`, level: n, x: CORE.link[0], z: CORE.link[1] })),
-    // canary-34 is mounted in the L34 lift station (the box Tisya builds).
-    sensors: have.has(34) ? [{ deviceId: "canary-34", level: 34, x: CORE.pump[0] - 2.4, z: CORE.pump[1] - 3.2, y: 2.2, building: "L34/pump", hardware: true }] : [],
+    sensors: mountSensors(sorted),
   };
+}
+
+/**
+ * Canary boxes and where they're mounted. canary-34 is the real box (Tisya's), in the L34 lift
+ * station. The others are planned spots, so alerts from new boxes (and test alerts) land on a
+ * real building. To add a box: one line here, `at` is "pump" or a facility on that level.
+ */
+export const SENSOR_MOUNTS: { deviceId: string; level: number; at: "pump" | BuildingUse; hardware: boolean }[] = [
+  { deviceId: "canary-34", level: 34, at: "pump", hardware: true },
+  { deviceId: "canary-34-market", level: 34, at: "market", hardware: false },
+  { deviceId: "canary-34-school", level: 34, at: "school", hardware: false },
+  { deviceId: "canary-12-relay", level: 12, at: "relay", hardware: false },
+  { deviceId: "canary-35-clinic", level: 35, at: "clinic", hardware: false },
+];
+
+function mountSensors(levels: Level[]): SensorMount[] {
+  const out: SensorMount[] = [];
+  for (const m of SENSOR_MOUNTS) {
+    const l = levels.find((x) => x.n === m.level);
+    if (!l) continue;
+    if (m.at === "pump") { out.push({ deviceId: m.deviceId, level: m.level, x: CORE.pump[0] - 2.4, z: CORE.pump[1] - 3.2, y: 2.2, building: `L${m.level}/pump`, hardware: m.hardware }); continue; }
+    const b = l.buildings.find((x) => x.use === m.at);
+    if (b) out.push({ deviceId: m.deviceId, level: m.level, x: b.center[0], z: b.center[1], y: b.height, building: b.id, hardware: m.hardware });
+  }
+  return out;
 }
 
 export function createWorld(seed = DEFAULT_SEED, levels = INITIAL_LEVELS): CityWorld {

@@ -15,7 +15,7 @@ import { CEILING, CISTERN_RADIUS, CORE, pumpId, SOURCE_ID, streetGraph, type Cit
 import { buildingAt, gridGeometry, levelGeometry, P, paintBuildings, shapeOf } from "./geometry";
 
 export type View = "3d" | "top";
-export type LayerId = "buildings" | "water" | "network" | "alerts" | "sensors";
+export type LayerId = "buildings" | "xray" | "water" | "network" | "alerts" | "sensors";
 export type Layers = Record<LayerId, boolean>;
 export type Selection =
   | { type: "building"; id: string }
@@ -29,6 +29,8 @@ export interface HubView { hubId: string; level: number; x: number; z: number; o
 export const SEVERITY_COLOR: Record<Severity, string> = {
   sos: "#c2412d", hazard: "#cf6a2c", caution: "#c98a1b", message: "#6d5fb0", info: "#3b6ea8",
 };
+
+export interface Zone { id: string; kind: "bad_air" | "heat" | "blackout"; at: XZ; radius: number; label: string; color: string; warning: boolean }
 
 export interface CitySceneProps {
   world: CityWorld;
@@ -49,6 +51,10 @@ export interface CitySceneProps {
   resetKey: number;
   /** A flood on the active level: where the water was detected and the streets assumed unsafe. */
   flood: { at: XZ; radius: number; blocked: ReadonlySet<string>; spread: boolean } | null;
+  /** Sensor zones other than flooding: bad air (haze), heat (warm tint), blackout (outline). */
+  zones?: Zone[];
+  /** Buildings with no power. */
+  dark?: ReadonlySet<string>;
   route: Route | null;
   /** Buildings with no dry way to the stairs. */
   cut: ReadonlySet<string>;
@@ -64,6 +70,7 @@ const PIN_H = 13;
 export default function CityScene(props: CitySceneProps) {
   const labels = useLabels(props);
   const registry = useRef(new Map<string, HTMLDivElement>());
+  const leaders = useRef(new Map<string, SVGLineElement>());
   return (
     <div className="relative h-full w-full">
     <Canvas
@@ -92,9 +99,15 @@ export default function CityScene(props: CitySceneProps) {
       <Stack {...props} />
       <MapControls makeDefault maxPolarAngle={1.25} minDistance={25} maxDistance={900} enableDamping dampingFactor={0.12} />
       <CameraRig view={props.view} focus={props.focus} resetKey={props.resetKey} active={props.active} />
-      <Projector labels={labels} registry={registry} />
+      <Projector labels={labels} registry={registry} leaders={leaders} />
     </Canvas>
       <div className="pointer-events-none absolute inset-0 z-[var(--z-labels)] overflow-hidden" aria-hidden>
+        {/* Leader lines: drawn only when a label had to move away from its spot. */}
+        <svg className="absolute inset-0 h-full w-full">
+          {labels.map((l) => (
+            <line key={l.id} ref={(el) => { if (el) leaders.current.set(l.id, el); else leaders.current.delete(l.id); }} stroke="#6b707a" strokeWidth={1} strokeDasharray="2 2" visibility="hidden" />
+          ))}
+        </svg>
         {labels.map((l) => (
           <div
             key={l.id}
@@ -133,6 +146,9 @@ function useLabels(p: CitySceneProps): Label[] {
       out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet map-label--minor">{st.name}</span>, rank: 30 });
     if (p.flood)
       out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span>, rank: 70 });
+    if (layers.alerts)
+      for (const z of p.zones ?? [])
+        out.push({ id: `zone-${z.id}`, pos: [z.at[0], 3, z.at[1] + z.radius * 0.6], rank: 72, node: <span className="map-label" style={{ borderColor: z.color, color: z.kind === "blackout" ? "var(--foreground)" : z.color }}>{z.label}</span> });
     if (p.trace && layers.water) {
       const at = sourcePoint(world, active, p.trace.source);
       if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#7a5418" }}>Likely bad-water source (a guess)</span>, rank: 75 });
@@ -180,7 +196,7 @@ function useLabels(p: CitySceneProps): Label[] {
               <span style={{ color }}>●</span> {pinTitle(e)}
               {list.length > 1 && <span className="text-[var(--faint)]"> · +{list.length - 1} more</span>}
               <span className="block text-[10px] text-[var(--muted)]">
-                {pin.named ? `${pin.named} · ` : ""}{e.demo ? "demo data" : e.verified ? "✓ verified" : "not verified"}
+                {pin.named ? `${pin.named} · ` : ""}{e.test ? "test alert" : e.demo ? "demo data" : e.verified ? "✓ verified" : "not verified"}
               </span>
             </span>
           ),
@@ -188,10 +204,10 @@ function useLabels(p: CitySceneProps): Label[] {
       }
     }
     return out;
-  }, [world, active, layers, hubs, events, view, p.flood, p.route, p.trace]);
+  }, [world, active, layers, hubs, events, view, p.flood, p.route, p.trace, p.zones]);
 }
 
-function Projector({ labels, registry }: { labels: Label[]; registry: React.RefObject<Map<string, HTMLDivElement>> }) {
+function Projector({ labels, registry, leaders }: { labels: Label[]; registry: React.RefObject<Map<string, HTMLDivElement>>; leaders: React.RefObject<Map<string, SVGLineElement>> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   const ranked = useMemo(() => [...labels].sort((a, b) => b.rank - a.rank), [labels]);
   const sizes = useRef(new Map<string, [number, number]>());
@@ -210,8 +226,10 @@ function Projector({ labels, registry }: { labels: Label[]; registry: React.RefO
       v.set(l.pos[0], l.pos[1], l.pos[2]).project(camera);
       const [w, h] = sizes.current.get(l.id) ?? [0, 0];
       let spot: [number, number] | null = null;
+      let anchor: [number, number] | null = null;
       if (!(v.z > 1 || Math.abs(v.x) > 1.2 || Math.abs(v.y) > 1.2) && w > 0) {
         const x = ((v.x + 1) / 2) * size.width, y = ((1 - v.y) / 2) * size.height;
+        anchor = [x, y];
         const tries: [number, number][] = l.rank >= NUDGE
           ? [[0, 0], [0, -(h + 4)], [0, h + 4], [w * 0.6, -(h * 0.6)], [-w * 0.6, -(h * 0.6)], [w * 0.6, h * 0.6], [-w * 0.6, h * 0.6]]
           : [[0, 0]];
@@ -222,6 +240,12 @@ function Projector({ labels, registry }: { labels: Label[]; registry: React.RefO
           if (box[0] < 0 || box[2] > size.width || box[1] < 0 || box[3] > size.height) continue;
           if (!hits(...box)) { placed.push(box); spot = [cx, cy]; break; }
         }
+      }
+      const line = leaders.current.get(l.id);
+      const moved = spot && anchor && (Math.abs(spot[0] - anchor[0]) > 1 || Math.abs(spot[1] - anchor[1]) > 1);
+      if (line) {
+        line.setAttribute("visibility", moved ? "visible" : "hidden");
+        if (moved) { line.setAttribute("x1", anchor![0].toFixed(1)); line.setAttribute("y1", anchor![1].toFixed(1)); line.setAttribute("x2", spot![0].toFixed(1)); line.setAttribute("y2", spot![1].toFixed(1)); }
       }
       if (!spot) { el.style.visibility = "hidden"; continue; }
       el.style.visibility = "visible";
@@ -284,7 +308,7 @@ function ActiveLevel(p: CitySceneProps & { level: Level }) {
   useSlide(ref, 0);
 
   // Status only repaints vertex colors.
-  useEffect(() => { paintBuildings(g.buildings, p.water.dry, p.cut, p.risk); }, [g, p.water, p.cut, p.risk]);
+  useEffect(() => { paintBuildings(g.buildings, p.water.dry, p.cut, p.risk, p.dark); }, [g, p.water, p.cut, p.risk, p.dark]);
 
   const selectedBuilding = p.selection?.type === "building" ? level.buildings.find((b) => b.id === p.selection!.id) : undefined;
 
@@ -325,13 +349,14 @@ function ActiveLevel(p: CitySceneProps & { level: Level }) {
       {p.layers.buildings && (
         <mesh
           geometry={g.buildings.geometry}
-          castShadow
+          castShadow={!p.layers.xray}
           receiveShadow
           onClick={onBuilding}
           onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
           onPointerOut={() => { document.body.style.cursor = ""; }}
         >
-          <meshStandardMaterial vertexColors roughness={0.92} metalness={0} />
+          {/* X-ray: see-through buildings so the pipes and zones underneath show. */}
+          <meshStandardMaterial key={p.layers.xray ? "xray" : "solid"} vertexColors roughness={0.92} metalness={0} transparent={p.layers.xray} opacity={p.layers.xray ? 0.35 : 1} depthWrite={!p.layers.xray} />
         </mesh>
       )}
       {selectedBuilding && <Highlight outer={selectedBuilding.footprint.outer} holes={selectedBuilding.footprint.holes} height={selectedBuilding.height} />}
@@ -340,6 +365,7 @@ function ActiveLevel(p: CitySceneProps & { level: Level }) {
       <Core {...p} />
       <Stairs world={world} />
       {p.flood && <Flood world={world} flood={p.flood} />}
+      {p.layers.alerts && p.zones?.map((z) => <SensorZone key={z.id} zone={z} />)}
       {p.route && <SafeRoute route={p.route} />}
       {p.trace && p.layers.water && <SourceMarker world={world} level={level.n} id={p.trace.source} />}
       {p.layers.sensors && <Sensors {...p} />}
@@ -387,6 +413,35 @@ function Stairs({ world }: { world: CityWorld }) {
         </group>
       ))}
     </>
+  );
+}
+
+/** A sensor zone on the ground: haze for bad air, a warm tint for heat, a dark ring for a blackout. */
+function SensorZone({ zone }: { zone: Zone }) {
+  const ring = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    // Warnings (not yet happening) breathe slowly so they read as "coming", not "here".
+    if (ring.current && zone.warning) (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 2);
+  });
+  const fill = zone.kind === "blackout" ? 0.16 : zone.kind === "heat" ? 0.22 : 0.3;
+  return (
+    <group position={[zone.at[0], 0, zone.at[1]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.36, 0]} raycast={() => null}>
+        <circleGeometry args={[zone.radius, 48]} />
+        <meshBasicMaterial color={zone.color} transparent opacity={fill} depthWrite={false} />
+      </mesh>
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.38, 0]} raycast={() => null}>
+        <ringGeometry args={[zone.radius - 0.8, zone.radius, 64]} />
+        <meshBasicMaterial color={zone.color} transparent opacity={0.6} depthWrite={false} />
+      </mesh>
+      {zone.kind === "bad_air" && (
+        // A low haze dome so bad air reads as something in the air, not on the floor.
+        <mesh position={[0, 0, 0]} scale={[1, 0.35, 1]} raycast={() => null}>
+          <sphereGeometry args={[zone.radius * 0.8, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshBasicMaterial color={zone.color} transparent opacity={0.12} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
   );
 }
 

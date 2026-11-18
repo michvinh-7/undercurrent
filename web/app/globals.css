@@ -84,12 +84,12 @@ body {
   --border-strong: #c3bcaf;
   --foreground: #23262c;
   --muted: #5e6470;
-  --faint: #8d929b;
+  --faint: #6b707a; /* 4.5:1 on panels (was #8d929b, 3.0:1) */
   --accent: #4f5fb3;
   --water: #2f74ad;
   --danger: #b8402e;
-  --warn: #a96f12;
-  --ok: #2f7f6f;
+  --warn: #8a5a0b; /* 5.7:1 (was #a96f12, 4.0:1) */
+  --ok: #276b5d; /* 6.0:1 (was #2f7f6f, 4.6:1) */
   --sim: #7b5fb0;
   --directorate: #b83a52;
   background: var(--background);

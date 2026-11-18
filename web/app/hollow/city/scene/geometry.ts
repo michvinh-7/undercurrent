@@ -32,6 +32,8 @@ export const P = {
   risk: "#b07d2a",
   riskWall: "#efe2c4",
   riskRoof: "#b9975a",
+  darkWall: "#4a4d55", // no power (blackout)
+  darkRoof: "#2f3238",
 };
 
 const ROOF: Partial<Record<BuildingUse, string>> = {
@@ -159,19 +161,21 @@ export function buildingAt(mesh: BuildingMesh, vertex: number): string | null {
 }
 
 /** Recolor buildings by status in place: dry buildings turn amber, everything else is reset. */
-export function paintBuildings(mesh: BuildingMesh, dry: ReadonlySet<string> | ReadonlyMap<string, unknown>, cut: ReadonlySet<string> = new Set(), risk: ReadonlySet<string> = new Set()) {
+export function paintBuildings(mesh: BuildingMesh, dry: ReadonlySet<string> | ReadonlyMap<string, unknown>, cut: ReadonlySet<string> = new Set(), risk: ReadonlySet<string> = new Set(), dark: ReadonlySet<string> = new Set()) {
   const attr = mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
   const arr = attr.array as Float32Array;
   arr.set(mesh.base);
   const dw = new THREE.Color(P.dryWall), dr = new THREE.Color(P.dryRoof);
   const cw = new THREE.Color(P.cutWall), cr = new THREE.Color(P.cutRoof);
   const rw = new THREE.Color(P.riskWall), rr = new THREE.Color(P.riskRoof);
+  const kw = new THREE.Color(P.darkWall), kr = new THREE.Color(P.darkRoof);
   for (const r of mesh.ranges) {
-    const isCut = cut.has(r.id), isDry = dry.has(r.id), isRisk = risk.has(r.id);
-    if (!isDry && !isCut && !isRisk) continue;
+    const isCut = cut.has(r.id), isDry = dry.has(r.id), isRisk = risk.has(r.id), isDark = dark.has(r.id);
+    if (!isDry && !isCut && !isRisk && !isDark) continue;
     for (let i = r.start; i < r.start + r.count; i++) {
       const roof = mesh.roof[i];
-      const c = isCut ? (roof ? cr : cw) : isDry ? (roof ? dr : dw) : roof ? rr : rw;
+      // A blackout darkens whatever else is going on; the other states keep their order.
+      const c = isDark ? (roof ? kr : kw) : isCut ? (roof ? cr : cw) : isDry ? (roof ? dr : dw) : roof ? rr : rw;
       arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
     }
   }
