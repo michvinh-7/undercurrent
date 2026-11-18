@@ -1,48 +1,20 @@
 "use client";
 
-// Command dashboard (Person 4): live priority queue, network controls, missing-persons board.
-// Reads the hub's live stream (GET /events/stream). Falls back to labeled fake examples if no hub answers.
+// The rebel console. Every demo beat must be readable here, without the 3D map:
+//   1. a verified sensor alert lands       → queue + "Verified" badge
+//   2. the link is cut, alerts queue        → Link card + "N waiting to send"
+//   3. a forged "all clear" is rejected     → Forgeries blocked counter
+//   4. an edited record                     → Chain card names the exact row
+//   5. the Directorate sniffs the channel   → Directorate view toggle (and /truth)
+// Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fakeEvents } from "@/lib/fake-events";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
-import { getLink, hubUrl, setLink, type LinkStatus } from "@/lib/hub";
+import { isEncrypted, isSensor, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
 
-const SOS = 0.9; // matches the SOS band in hub/app/triage.py score()
-const NEW_MS = 4000;
-
-type Conn = "connecting" | "live" | "offline";
-
-function useEventStream() {
-  const [events, setEvents] = useState<Map<string, HollowEvent>>(new Map());
-  const [arrived, setArrived] = useState<Map<string, number>>(new Map());
-  const [conn, setConn] = useState<Conn>("connecting");
-  const everConnected = useRef(false);
-
-  useEffect(() => {
-    const es = new EventSource(`${hubUrl()}/events/stream`);
-    const giveUp = setTimeout(() => !everConnected.current && setConn("offline"), 3000);
-    es.onopen = () => {
-      everConnected.current = true;
-      setConn("live");
-    };
-    es.onerror = () => setConn(everConnected.current ? "connecting" : "offline"); // EventSource retries by itself
-    es.onmessage = (m) => {
-      const e = JSON.parse(m.data) as HollowEvent;
-      setEvents((cur) => new Map(cur).set(e.id, e));
-      setArrived((cur) => new Map(cur).set(e.id, Date.now()));
-    };
-    return () => {
-      clearTimeout(giveUp);
-      es.close();
-    };
-  }, []);
-
-  const showingFakes = conn === "offline" && events.size === 0;
-  const list = showingFakes ? fakeEvents : [...events.values()];
-  return { events: list, arrived, conn, showingFakes };
-}
+const NEW_MS = 5000;
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -53,59 +25,136 @@ function useNow(ms = 1000) {
   return now;
 }
 
-const byPriority = (a: HollowEvent, b: HollowEvent) =>
-  (b.priority ?? -1) - (a.priority ?? -1) || b.created_at.localeCompare(a.created_at);
+// Unscored events (AI triage off, e.g. on the box) sort by rule: SOS, then sensor alarms. Only the order
+// uses this; the priority column still shows "—" for them.
+const rank = (e: HollowEvent) => e.priority ?? (isSOS(e) ? 0.95 : isSensor(e) ? 0.9 : 0.3);
+const byPriority = (a: HollowEvent, b: HollowEvent) => rank(b) - rank(a) || b.created_at.localeCompare(a.created_at);
 
-export default function Dashboard() {
-  const { events, arrived, conn, showingFakes } = useEventStream();
+export default function Console() {
+  const net = useUndercurrent();
   const now = useNow();
-  const queue = useMemo(() => [...events].sort(byPriority), [events]);
-  // The initial backlog arrives all at once on connect; only flag events that came in after that.
-  const firstArrival = useMemo(() => Math.min(...arrived.values()), [arrived]);
+  const [directorate, setDirectorate] = useState(false);
+
+  const queue = useMemo(() => net.events.filter((e) => e.type !== "roster").sort(byPriority), [net.events]);
+  const primary = net.hubs.find((h) => h.role === "primary");
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Command</p>
-          <h1 className="text-2xl font-semibold">Undercurrent dashboard</h1>
-        </div>
-        <ConnBadge conn={conn} />
-      </header>
+    <main
+      className="mx-auto max-w-7xl px-4 py-6 sm:px-6"
+      style={directorate ? { boxShadow: "inset 0 0 0 2px var(--directorate)" } : undefined}
+    >
+      <Header net={net} directorate={directorate} setDirectorate={setDirectorate} />
 
-      {showingFakes && (
-        <p className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm">
-          No hub answered at {hubUrl()}. Showing <strong>fake example events</strong>, not real reports.
+      {net.mode === "demo" && (
+        <p className="sim-hatch mt-4 rounded-lg border border-[var(--sim)] px-3 py-2 text-sm">
+          <span className="caption mr-2 !text-[var(--sim)]">Demo data</span>
+          No hub answered{primary ? ` at ${primary.url}` : ""}. Showing example events, not real reports. Buttons
+          change the demo only.
         </p>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <StatStrip net={net} />
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <section>
-          <h2 className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">
-            Priority queue · {queue.length} reports
-          </h2>
+          <div className="flex items-baseline justify-between">
+            <h2 className="caption">
+              {directorate ? "Intercepted traffic · Directorate view" : "Priority queue"} · {queue.length}
+            </h2>
+            {net.mode === "demo" && (
+              <button onClick={() => net.actions.demoSensorAlert(34)} className="caption underline hover:!text-[var(--foreground)]">
+                + demo sensor alert
+              </button>
+            )}
+          </div>
           <ol className="mt-3 space-y-2">
             {queue.map((e) => {
-              const t = arrived.get(e.id);
-              const isNew = t !== undefined && t > firstArrival + 500 && now - t < NEW_MS;
-              return <QueueItem key={e.id} e={e} isNew={isNew} now={now} />;
+              const t = net.arrived.get(e.id);
+              const isNew = t !== undefined && net.isFresh(e.id) && now - t < NEW_MS;
+              return (
+                <QueueItem
+                  key={e.id}
+                  e={e}
+                  isNew={isNew}
+                  now={now}
+                  verified={net.isVerified(e)}
+                  tampered={net.chain?.first_bad_event === e.id}
+                  directorate={directorate}
+                />
+              );
             })}
             {queue.length === 0 && <li className="text-[var(--muted)]">No reports yet.</li>}
           </ol>
         </section>
 
         <aside className="space-y-6">
-          <NetworkControls />
-          <MissingBoard events={events} now={now} />
+          {[...net.hubs].sort((a) => (a === net.sendingHub ? -1 : 1)).map((h) => (
+            <LinkPanel key={h.role} hub={h} net={net} />
+          ))}
+          <ForgeryPanel net={net} now={now} />
+          <ChainPanel net={net} events={net.events} />
+          <MissingBoard events={net.events} now={now} />
         </aside>
       </div>
     </main>
   );
 }
 
-function ConnBadge({ conn }: { conn: Conn }) {
-  const color = conn === "live" ? "var(--ok)" : conn === "offline" ? "var(--danger)" : "var(--muted)";
-  const text = conn === "live" ? "Live" : conn === "offline" ? "Hub offline" : "Connecting…";
+function Header({
+  net,
+  directorate,
+  setDirectorate,
+}: {
+  net: Undercurrent;
+  directorate: boolean;
+  setDirectorate: (v: boolean) => void;
+}) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="caption">
+          Undercurrent / Command{primary?.hubId ? ` / ${primary.hubId.replace("hub-", "Hub ")}` : ""}
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+          {directorate ? "What the Directorate sees" : "Rebel console"}
+        </h1>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <nav className="flex gap-3 text-sm text-[var(--muted)]">
+          <Link href="/hollow" className="hover:text-[var(--foreground)]">The Hollow →</Link>
+          <Link href="/truth" className="hover:text-[var(--foreground)]">Directorate view →</Link>
+        </nav>
+        <ModeBadge mode={net.mode} />
+        <button
+          role="switch"
+          aria-checked={directorate}
+          onClick={() => setDirectorate(!directorate)}
+          className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
+          style={{
+            borderColor: directorate ? "var(--directorate)" : "var(--border-strong)",
+            color: directorate ? "var(--directorate)" : undefined,
+          }}
+        >
+          <span
+            className="relative h-4 w-7 rounded-full transition-colors"
+            style={{ background: directorate ? "var(--directorate)" : "var(--border-strong)" }}
+          >
+            <span
+              className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all"
+              style={{ left: directorate ? 14 : 2 }}
+            />
+          </span>
+          Directorate view
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function ModeBadge({ mode }: { mode: Undercurrent["mode"] }) {
+  const color = mode === "live" ? "var(--ok)" : mode === "demo" ? "var(--sim)" : "var(--warn)";
+  const text = mode === "live" ? "Live" : mode === "demo" ? "Demo data" : "Reconnecting…";
   return (
     <span className="flex items-center gap-2 text-sm">
       <span className="h-2 w-2 rounded-full" style={{ background: color }} />
@@ -114,28 +163,117 @@ function ConnBadge({ conn }: { conn: Conn }) {
   );
 }
 
-function QueueItem({ e, isNew, now }: { e: HollowEvent; isNew: boolean; now: number }) {
-  const sos = (e.priority ?? 0) >= SOS;
+function Stat({ label, value, sub, color, bumpKey }: { label: string; value: React.ReactNode; sub: React.ReactNode; color?: string; bumpKey?: number }) {
+  return (
+    <div className="panel px-4 py-3">
+      <p className="caption">{label}</p>
+      <p key={bumpKey} className={`mt-1 font-mono text-2xl font-semibold ${bumpKey ? "bump" : ""}`} style={{ color }}>
+        {value}
+      </p>
+      <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{sub}</p>
+    </div>
+  );
+}
+
+function StatStrip({ net }: { net: Undercurrent }) {
+  const alerts = net.events.filter((e) => e.type !== "roster");
+  const verified = alerts.filter(net.isVerified).length;
+  const link = net.sendingHub?.link;
+  const chain = net.chain;
+  return (
+    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <Stat label="Verified reports" value={`${verified}/${alerts.length}`} sub="signed by a key on the roster" color="var(--ok)" />
+      <Stat
+        label={`Link · ${net.sendingHub?.hubId?.replace("hub-", "") ?? "hub"}`}
+        value={!link ? "—" : link.cut ? "CUT" : "Up"}
+        sub={!link ? "no hub answered" : `${link.queued} waiting to send`}
+        color={!link ? undefined : link.cut ? "var(--danger)" : "var(--ok)"}
+      />
+      <Stat
+        label="Forgeries blocked"
+        value={net.forgeriesBlocked}
+        sub={net.rejected[0] ? `last: ${net.rejected[0].reason}` : "none yet"}
+        color={net.forgeriesBlocked ? "var(--danger)" : undefined}
+        bumpKey={net.forgeriesBlocked}
+      />
+      <Stat
+        label="Record chain"
+        value={!chain ? "—" : chain.chain_intact ? "Intact" : "Tampered"}
+        sub={!chain ? "no hub answered" : chain.chain_intact ? "every row checks out" : `first bad row ${chain.first_bad_event?.slice(0, 8)}…`}
+        color={!chain ? undefined : chain.chain_intact ? "var(--ok)" : "var(--danger)"}
+      />
+    </div>
+  );
+}
+
+function Badge({ children, color, solid }: { children: React.ReactNode; color: string; solid?: boolean }) {
+  return (
+    <span
+      className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
+      style={solid ? { background: color, color: "white" } : { color, boxShadow: `inset 0 0 0 1px ${color}` }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** What a sniffer sees of a ciphertext: bytes, nothing else. */
+function hexPreview(b64: string, n = 24) {
+  try {
+    const bin = atob(b64);
+    return Array.from(bin.slice(0, n), (c) => c.charCodeAt(0).toString(16).padStart(2, "0").toUpperCase()).join(" ") + " …";
+  } catch {
+    return b64.slice(0, 48) + "…";
+  }
+}
+
+function QueueItem({
+  e,
+  isNew,
+  now,
+  verified,
+  tampered,
+  directorate,
+}: {
+  e: HollowEvent;
+  isNew: boolean;
+  now: number;
+  verified: boolean;
+  tampered: boolean;
+  directorate: boolean;
+}) {
+  const sos = isSOS(e);
+  const enc = isEncrypted(e);
+  const border = tampered ? "var(--danger)" : sos ? "var(--danger)" : isNew ? "var(--accent)" : "var(--border)";
   return (
     <li
-      className="flex items-start justify-between gap-3 rounded-lg border bg-[var(--panel)] px-4 py-3 transition-colors duration-700"
-      style={{
-        borderColor: sos ? "var(--danger)" : isNew ? "var(--accent)" : "var(--border)",
-        background: isNew ? "color-mix(in srgb, var(--accent) 14%, var(--panel))" : undefined,
-      }}
+      className={`flex items-start justify-between gap-3 rounded-lg border bg-[var(--panel)] px-4 py-3 transition-colors duration-700 ${sos && isNew ? "pulse-danger" : ""}`}
+      style={{ borderColor: border, background: isNew ? "color-mix(in srgb, var(--accent) 12%, var(--panel))" : undefined }}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {sos && <span className="rounded bg-[var(--danger)] px-1.5 py-0.5 font-semibold text-white">SOS</span>}
-          <span className="font-mono uppercase text-[var(--accent)]">{TYPE_LABEL[e.type]}</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {sos && !enc && <Badge color="var(--danger)" solid>SOS</Badge>}
+          {tampered && <Badge color="var(--danger)" solid>Tampered row</Badge>}
+          {tampered ? null : verified ? <Badge color="var(--ok)">✓ Verified</Badge> : <Badge color="var(--warn)">{e.sig ? "Unknown key" : "Unsigned"}</Badge>}
+          {isSensor(e) && <Badge color="var(--water)">Sensor · {e.device_id ?? "canary"}</Badge>}
+          {enc ? <Badge color="var(--accent)">Cell message</Badge> : <span className="font-mono uppercase text-[var(--accent)]">{TYPE_LABEL[e.type]}</span>}
           <span>Level {e.level}</span>
           <span className="text-[var(--muted)]">· {timeAgo(e.created_at, now)} · {e.hub_id}</span>
           {isNew && <span className="font-semibold text-[var(--accent)]">NEW</span>}
         </div>
-        <p className="mt-1 break-words">{summary(e)}</p>
+        {enc ? (
+          directorate ? (
+            <p className="mt-1 break-all font-mono text-xs text-[var(--directorate)]">{hexPreview(String(e.payload.ciphertext ?? ""))}</p>
+          ) : (
+            <p className="mt-1 text-[var(--muted)]">Encrypted for the cell. Open it on a member phone.</p>
+          )
+        ) : (
+          <p className="mt-1 break-words">{summary(e)}</p>
+        )}
+        {directorate && !enc && <p className="caption mt-1 !text-[var(--faint)]">Public · readable by anyone, provably from a member</p>}
       </div>
       <span className="shrink-0 font-mono text-sm" title="Priority, 0 to 1">
-        {e.priority === null ? <span className="text-[var(--muted)]">unscored</span> : e.priority.toFixed(2)}
+        {e.priority === null ? <span className="text-[var(--muted)]">—</span> : e.priority.toFixed(2)}
       </span>
     </li>
   );
@@ -147,46 +285,41 @@ const MAX_BPS = 100_000;
 const toBps = (x: number) => Math.round(MIN_BPS * (MAX_BPS / MIN_BPS) ** x);
 const toSlider = (bps: number) => Math.log(bps / MIN_BPS) / Math.log(MAX_BPS / MIN_BPS);
 
-function NetworkControls() {
-  const [link, setLinkState] = useState<LinkStatus | null>(null);
-  const [error, setError] = useState(false);
+function LinkPanel({ hub, net }: { hub: HubState; net: Undercurrent }) {
   const [draft, setDraft] = useState<number | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      getLink()
-        .then((l) => alive && (setLinkState(l), setError(false)))
-        .catch(() => alive && setError(true));
-    load();
-    const t = setInterval(load, 2000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
-
-  const apply = (settings: Parameters<typeof setLink>[0]) =>
-    setLink(settings).then(setLinkState).catch(() => setError(true));
-
+  const link = hub.link;
+  const name = hub.hubId?.replace("hub-", "Hub ") ?? (hub.role === "primary" ? "This hub" : "Peer hub");
+  const apply = (s: Parameters<Undercurrent["actions"]["setLink"]>[1]) => net.actions.setLink(hub, s);
   const unlimited = link?.bandwidth_bps === null;
   const shownBps = draft ?? link?.bandwidth_bps ?? MAX_BPS;
 
   return (
-    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-      <h2 className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Network (simulated link)</h2>
-      {error || !link ? (
-        <p className="mt-2 text-sm text-[var(--muted)]">{error ? "Link controls unavailable: no hub answered." : "Loading…"}</p>
+    <section className="panel p-4" style={link?.cut ? { borderColor: "var(--danger)" } : undefined}>
+      <div className="flex items-baseline justify-between">
+        <h2 className="caption">Outbound link · {name}</h2>
+        <span className="font-mono text-xs" style={{ color: !link ? "var(--muted)" : link.cut ? "var(--danger)" : "var(--ok)" }}>
+          {!link ? "no answer" : link.cut ? "CUT" : "CONNECTED"}
+        </span>
+      </div>
+      {!link ? (
+        <p className="mt-2 text-sm text-[var(--muted)]">No hub answered at {hub.url}.</p>
       ) : (
         <div className="mt-3 space-y-4">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-3xl font-semibold" style={{ color: link.queued ? "var(--warn)" : undefined }}>
+              {link.queued}
+            </span>
+            <span className="text-sm text-[var(--muted)]">
+              waiting to send · {link.queued_bytes.toLocaleString()} bytes
+            </span>
+          </div>
           <button
             onClick={() => apply({ cut: !link.cut })}
-            className="w-full rounded-lg px-4 py-3 font-semibold text-white"
+            className="w-full rounded-lg px-4 py-2.5 font-semibold text-white"
             style={{ background: link.cut ? "var(--ok)" : "var(--danger)" }}
           >
-            {link.cut ? "Restore the network" : "Cut the network"}
+            {link.cut ? "Restore the link" : "Cut the link"}
           </button>
-
           <label className="block">
             <span className="flex justify-between text-sm">
               <span>Bandwidth</span>
@@ -207,12 +340,84 @@ function NetworkControls() {
           <button onClick={() => apply({ unlimited: true })} className="text-sm text-[var(--muted)] underline">
             Set unlimited
           </button>
-
-          <p className="text-sm text-[var(--muted)]">
-            {link.cut ? "Cut. " : ""}
-            {link.queued} waiting to send ({link.queued_bytes.toLocaleString()} bytes)
-          </p>
         </div>
+      )}
+    </section>
+  );
+}
+
+function ForgeryPanel({ net, now }: { net: Undercurrent; now: number }) {
+  const [result, setResult] = useState<string | null>(null);
+  const target = net.sendingHub;
+  return (
+    <section className="panel p-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="caption">Forgeries blocked</h2>
+        <span key={net.forgeriesBlocked} className="bump font-mono text-2xl font-semibold" style={{ color: net.forgeriesBlocked ? "var(--danger)" : undefined }}>
+          {net.forgeriesBlocked}
+        </span>
+      </div>
+      <ul className="mt-3 space-y-2 text-sm">
+        {net.rejected.slice(0, 5).map((r) => (
+          <li key={`${r.hubId}-${r.seq}`} className="flex items-start justify-between gap-2">
+            <span className="min-w-0">
+              <span className="block truncate">
+                {typeof r.event.payload?.note === "string" ? `“${r.event.payload.note}”` : `${r.event.type ?? "event"} · level ${r.event.level ?? "?"}`}
+              </span>
+              <span className="caption !text-[var(--danger)]">{r.reason}</span>
+              <span className="caption"> · {r.via} · {r.hubId?.replace("hub-", "") ?? ""}</span>
+            </span>
+            <span className="shrink-0 text-xs text-[var(--muted)]">{timeAgo(r.received_at, now)}</span>
+          </li>
+        ))}
+        {net.rejected.length === 0 && <li className="text-[var(--muted)]">Nothing rejected yet.</li>}
+      </ul>
+      <button
+        onClick={async () => {
+          setResult("sending…");
+          const r = await net.actions.injectForgery(target, 34);
+          setResult(r.ok ? "⚠ the hub ACCEPTED it" : `refused: ${r.reason}`);
+        }}
+        className="mt-4 w-full rounded-lg border px-3 py-2 text-sm"
+        style={{ borderColor: "var(--directorate)", color: "var(--directorate)" }}
+      >
+        Directorate: inject “all clear, level 34”
+      </button>
+      {result && <p className="mt-2 font-mono text-xs text-[var(--muted)]">{result}</p>}
+      <p className="mt-2 text-xs text-[var(--faint)]">
+        Signs a real request with a fresh key that is on no roster.
+      </p>
+    </section>
+  );
+}
+
+function ChainPanel({ net, events }: { net: Undercurrent; events: HollowEvent[] }) {
+  const chain = net.chain;
+  const bad = chain?.first_bad_event ? events.find((e) => e.id === chain.first_bad_event) : undefined;
+  const gaps = Object.entries(chain?.gaps ?? {}).filter(([, n]) => n > 0);
+  return (
+    <section className="panel p-4" style={chain && !chain.chain_intact ? { borderColor: "var(--danger)" } : undefined}>
+      <h2 className="caption">Record chain check</h2>
+      {!chain ? (
+        <p className="mt-2 text-sm text-[var(--muted)]">No hub answered.</p>
+      ) : chain.chain_intact ? (
+        <p className="mt-2 text-sm">
+          <span className="font-semibold text-[var(--ok)]">Intact.</span> Every row&apos;s hash and signature check out
+          against the one before it.
+        </p>
+      ) : (
+        <div className="mt-2 text-sm">
+          <p className="font-semibold text-[var(--danger)]">Edited record found.</p>
+          <p className="mt-1 break-all font-mono text-xs">row {chain.first_bad_event}</p>
+          {bad && (
+            <p className="mt-1 text-[var(--muted)]">
+              {TYPE_LABEL[bad.type]} · level {bad.level} · {bad.hub_id}: “{summary(bad)}”
+            </p>
+          )}
+        </div>
+      )}
+      {gaps.length > 0 && (
+        <p className="caption mt-2">Syncing: {gaps.map(([h, n]) => `${n} pending from ${h}`).join(", ")}</p>
       )}
     </section>
   );
@@ -220,20 +425,19 @@ function NetworkControls() {
 
 function MissingBoard({ events, now }: { events: HollowEvent[]; now: number }) {
   const [query, setQuery] = useState("");
-  const missing = events.filter((e) => e.type === "missing_person").sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const missing = events.filter((e) => e.type === "missing_person" && !isEncrypted(e)).sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const q = query.trim().toLowerCase();
   const sightings = q
     ? events
-        .filter((e) => e.type === "checkin" || e.type === "missing_person")
+        .filter((e) => (e.type === "checkin" || e.type === "missing_person") && !isEncrypted(e))
         .filter((e) => JSON.stringify(e.payload).toLowerCase().includes(q))
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
     : [];
 
   return (
-    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
-      <h2 className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Missing persons · {missing.length}</h2>
-
+    <section className="panel p-4">
+      <h2 className="caption">Missing persons · {missing.length}</h2>
       <label className="mt-3 block">
         <span className="sr-only">Search check-ins and missing reports by name</span>
         <input
@@ -243,7 +447,6 @@ function MissingBoard({ events, now }: { events: HollowEvent[]; now: number }) {
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-base outline-none focus:border-[var(--accent)]"
         />
       </label>
-
       {q ? (
         <ul className="mt-3 space-y-2 text-sm">
           {sightings.map((e) => (
