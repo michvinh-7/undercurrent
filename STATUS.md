@@ -111,11 +111,11 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 ## Taheful: console, Directorate view, map, video
 
 - [x] `/dashboard` is live: priority queue, SOS flash, missing-persons search, bandwidth slider, cut button.
-- [ ] Rebel console: "verified" badges, a "forgeries blocked" counter from `listRejected()`, a Directorate-view toggle. Build against fake events first.
-- [ ] Directorate view (`web/app/truth`, a placeholder today): ciphertext next to plaintext, in monospace.
-- [ ] Fonts: one `next/font` sans and one mono in `layout.tsx`; CSS tokens on the console pages.
-- [ ] Bonus: the 3D Hollow map (`web/app/hollow`), loaded with `next/dynamic` and `ssr: false`. Ship or cut at Wed noon.
-- [ ] Check every page at phone width.
+- [x] Rebel console: "verified" badges, a "forgeries blocked" counter, a Directorate-view toggle, plus the sending hub's backlog and the chain check naming the tampered row. *(PR #21; tested against two real hubs.)*
+- [x] Directorate view (`/truth`): wire bytes next to what a member reads. *(One labeled demo cell message until `cell.ts` lands; then it shows real ones.)*
+- [x] Fonts: Geist sans + mono in `layout.tsx`; tokens in `globals.css`.
+- [x] The 3D Hollow map (`/hollow`): generated 40-level city (World check 12/12), simulated water failures, live alerts, link cut/backlog, refused forgeries. *(PR #21. No beat depends on it.)*
+- [ ] Check every page at phone width. *(Console, `/truth` and `/hollow` checked; phone forms are Alanna's.)*
 - [ ] Demo script, two rehearsals, record and edit the video (Thu 11/19).
 - [ ] Devpost: story, how it works, results, what it doesn't do. Submit early Fri 11/20.
 
