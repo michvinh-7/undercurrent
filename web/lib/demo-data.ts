@@ -35,6 +35,26 @@ export function demoEvents(now = Date.now()): HollowEvent[] {
       payload: { kind: "flooding", severity: "high", location: "Pump room", note: "Water probe past threshold for 3 s" },
       author_pub: CANARY_PUB, source: "sensor", device_id: "canary-34",
     }),
+    base(20, {
+      type: "hazard", level: 34, created_at: ago(now, 1200), priority: 0.6,
+      payload: { kind: "bad_water", severity: "medium", location: "Pumpwell St", note: "Tap water brown and smells of metal" },
+    }),
+    base(21, {
+      type: "hazard", level: 34, created_at: ago(now, 2100), priority: 0.55, author: "anon-2c91", author_pub: MEMBER2_PUB,
+      payload: { kind: "bad_water", severity: "medium", location: "Pumpwell Street, near the school", note: "Kids sick after drinking from the tap" },
+    }),
+    base(22, {
+      type: "hazard", level: 34, created_at: ago(now, 3300), priority: 0.5,
+      payload: { kind: "bad_water", severity: "low", location: "pumpwell st", note: "Cloudy water" },
+    }),
+    base(23, {
+      type: "case", level: 34, created_at: ago(now, 1500), priority: 0.66,
+      payload: { symptoms: ["coughing", "short of breath"], people_affected: 4, raw_text: "my whole family coughing, hard to breathe at night" },
+    }),
+    base(24, {
+      type: "case", level: 34, created_at: ago(now, 4000), priority: 0.6, author: "anon-2c91", author_pub: MEMBER2_PUB,
+      payload: { symptoms: ["chest pain", "coughing"], people_affected: 2 },
+    }),
     base(2, {
       type: "checkin", level: 34, created_at: ago(now, 95), priority: 0.93,
       payload: { status: "need_help", name: "Ines Varga", note: "Stuck behind the east bulkhead, water rising" },

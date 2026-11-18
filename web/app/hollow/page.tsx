@@ -1,9 +1,9 @@
 "use client";
 
-// The 3D Hollow map. WebGL needs the browser, so the whole view loads client-side only.
+// The Hollow map. WebGL needs the browser, so the view loads client-side only.
 import dynamic from "next/dynamic";
 
-const HollowApp = dynamic(() => import("./HollowApp"), {
+const CityApp = dynamic(() => import("./city/CityApp"), {
   ssr: false,
   loading: () => (
     <main className="flex min-h-[100dvh] items-center justify-center">
@@ -13,5 +13,5 @@ const HollowApp = dynamic(() => import("./HollowApp"), {
 });
 
 export default function HollowPage() {
-  return <HollowApp />;
+  return <CityApp />;
 }

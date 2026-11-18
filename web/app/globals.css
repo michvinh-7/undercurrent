@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* One token set for the console, the Directorate view and the Hollow map.
-   The map reads the same values (web/app/hollow/scene/colors.ts mirrors them). */
+   The Hollow map uses its own light theme (.theme-paper below). */
 :root {
   --background: #07080c;
   --panel: #10121a;
@@ -67,3 +67,68 @@ body {
   100% { transform: scale(1); }
 }
 .bump { animation: bump 0.6s ease-out; }
+
+/* --- The Hollow city map: a calm, light "paper" theme scoped to the map page ---------- */
+.theme-paper {
+  --background: #ebe8e2;
+  --panel: #fbfaf7;
+  --panel-2: #f1eee8;
+  --border: #ddd8ce;
+  --border-strong: #c3bcaf;
+  --foreground: #23262c;
+  --muted: #5e6470;
+  --faint: #8d929b;
+  --accent: #4f5fb3;
+  --water: #2f74ad;
+  --danger: #b8402e;
+  --warn: #a96f12;
+  --ok: #2f7f6f;
+  --sim: #7b5fb0;
+  --directorate: #b83a52;
+  background: var(--background);
+  color: var(--foreground);
+  color-scheme: light;
+}
+.map-label {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--panel) 94%, transparent);
+  color: var(--foreground);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.map-label--quiet {
+  color: var(--muted);
+  background: color-mix(in oklab, var(--panel) 80%, transparent);
+}
+.map-street {
+  color: #7a7468;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #f3efe6, 0 0 3px #f3efe6;
+}
+.map-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+}
+.map-chip:hover { background: var(--panel-2); }
+@media (max-width: 640px) {
+  .theme-paper .map-street { display: none; }
+  .theme-paper .map-label { font-size: 10px; padding: 2px 5px; }
+  .theme-paper .map-label--minor, .theme-paper .map-label .block { display: none; }
+}
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.bubble-in { animation: bubble-in 260ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .bubble-in { animation: none; } }

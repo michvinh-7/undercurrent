@@ -119,7 +119,7 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 - [x] Rebel console: "verified" badges, a "forgeries blocked" counter, a Directorate-view toggle, plus the sending hub's backlog and the chain check naming the tampered row. *(PR #21; tested against two real hubs.)*
 - [x] Directorate view (`/truth`): wire bytes next to what a member reads. *(One labeled demo cell message until `cell.ts` lands; then it shows real ones.)*
 - [x] Fonts: Geist sans + mono in `layout.tsx`; tokens in `globals.css`.
-- [x] The 3D Hollow map (`/hollow`): generated 40-level city (World check 12/12), simulated water failures, live alerts, link cut/backlog, refused forgeries. *(PR #21. No beat depends on it.)*
+- [x] The Hollow map (`/hollow`), rebuilt as a city map: one level at a time with real street and building layouts (generated), a "What's happening" bubble in plain words, flood alerts that close streets and draw the safest route, bad-water reports traced up the pipes to a likely source (a guess, labelled), cough/breathing reports and check-ins per level, way to the nearest care from any building, add-a-level. Starts with L12, L34, L35. *(PR #28. No beat depends on it.)*
 - [ ] Check every page at phone width. *(Console, `/truth` and `/hollow` checked; phone forms are Alanna's.)*
 - [ ] Demo script, two rehearsals, record and edit the video (Thu 11/19).
 - [ ] Devpost: story, how it works, results, what it doesn't do. Submit early Fri 11/20.
