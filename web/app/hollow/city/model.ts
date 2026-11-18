@@ -506,3 +506,173 @@ export function scenariosFor(world: CityWorld, n: number): Scenario[] {
   if (feed && net.pipe.get(feed)!.kind === "riser") list.push({ id: `riser-${n}`, label: `Riser into L${n} breaks`, failure: { pipes: [feed] } });
   return list;
 }
+
+// --- Walking: the street graph, floods, safe routes -----------------------------------------
+
+export interface StreetEdge { id: string; a: string; b: string; street: string; width: number }
+export interface StreetGraph { pos: Map<string, XZ>; edges: StreetEdge[]; stairs: { id: string; name: string; at: XZ }[] }
+
+const graphCache = new WeakMap<Grid, StreetGraph>();
+/** Every walkable street segment between crossings (same on every level). */
+export function streetGraph(grid: Grid): StreetGraph {
+  const hit = graphCache.get(grid);
+  if (hit) return hit;
+  const ns = grid.streets.filter((s) => s.dir === "ns").sort((a, b) => a.at - b.at);
+  const ew = grid.streets.filter((s) => s.dir === "ew").sort((a, b) => a.at - b.at);
+  const k = (i: number, j: number) => `${i}.${j}`;
+  const pos = new Map<string, XZ>();
+  const zLine = [ns[0].from, ...ew.map((s) => s.at), ns[0].to];
+  const xLine = [ew[0].from, ...ns.map((s) => s.at), ew[0].to];
+  ns.forEach((s, i) => zLine.forEach((z, j) => pos.set(k(i + 1, j), [s.at, z])));
+  ew.forEach((s, j) => { pos.set(k(0, j + 1), [xLine[0], s.at]); pos.set(k(ns.length + 1, j + 1), [xLine[xLine.length - 1], s.at]); });
+  const edges: StreetEdge[] = [];
+  ns.forEach((s, i) => { for (let j = 0; j < zLine.length - 1; j++) edges.push({ id: `${k(i + 1, j)}~${k(i + 1, j + 1)}`, a: k(i + 1, j), b: k(i + 1, j + 1), street: s.name, width: s.width }); });
+  ew.forEach((s, j) => { for (let i = 0; i < xLine.length - 1; i++) edges.push({ id: `${k(i, j + 1)}~${k(i + 1, j + 1)}`, a: k(i, j + 1), b: k(i + 1, j + 1), street: s.name, width: s.width }); });
+  // Stairwells at both ends of the central east–west street lead to the levels above and below.
+  const cj = ew.findIndex((s) => s.at === 0) + 1;
+  const stairs = [
+    { id: k(0, cj), name: "West stairs", at: pos.get(k(0, cj))! },
+    { id: k(ns.length + 1, cj), name: "East stairs", at: pos.get(k(ns.length + 1, cj))! },
+  ];
+  const g = { pos, edges, stairs };
+  graphCache.set(grid, g);
+  return g;
+}
+
+function distToSeg([px, pz]: XZ, [ax, az]: XZ, [bx, bz]: XZ): { d: number; at: XZ } {
+  const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
+  const at: XZ = [ax + t * dx, az + t * dz];
+  return { d: Math.hypot(px - at[0], pz - at[1]), at };
+}
+const dist = (a: XZ, b: XZ) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** Street segments assumed unsafe around a flood point. An assumption: the sensor only knows its own spot. */
+export function floodedEdges(grid: Grid, at: XZ, radius: number): Set<string> {
+  const g = streetGraph(grid);
+  return new Set(g.edges.filter((e) => distToSeg(at, g.pos.get(e.a)!, g.pos.get(e.b)!).d < radius + e.width / 2).map((e) => e.id));
+}
+
+export interface Route { points: XZ[]; meters: number; minutes: number; via: string[]; to: string; toId: string }
+export interface Destination { id: string; name: string; at: XZ }
+
+/** Shortest walk from a point to the nearest destination, avoiding blocked segments. */
+export function safeRoute(grid: Grid, from: XZ, targets: Destination[], blocked: ReadonlySet<string>): Route | null {
+  const g = streetGraph(grid);
+  const open = g.edges.filter((e) => !blocked.has(e.id));
+  const access = (p: XZ) => {
+    let best: { e: StreetEdge; at: XZ; d: number } | null = null;
+    for (const e of open) { const r = distToSeg(p, g.pos.get(e.a)!, g.pos.get(e.b)!); if (!best || r.d < best.d) best = { e, ...r }; }
+    return best;
+  };
+  const start = access(from);
+  if (!start) return null;
+  // Dijkstra from the start's segment ends.
+  const d = new Map<string, number>(), prev = new Map<string, string | null>();
+  for (const id of g.pos.keys()) d.set(id, Infinity);
+  for (const end of [start.e.a, start.e.b]) { d.set(end, dist(from, start.at) + dist(start.at, g.pos.get(end)!)); prev.set(end, null); }
+  const adj = new Map<string, { to: string; w: number; e: StreetEdge }[]>();
+  for (const e of open) {
+    const w = dist(g.pos.get(e.a)!, g.pos.get(e.b)!);
+    (adj.get(e.a) ?? adj.set(e.a, []).get(e.a)!).push({ to: e.b, w, e });
+    (adj.get(e.b) ?? adj.set(e.b, []).get(e.b)!).push({ to: e.a, w, e });
+  }
+  const done = new Set<string>();
+  for (;;) {
+    let u: string | null = null;
+    for (const [id, v] of d) if (!done.has(id) && v < Infinity && (u === null || v < d.get(u)!)) u = id;
+    if (u === null) break;
+    done.add(u);
+    for (const { to, w } of adj.get(u) ?? []) if (d.get(u)! + w < d.get(to)!) { d.set(to, d.get(u)! + w); prev.set(to, u); }
+  }
+  let best: { t: Destination; total: number; end: string; at: XZ } | null = null;
+  for (const t of targets) {
+    const a = access(t.at);
+    if (!a) continue;
+    for (const end of [a.e.a, a.e.b]) {
+      const total = d.get(end)! + dist(g.pos.get(end)!, a.at) + dist(a.at, t.at);
+      if (Number.isFinite(total) && (!best || total < best.total)) best = { t, total, end, at: a.at };
+    }
+  }
+  if (!best) return null;
+  const chain: string[] = [];
+  for (let c: string | null | undefined = best.end; c; c = prev.get(c)) chain.unshift(c);
+  const points: XZ[] = [from, start.at, ...chain.map((id) => g.pos.get(id)!), best.at, best.t.at];
+  const via: string[] = [];
+  for (let i = 0; i + 1 < chain.length; i++) {
+    const e = open.find((x) => (x.a === chain[i] && x.b === chain[i + 1]) || (x.b === chain[i] && x.a === chain[i + 1]));
+    if (e && via[via.length - 1] !== e.street) via.push(e.street);
+  }
+  return { points, meters: Math.round(best.total), minutes: Math.max(1, Math.round(best.total / 70)), via, to: best.t.name, toId: best.t.id };
+}
+
+/** Buildings with no dry street to either stairwell. */
+export function cutOffBuildings(grid: Grid, level: Level, blocked: ReadonlySet<string>): Set<string> {
+  const g = streetGraph(grid);
+  const open = g.edges.filter((e) => !blocked.has(e.id));
+  const reach = new Set(g.stairs.map((s) => s.id));
+  const queue = [...reach];
+  while (queue.length) {
+    const u = queue.shift()!;
+    for (const e of open) {
+      const v = e.a === u ? e.b : e.b === u ? e.a : null;
+      if (v && !reach.has(v)) { reach.add(v); queue.push(v); }
+    }
+  }
+  const out = new Set<string>();
+  for (const b of level.buildings) {
+    const near = g.edges.map((e) => ({ e, d: distToSeg(b.center, g.pos.get(e.a)!, g.pos.get(e.b)!).d })).sort((x, y) => x.d - y.d);
+    const ok = near.filter((x) => x.d <= near[0].d + 14).some((x) => !blocked.has(x.e.id) && (reach.has(x.e.a) || reach.has(x.e.b)));
+    if (!ok) out.add(b.id);
+  }
+  return out;
+}
+
+export const destinations = (level: Level, uses: BuildingUse[]): Destination[] =>
+  level.buildings.filter((b) => uses.includes(b.use)).map((b) => ({ id: b.id, name: b.name.replace(`L${level.n} `, ""), at: b.center }));
+
+// --- Tracing bad water up the pipes ----------------------------------------------------------
+
+/** Pipe and node ids from a pipe up to the cistern, downstream first. */
+export function upstream(world: CityWorld, pipeId: string): string[] {
+  const out: string[] = [];
+  const net = world.network;
+  for (let p = net.pipe.get(pipeId), guard = 0; p && guard < 10000; guard++) {
+    out.push(p.id, p.from);
+    const up = net.feeds.get(p.from);
+    p = up ? net.pipe.get(up) : undefined;
+  }
+  return out;
+}
+
+/** Where a level's water comes in: the pipe feeding its lift station. */
+export const levelInlet = (world: CityWorld, n: number) => world.network.feeds.get(pumpId(n)) ?? null;
+
+/** The main closest to the supply among those under a named street on a level. */
+export function streetMain(world: CityWorld, n: number, street: string): string | null {
+  const mains = world.network.pipes.filter((p) => p.level === n && p.kind === "main" && p.label === `Main under ${street}`);
+  if (!mains.length) return null;
+  return mains.sort((a, b) => upstream(world, a.id).length - upstream(world, b.id).length)[0].id;
+}
+
+export interface Trace {
+  /** Likely source: the most downstream element every chain passes through. */
+  source: string;
+  reports: number;
+  /** Buildings fed through the source. */
+  atRisk: Set<string>;
+  /** Pipes downstream of the source. */
+  pipes: Set<string>;
+}
+
+/** Needs at least two reports: one report can't point to a shared source. */
+export function traceSource(world: CityWorld, chains: string[][]): Trace | null {
+  const usable = chains.filter((c) => c.length);
+  if (usable.length < 2) return null;
+  const shared = usable[0].find((id) => usable.every((c) => c.includes(id)));
+  if (!shared) return null;
+  const pipes = new Set<string>(), atRisk = new Set<string>();
+  for (const p of world.network.pipes) if (upstream(world, p.id).includes(shared)) pipes.add(p.id);
+  for (const t of world.network.taps) if (pipes.has(t.pipe)) atRisk.add(t.building);
+  return { source: shared, reports: usable.length, atRisk, pipes };
+}

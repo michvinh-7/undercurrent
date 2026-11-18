@@ -25,6 +25,13 @@ export const P = {
   select: "#4f5fb3",
   ok: "#2f7f6f",
   ghost: "#8b8577",
+  flood: "#5f7f93",
+  route: "#1f8a70",
+  cutWall: "#c9c4bb",
+  cutRoof: "#7d7a74",
+  risk: "#b07d2a",
+  riskWall: "#efe2c4",
+  riskRoof: "#b9975a",
 };
 
 const ROOF: Partial<Record<BuildingUse, string>> = {
@@ -152,15 +159,19 @@ export function buildingAt(mesh: BuildingMesh, vertex: number): string | null {
 }
 
 /** Recolor buildings by status in place: dry buildings turn amber, everything else is reset. */
-export function paintBuildings(mesh: BuildingMesh, dry: ReadonlySet<string> | ReadonlyMap<string, unknown>) {
+export function paintBuildings(mesh: BuildingMesh, dry: ReadonlySet<string> | ReadonlyMap<string, unknown>, cut: ReadonlySet<string> = new Set(), risk: ReadonlySet<string> = new Set()) {
   const attr = mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
   const arr = attr.array as Float32Array;
   arr.set(mesh.base);
   const dw = new THREE.Color(P.dryWall), dr = new THREE.Color(P.dryRoof);
+  const cw = new THREE.Color(P.cutWall), cr = new THREE.Color(P.cutRoof);
+  const rw = new THREE.Color(P.riskWall), rr = new THREE.Color(P.riskRoof);
   for (const r of mesh.ranges) {
-    if (!dry.has(r.id)) continue;
+    const isCut = cut.has(r.id), isDry = dry.has(r.id), isRisk = risk.has(r.id);
+    if (!isDry && !isCut && !isRisk) continue;
     for (let i = r.start; i < r.start + r.count; i++) {
-      const c = mesh.roof[i] ? dr : dw;
+      const roof = mesh.roof[i];
+      const c = isCut ? (roof ? cr : cw) : isDry ? (roof ? dr : dw) : roof ? rr : rw;
       arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
     }
   }
