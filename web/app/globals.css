@@ -1,17 +1,69 @@
 @import "tailwindcss";
 
+/* One token set for the console, the Directorate view and the Hollow map.
+   The map reads the same values (web/app/hollow/scene/colors.ts mirrors them). */
 :root {
-  --background: #0b0b10;
-  --panel: #14141c;
-  --border: #2a2a38;
-  --foreground: #e7e7ee;
-  --muted: #9a9aaf;
-  --accent: #8b7cf6;
-  --danger: #ef4444;
-  --ok: #22c55e;
+  --background: #07080c;
+  --panel: #10121a;
+  --panel-2: #161926;
+  --border: #252938;
+  --border-strong: #363b50;
+  --foreground: #e8e9f0;
+  --muted: #8d90a6;
+  --faint: #5b5f75;
+  --accent: #8b7cf6; /* the Undercurrent itself: links, selection */
+  --water: #38bdf8; /* water network, flow */
+  --danger: #ef4444; /* SOS, hazards, forgeries */
+  --warn: #f59e0b; /* degraded, queued, at risk */
+  --ok: #22c55e; /* verified, intact, connected */
+  --sim: #c084fc; /* simulated data: always labeled, never mixed with real */
+  --directorate: #f43f5e;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
 }
+
+/* Small uppercase mono caption used for section labels ("FIG. 01", "PRIORITY QUEUE"). */
+.caption {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+/* Simulated things get a hatch so they never read as real readings. */
+.sim-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--sim) 14%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+.pulse-danger { animation: pulse-ring 1.4s ease-out infinite; }
+
+@keyframes bump {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.18); color: var(--danger); }
+  100% { transform: scale(1); }
+}
+.bump { animation: bump 0.6s ease-out; }
