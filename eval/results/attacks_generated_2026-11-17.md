@@ -5,7 +5,8 @@
 | Forged and replayed messages accepted | 0 of 300 (95% upper bound 1.0%) |
 | Real member alerts accepted | 40 of 40 |
 | "Forgeries blocked" counter | 275 |
-| Edited records caught at the exact row | 140 of 140 (95% upper bound on misses 2.1%) |
+| Edited records caught at the exact row | 160 of 160 (95% upper bound on misses 1.9%) |
+| Deleted rows put back by the other hub (two hubs) | 20 of 20, chain intact, counter moved by 0, median 0.96 s |
 
 | Attack | Accepted | What the hub said |
 |---|---|---|
@@ -31,7 +32,8 @@
 | rehash | 20 of 20 |
 | rehash chain | 20 of 20 |
 | delete | 20 of 20 |
+| delete newest | 20 of 20 |
 | priority (known limit, not counted) | 0 of 20 |
-| delete newest (known limit, not counted) | 0 of 20 |
+| delete newest and record (known limit, not counted) | 0 of 20 |
 
-Known limits: `priority` is the hub's own score and sits outside the hash on purpose, so changing it isn't caught. Deleting the newest row leaves no later row to notice; with two hubs, sync restores it from the other hub.
+Known limits: `priority` is the hub's own score and sits outside the hash on purpose, so changing it isn't caught. Deleting the newest row is caught because the hub keeps the hash of every event it wrote; an attacker who also erases that record hides it from a hub on its own. With two hubs the other one still holds the row; it can't be put back then, but the hub's refusal of its own missing event is logged once in GET /rejected.

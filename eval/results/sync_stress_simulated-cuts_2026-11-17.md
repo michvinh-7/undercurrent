@@ -7,5 +7,5 @@
 | Duplicates | 0 |
 | Chains intact, no gaps | yes |
 | Sync rejections (false forgeries) | 0 |
-| Time to settle after restore, mean of rounds (s) | 6.1 [5.7, 6.7] |
+| Time to settle after restore, mean of rounds (s) | 6.1 [5.8, 6.7] |
 | Link speed | 2000 B/s each way |

@@ -45,7 +45,8 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 | Claim | Result | How |
 |---|---|---|
 | Forged and replayed messages accepted | **0 of 300**; all 40 real member alerts accepted | `eval/run_attacks.py`, real hub, generated attacks |
-| Edited database records caught at the exact row | **140 of 140** | same script, direct edits to the hub's database |
+| Edited database records caught at the exact row | **160 of 160**, deleting the newest row included | same script, direct edits to the hub's database |
+| Deleted rows put back by the other hub | **20 of 20**, chain intact, "forgeries blocked" counter unmoved | same script, two real hubs synced |
 | Alerts delivered after random link cuts | **200 of 200** after 26 cuts, 0 duplicates | `eval/run_sync_stress.py`, two real hubs, simulated cuts |
 | Time from water on the probe to the alert on the other hub | waiting on the box | |
 | AI urgency accuracy, local model | **76%** [69, 83] on 149 held-back messages | `eval/run_triage_eval.py` |
@@ -57,7 +58,7 @@ Full tables with confidence intervals: [`eval/results/`](eval/results/).
 - **Metadata is visible.** Hubs can see who sent a cell message, when, and from which level. Hiding that, the way Tor does, is out of scope.
 - **A stolen phone can sign** until a roster event removes its key.
 - **A hub's own priority score isn't protected** by the hash, on purpose: the hub sets it on arrival.
-- **Deleting the newest record** of a hub isn't caught by the chain alone. With two hubs, sync puts it back.
+- **Deleting the newest record and the hub's own record of writing it** hides it from that hub on its own. Deleting just the row is caught, and the other hub puts it back.
 
 ---
 
@@ -106,7 +107,17 @@ HUB_ID=hub-L34 HUB_DB=l34.db HUB_PEERS=http://localhost:8002 uvicorn app.main:ap
 HUB_ID=hub-L12 HUB_DB=l12.db HUB_PEERS=http://localhost:8001 uvicorn app.main:app --port 8002
 ```
 
-Post to one and it appears on the other. Cut a hub's link with `POST /link {"cut": true}`, post more, restore it, and everything arrives.
+Post to one and it appears on the other. Cut a hub's link with `POST /link {"cut": true}`, post more, restore it, and everything arrives. Delete a row from one hub's database and the other hub puts it back.
+
+Or start, reset and stop both at once (fresh databases, both wiped together so rehearsals stay clean):
+
+```bash
+cd hub
+.venv/bin/python scripts/demo_hubs.py up        # add --signed --roster demo/roster.json for the demo
+.venv/bin/python scripts/demo_hubs.py status
+.venv/bin/python scripts/demo_hubs.py reset
+.venv/bin/python scripts/demo_hubs.py down
+```
 
 **4. Signing**
 
@@ -116,7 +127,17 @@ Unsigned events are accepted while `REQUIRE_SIGNED=0` (the default). For the dem
 [{"pub": "<base64 Ed25519 public key>", "role": "operator"}, {"pub": "...", "role": "member"}]
 ```
 
-Python signs with `hub/app/crypto.py` (`crypto.sign`); the browser uses `web/lib/canonical.ts` with tweetnacl.
+Make the keys and the roster file with `hub/scripts/roster_tool.py` (operator key, the box's and phones' public keys), and add or remove a member on a running hub the same way; the change syncs to every hub:
+
+```bash
+cd hub
+.venv/bin/python scripts/roster_tool.py new-key --out demo/operator.key
+.venv/bin/python scripts/roster_tool.py file --operator demo/operator.key --member <public key>:canary-34 --out demo/roster.json
+.venv/bin/python scripts/roster_tool.py add <public key> --hub http://localhost:8001 --operator demo/operator.key
+.venv/bin/python scripts/roster_tool.py remove <public key> --hub http://localhost:8001 --operator demo/operator.key
+```
+
+Key files (`*.key`) and `hub/demo/` are in `.gitignore`. Python signs with `hub/app/crypto.py` (`crypto.sign`); the browser uses `web/lib/canonical.ts` with tweetnacl.
 
 **5. Web**
 

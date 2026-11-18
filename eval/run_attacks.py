@@ -27,13 +27,20 @@ row: the edited row, or for a deleted row the one right after it.
   rehash          a field changed and that row's hash recomputed
   rehash chain    a field changed and every hash from there on recomputed
   delete          a row in the middle of the chain deleted
+  delete newest   the newest row deleted: caught because the hub keeps the hash of
+                  every event it wrote (own_hashes), so the row it wrote is missing
 
 Known limits, measured and reported but not counted in N: changing `priority`
-(the hub's own score, outside the hash on purpose) and deleting the newest row.
-Sync puts a deleted newest row back from the other hub, but this test has one hub.
+(the hub's own score, outside the hash on purpose), and deleting the newest row
+together with the hub's own record of writing it (one hub alone can't tell).
+
+Part 3, deleted rows put back (two hubs). Starts hub-L34 and hub-L12 synced, then
+deletes rows of L34's own chain straight from its database while both run. Counted:
+the row is back within the timeout, the chain check passes, and L34's "forgeries
+blocked" counter didn't move (a row coming home isn't a forgery).
 
     hub/.venv/bin/python eval/run_attacks.py              # 25 of each attack, 20 of each edit
-    hub/.venv/bin/python eval/run_attacks.py --n 50 --trials 40
+    hub/.venv/bin/python eval/run_attacks.py --n 50 --trials 40 --restores 40
 """
 
 import argparse
@@ -43,6 +50,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import time
 import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -175,12 +183,15 @@ def run_edits(db: Path, tmp: Path, rng, trials):
         con.row_factory = sqlite3.Row
         if kind in ("delete", "rehash chain", "rehash", "payload", "level", "author", "created_at", "priority"):
             target = rng.choice(order[1:-1] if kind == "delete" else order)
-        else:  # delete newest
+        else:  # delete newest (with or without the hub's own record of it)
             target = order[-1]
         expect = target
-        if kind in ("delete", "delete newest"):
+        if kind in ("delete", "delete newest", "delete newest and record"):
             con.execute("DELETE FROM events WHERE id = ?", (target,))
-            expect = order[order.index(target) + 1] if target != order[-1] else None
+            if kind == "delete":
+                expect = order[order.index(target) + 1]  # the next row points at the missing one
+            if kind == "delete newest and record":
+                con.execute("DELETE FROM own_hashes WHERE event_id = ?", (target,))
         elif kind == "priority":
             con.execute("UPDATE events SET priority = 0.01 WHERE id = ?", (target,))
         else:
@@ -206,8 +217,8 @@ def run_edits(db: Path, tmp: Path, rng, trials):
         path.unlink()
         return report["first_bad_event"] == expect and expect is not None, report["first_bad_event"] is not None
 
-    counted = ["payload", "level", "author", "created_at", "rehash", "rehash chain", "delete"]
-    limits = ["priority", "delete newest"]
+    counted = ["payload", "level", "author", "created_at", "rehash", "rehash chain", "delete", "delete newest"]
+    limits = ["priority", "delete newest and record"]
     rows = {}
     for kind in counted + limits:
         caught = flagged = 0
@@ -224,12 +235,68 @@ def run_edits(db: Path, tmp: Path, rng, trials):
     }
 
 
+# ---------------------------------------------------------------- part 3: deleted rows put back
+
+def run_restores(tmp: Path, keys, rng, trials: int, port: int, timeout_s: float = 15):
+    """Two synced hubs; delete rows of L34's own chain from its database while both run."""
+    a_url, b_url = f"http://127.0.0.1:{port}", f"http://127.0.0.1:{port + 1}"
+    run = tmp / "restores"
+    run.mkdir()
+    shutil.copy(tmp / "roster.json", run / "roster.json")
+    procs = [start_hub(HUB, port, str(run), peers=[port + 1]), start_hub(PEER, port + 1, str(run), peers=[port])]
+    client = httpx.Client(timeout=10)
+    try:
+        for url in (a_url, b_url):
+            wait_up(client, url)
+        sent = []
+        for _ in range(trials + 2):
+            e = signed_alert(HUB, LEVEL, rng.choice(keys["members"]), rng)
+            assert client.post(f"{a_url}/events", json=e).status_code == 201
+            sent.append(e["id"])
+        end = time.time() + 60
+        while not set(sent) <= set(client.get(f"{b_url}/sync/ids").json()["ids"]):
+            if time.time() > end:
+                raise SystemExit("the peer never received the alerts")
+            time.sleep(0.2)
+        counter_before = client.get(f"{a_url}/rejected").json()["total"]
+        restored = intact = 0
+        seconds = []
+        for i in range(trials):
+            target = sent[-1] if i % 2 == 0 else rng.choice(sent[1:-1])  # newest, or one in the middle
+            db = sqlite3.connect(run / f"{HUB}.db")
+            db.execute("DELETE FROM events WHERE id = ?", (target,))
+            db.commit()
+            db.close()
+            t0, back = time.time(), False
+            while time.time() - t0 < timeout_s:
+                if target in client.get(f"{a_url}/sync/ids").json()["ids"]:
+                    back = True
+                    break
+                time.sleep(0.1)
+            seconds.append(time.time() - t0)
+            restored += back
+            intact += back and client.get(f"{a_url}/events/verify").json()["chain_intact"]
+        time.sleep(3)  # more sync ticks: the counter must still not move
+        counter_moved = client.get(f"{a_url}/rejected").json()["total"] - counter_before
+        status = client.get(f"{a_url}/sync/status").json()
+    finally:
+        client.close()
+        stop(procs)
+    seconds.sort()
+    print(f"  {restored}/{trials} deleted rows put back by the other hub, chain intact after {intact}, "
+          f"counter moved by {counter_moved}, median {seconds[len(seconds) // 2]:.1f} s")
+    return {"restore_n": trials, "restored": restored, "restored_intact": intact,
+            "restore_counter_moved": counter_moved, "restore_median_s": round(seconds[len(seconds) // 2], 2),
+            "restore_hub_count": status["restored"]}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--n", type=int, default=25, help="tries of each message attack")
     ap.add_argument("--real", type=int, default=40, help="real member alerts sent first")
     ap.add_argument("--trials", type=int, default=20, help="trials of each database edit")
-    ap.add_argument("--port", type=int, default=8111)
+    ap.add_argument("--restores", type=int, default=20, help="rows deleted for part 3 (two hubs)")
+    ap.add_argument("--port", type=int, default=8111, help="part 1 uses it; part 3 the next two")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -251,18 +318,21 @@ def main():
         stop([proc])
     print("Part 2: edited records")
     edits = run_edits(tmp / f"{HUB}.db", tmp, rng, args.trials)
+    print("Part 3: deleted rows put back by the other hub")
+    restores = run_restores(tmp, keys, rng, args.restores, args.port + 1)
     shutil.rmtree(tmp)
 
-    m, e = messages, edits
+    m, e, r = messages, edits, restores
     results = {
         "split": "attacks", "backend": "hub-checks", "date": date.today().isoformat(), "seed": args.seed,
-        **m, **e,
+        **m, **e, **r,
         "attack_accept_upper95": upper95(m["attack_accepted"], m["attack_n"]),
         "edit_miss_upper95": upper95(e["edit_n"] - e["edit_caught"], e["edit_n"]),
     }
     results["passed"] = (
         m["attack_accepted"] == 0 and m["real_accepted"] == m["real_sent"] and m["only_real_stored"]
         and m["verify"]["chain_intact"] and e["edit_caught"] == e["edit_n"]
+        and r["restored_intact"] == r["restore_n"] and r["restore_counter_moved"] == 0
     )
     lim = e["edits"]
     lines = [
@@ -276,6 +346,8 @@ def main():
         f"| \"Forgeries blocked\" counter | {m['rejected_counter']} |",
         f"| Edited records caught at the exact row | {e['edit_caught']} of {e['edit_n']} "
         f"(95% upper bound on misses {results['edit_miss_upper95'] * 100:.1f}%) |",
+        f"| Deleted rows put back by the other hub (two hubs) | {r['restored_intact']} of {r['restore_n']}, "
+        f"chain intact, counter moved by {r['restore_counter_moved']}, median {r['restore_median_s']} s |",
         "",
         "| Attack | Accepted | What the hub said |",
         "|---|---|---|",
@@ -288,8 +360,10 @@ def main():
           for k, v in lim.items()],
         "",
         "Known limits: `priority` is the hub's own score and sits outside the hash on purpose, so "
-        "changing it isn't caught. Deleting the newest row leaves no later row to notice; with two hubs, "
-        "sync restores it from the other hub.",
+        "changing it isn't caught. Deleting the newest row is caught because the hub keeps the hash of "
+        "every event it wrote; an attacker who also erases that record hides it from a hub on its own. "
+        "With two hubs the other one still holds the row; it can't be put back then, but the hub's refusal "
+        "of its own missing event is logged once in GET /rejected.",
     ]
     table = "\n".join(lines)
     stem = f"attacks_generated_{date.today().isoformat()}"

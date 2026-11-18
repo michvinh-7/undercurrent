@@ -13,6 +13,10 @@ Why nothing is lost:
 - a cut holds queued events in the link (link.cut() re-queues the one mid-send),
   and the events that finished before the cut are pushed, not dropped (deliver())
 Why nothing is duplicated: the receiver stores an id once; a repeat is "duplicate".
+A row deleted from a hub's own chain comes back from a peer ("restored"), but only
+if that hub wrote exactly that event (Gate.admit_synced). An event a peer refuses is
+named in its reply ("refused") and not sent to that peer again, so it never takes
+the slow link's bandwidth twice.
 
 While the link is cut, the hub doesn't ask peers for their ids either: nothing
 crosses a cut link. It still queues new events against the last id list each peer
@@ -65,6 +69,7 @@ class Syncer:
         self.transport = transport
         self.in_flight: set[str] = set()
         self.peer_ids: dict[str, set[str]] = {}  # the last id list each peer sent
+        self.refused: dict[str, set[str]] = {}  # ids each peer refused: not sent to it again
         self.last_ok: dict[str, float] = {}
         self.last_error: dict[str, str] = {}
         self._lock = threading.Lock()  # guards the link and in_flight; never held during a push
@@ -79,8 +84,11 @@ class Syncer:
             return
         for peer in self.peers:
             try:
-                self.transport.push(peer, events)
+                reply = self.transport.push(peer, events) or {}
                 self._ok(peer)
+                if reply.get("refused"):
+                    with self._lock:
+                        self.refused.setdefault(peer, set()).update(reply["refused"])
             except Exception as err:  # peer down or unreachable: retried next tick
                 self.last_error[peer] = str(err)
         with self._lock:
@@ -119,8 +127,9 @@ class Syncer:
                     continue
             held = held if held is not None else self.log.list()
             with self._lock:
+                refused = self.refused.get(peer, set())
                 for e in held:
-                    if e.id not in theirs and e.id not in self.in_flight:
+                    if e.id not in theirs and e.id not in self.in_flight and e.id not in refused:
                         # Roster events go first, so members are known before their events land.
                         self.link.enqueue(e.model_copy(update={"priority": 1.0}) if e.type == "roster" else e)
                         self.in_flight.add(e.id)
@@ -133,13 +142,16 @@ class Syncer:
     # ------------------------------------------------------------------ receiving
 
     def receive(self, events: list[Event]) -> dict:
-        counts = {"stored": 0, "duplicate": 0, "deferred": 0, "rejected": 0}
+        """Counts per outcome, plus the ids refused (the sender won't offer them again)."""
+        counts = {"stored": 0, "restored": 0, "duplicate": 0, "deferred": 0, "rejected": 0}
+        refused = []
         for e in events:
             try:
                 counts[self.gate.admit_synced(e)] += 1
             except Rejected:
                 counts["rejected"] += 1
-        return counts
+                refused.append(e.id)
+        return {**counts, "refused": refused}
 
     # ------------------------------------------------------------------ loop
 
@@ -164,6 +176,8 @@ class Syncer:
                 {"url": p, "last_ok": self.last_ok.get(p), "error": self.last_error.get(p)} for p in self.peers
             ],
             "in_flight": len(self.in_flight),
+            "restored": self.gate.restored,
+            "refused": {p: len(ids) for p, ids in self.refused.items()},
             "link": self.link.status(),
             "gaps": self.log.verify_report()["gaps"],
         }
