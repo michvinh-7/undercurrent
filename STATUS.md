@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Tue 11/17 (night) by Michael
+**Last updated:** Tue 11/17 (late night, after PR #21) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -16,16 +16,16 @@ The demo is done when all five beats work on the flat console.
 | Demo beat | Status |
 |---|---|
 | 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
-| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | 🟡 Hub side merged (PRs #14, #19): 200 of 200 alerts on both hubs after 26 random cuts, 0 duplicates. Tested by hand on `/dashboard`: during a cut the sending hub shows "3 waiting to send" and none arrive; after restore all arrive. Needs the console to show the sending hub's link |
-| 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | 🟡 Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console counter isn't built |
-| 4. An edited record: the chain check points to the exact row | 🟡 Hub side done: 140 of 140 edits to the database caught at the exact row by `GET /events/verify`. The console display isn't built |
-| 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ❌ Only the encrypted payload shape is defined (`{enc, nonce, ciphertext}`) |
+| 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | ✅ Hub side merged (PRs #14, #19): 200 of 200 alerts on both hubs after 26 random cuts, 0 duplicates. Tested by hand on `/dashboard`: during a cut the sending hub shows "3 waiting to send" and none arrive; after restore all arrive. The console now shows the sending hub's backlog (PR #21) |
+| 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | ✅ Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console's "forgeries blocked" counter is in (PR #21) |
+| 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 140 of 140 edits to the database caught at the exact row by `GET /events/verify`. The console's chain check names the edited row (PR #21) |
+| 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | 🟡 `/truth` is built (PR #21) and shows one labeled demo cell message. Needs Alanna's `cell.ts` for real encrypted messages |
 
-**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Still open: phone signing, the simulation, the console badges, and the minimum box.
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21). Still open: phone signing, `cell.ts`, the simulation, and the box.
 
 **Blocking the most people:**
 1. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
-2. **The console (Taheful).** Beats 2, 3 and 4 work on the hub; they need the console to show them.
+2. **`cell.ts` and `sign.ts` (Alanna).** Beat 5 needs real cell messages; `REQUIRE_SIGNED=1` needs phones that sign.
 3. **The level pair.** L34/L12 (rework plan) or L38/L12 (`sim/world.json`, the `HUB_ID` default). Pick it in the chat before anyone writes it in code.
 
 **Web setup (merged, PR #12):** every web dependency is in at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. Run `npm install` in `web/`. Nobody adds a dependency without posting first.
