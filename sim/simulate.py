@@ -7,6 +7,8 @@ voltage sags. Each simulated canary and resident has its own Ed25519 key, preloa
 the roster through ROSTER_FILE, so every event arrives signed and shows as verified.
 Each event goes to the hub that serves its level (L31-40 → hub-L34, L1-30 → hub-L12)
 and syncs to the other one by itself. Tisya's real box (canary-34) is never simulated.
+Every event carries "simulated": true in its signed payload, and the console and map
+label it, so a simulated box is never mistaken for the real one.
 
 Run from the repo root with the hub's Python (it needs httpx and pynacl):
 
@@ -122,7 +124,9 @@ def make_event(world: dict, step: dict, created_at: str | None = None) -> dict:
     a = actors(world)[step["by"]]
     e = {
         "id": str(uuid.uuid4()), "type": step["type"], "hub_id": hub_for(world, a["level"]), "level": a["level"],
-        "created_at": created_at or now_iso(), "author": a["handle"], "payload": step["payload"],
+        "created_at": created_at or now_iso(), "author": a["handle"],
+        # Inside the signed payload, so the "simulated" label can't be added or stripped by anyone else.
+        "payload": {**step["payload"], "simulated": True},
     }
     if a["kind"] == "canary":
         e["source"], e["device_id"] = "sensor", a["device_id"]

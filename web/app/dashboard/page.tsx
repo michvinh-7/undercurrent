@@ -11,7 +11,7 @@
 import { AppBar } from "@/components/app-bar";
 import { useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
-import { isEncrypted, isSensor, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
+import { isEncrypted, isSensor, isSimulated, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
 
 const NEW_MS = 5000;
@@ -255,6 +255,7 @@ function QueueItem({
           {tampered && <Badge color="var(--danger)" solid>Tampered row</Badge>}
           {tampered ? null : verified ? <Badge color="var(--ok)">✓ Verified</Badge> : <Badge color="var(--warn)">{e.sig ? "Unknown key" : "Unsigned"}</Badge>}
           {isSensor(e) && <Badge color="var(--water)">Sensor · {e.device_id ?? "canary"}</Badge>}
+          {isSimulated(e) && <Badge color="var(--sim)">Simulated</Badge>}
           {enc ? <Badge color="var(--accent)">Cell message</Badge> : <span className="font-mono uppercase text-[var(--accent)]">{TYPE_LABEL[e.type]}</span>}
           <span>Level {e.level}</span>
           <span className="text-[var(--muted)]">· {timeAgo(e.created_at, now)} · {e.hub_id}</span>

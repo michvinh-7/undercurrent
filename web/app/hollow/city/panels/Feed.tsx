@@ -111,6 +111,7 @@ export default function Feed({ events, fresh, demo, onPick, onDemoAlert, filter,
                     <span className="truncate">{pinTitle(e)}</span>
                     {n > 1 && <span className="shrink-0 rounded-full bg-[var(--panel-2)] px-1.5 text-[11px] tabular-nums text-[var(--muted)]">×{n} {expanded ? "▾" : "▸"}</span>}
                     {e.test && <span className="shrink-0 rounded bg-[var(--panel-2)] px-1 text-[10px] uppercase text-[var(--muted)]">test</span>}
+                    {e.simulated && <span className="shrink-0 rounded px-1 text-[10px] uppercase text-[var(--sim)]" style={{ border: "1px solid color-mix(in srgb, var(--sim) 50%, transparent)" }}>sim</span>}
                     <span className="ml-auto shrink-0 text-[11px] text-[var(--faint)]">{allVerified ? "✓" : n > 1 ? "some unverified" : "unverified"}</span>
                   </button>
                   {expanded && (

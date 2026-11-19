@@ -88,7 +88,7 @@ export function LevelStatus({ world, level, events, water, hubs, sim }: {
         {lungs.length > 0 && (
           <Fact color="var(--warn)">
             {lungs.reduce((t, e) => t + peopleIn(e), 0)} people coughing or short of breath
-            <span className="block text-xs text-[var(--directorate)]">Directorate says {DIRECTORATE_LUNG_CASES[level] ?? 0} (demo figure)</span>
+            <span className="block text-xs text-[var(--directorate)]">Directorate says {DIRECTORATE_LUNG_CASES[level] ?? 0} (simulated bulletin)</span>
           </Fact>
         )}
       </ul>

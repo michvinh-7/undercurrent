@@ -4,14 +4,15 @@
 // member reads. Public alerts are readable by design and provably from a member. Cell
 // messages are ciphertext on the wire; only a phone holding the cell key can open them.
 //
-// Until web/lib/cell.ts lands, one labeled demo cell message is encrypted here in the browser
-// with tweetnacl secretbox and a demo key, so its ciphertext is real, not drawn.
+// In demo mode (no hub reachable), one labeled demo cell message is encrypted here in the
+// browser with tweetnacl secretbox and a demo key, so its ciphertext is real, not drawn. Live,
+// only real cell messages (web/lib/cell.ts) show.
 
 import { AppBar } from "@/components/app-bar";
 import { useEffect, useMemo, useState } from "react";
 import nacl from "tweetnacl";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
-import { isEncrypted, isSensor, useUndercurrent } from "@/lib/useUndercurrent";
+import { isEncrypted, isSensor, isSimulated, useUndercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
 
 const DEMO_PLAINTEXT = "Cell 7: meet at the L27 east stairwell, 0300. Bring the spare filters.";
@@ -75,8 +76,9 @@ export default function Truth() {
 
   const traffic = useMemo(() => {
     const real = net.events.filter((e) => e.type !== "roster").sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return demoCell ? [demoCell.event, ...real] : real;
-  }, [net.events, demoCell]);
+    // The labelled demo cell message only fills in when no hub answers; live, only real traffic shows.
+    return demoCell && net.mode === "demo" ? [demoCell.event, ...real] : real;
+  }, [net.events, net.mode, demoCell]);
 
   const encrypted = traffic.filter(isEncrypted).length;
   const pub = traffic.length - encrypted;
@@ -195,6 +197,7 @@ function Row({ e, now, verified, tampered, demoKey }: { e: HollowEvent; now: num
             <span className="caption !text-[var(--warn)]">{e.sig ? "Signed by an unknown key" : "Unsigned"}</span>
           )}
           {isSensor(e) && <span className="caption !text-[var(--water)]">Sensor · {e.device_id}</span>}
+          {isSimulated(e) && <span className="caption !text-[var(--sim)]">Simulated</span>}
           {demoKey && <span className="caption !text-[var(--sim)]">Demo message · demo key</span>}
         </div>
         <p className="mt-2 break-words">{memberText}</p>

@@ -83,11 +83,11 @@ export default function Inspector({ world, selection, events, water, net, hubs, 
     : e.place.kind === "level" ? `Somewhere on L${e.level}; the report doesn't say where${e.onMap ? "" : " (level not on the map yet)"}` : "Unknown: no level given";
   return (
     <Card title={<><span style={{ color: SEVERITY_COLOR[e.severity] }}>●</span> {pinTitle(e)}</>} right={close}>
-      <p className="mb-2 text-xs text-[var(--muted)]">{SEVERITY_LABEL[e.severity]} · {timeAgo(e.event.created_at)}{e.test ? " · test alert, not from a hub" : e.demo ? " · demo data" : ""}</p>
+      <p className="mb-2 text-xs text-[var(--muted)]">{SEVERITY_LABEL[e.severity]} · {timeAgo(e.event.created_at)}{e.test ? " · test alert, not from a hub" : e.demo ? " · demo data" : e.simulated ? " · simulated (sim/simulate.py), signed like a real one" : ""}</p>
       {e.severity !== "message" && <p className="mb-2 text-sm">{summary(e.event)}</p>}
       {e.severity === "message" && <p className="mb-2 text-sm text-[var(--muted)]">Encrypted cell message. Only members with the key can read it.</p>}
       <Row k="Check" v={tampered ? <span className="text-[var(--danger)]">Record edited after the fact</span> : e.verified ? <span className="text-[var(--ok)]">Verified by hub</span> : <span className="text-[var(--warn)]">Not verified</span>} />
-      <Row k="From" v={e.origin === "sensor" ? `Canary box ${e.event.device_id ?? ""}` : "A resident"} />
+      <Row k="From" v={e.origin === "sensor" ? `${e.simulated ? "Simulated " : ""}Canary box ${e.event.device_id ?? ""}` : e.simulated ? "A simulated resident" : "A resident"} />
       <Row k="Where" v={where} />
       <Row k="Via" v={e.event.hub_id} />
     </Card>
