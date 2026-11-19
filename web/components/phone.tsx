@@ -41,9 +41,21 @@ export function useStored<T>(key: string, initial: T | (() => T)) {
 
 const newHandle = () => `anon-${Math.random().toString(16).slice(2, 6)}`;
 
+/**
+ * Saves a ?hub=URL from the address bar on this phone (lib/hub.ts), on pages that don't
+ * otherwise talk to the hub, like the home page the setup link opens.
+ */
+export function RememberHub() {
+  useEffect(() => {
+    hubUrl();
+  }, []);
+  return null;
+}
+
 export function PhoneShell({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-6">
+      <RememberHub />
       <Link href="/" className="inline-block py-2 text-sm text-[var(--muted)]">
         ← All reports
       </Link>

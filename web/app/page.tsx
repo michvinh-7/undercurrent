@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RememberHub } from "@/components/phone";
 
 // The hub's home page on a resident's phone: pick what to report.
 const REPORTS = [
@@ -12,6 +13,7 @@ const REPORTS = [
 export default function Home() {
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-8">
+      <RememberHub />
       <p className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">Undercurrent · works without internet</p>
       <h1 className="mt-2 text-3xl font-semibold">What do you need to report?</h1>
       <ul className="mt-6 space-y-3">
