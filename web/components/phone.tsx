@@ -5,7 +5,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { addEvent } from "@/lib/hub";
+import { addEvent, hubUrl } from "@/lib/hub";
+import { NotJoinedError, prepare } from "@/lib/sign";
 import type { EventType } from "@/lib/types";
 
 /**
@@ -111,12 +112,27 @@ export function Choice<T extends string>({
   );
 }
 
-type Sent = { state: "idle" } | { state: "sending" } | { state: "sent"; hub: string } | { state: "error"; message: string };
+type Sent =
+  | { state: "idle" }
+  | { state: "sending" }
+  | { state: "sent"; hub: string; signed: boolean }
+  | { state: "error"; message: string; join?: boolean };
 
 /**
  * Wraps a report: the resident's level (remembered), their anonymous handle, and the submit button.
  * `payload` is null while the form is incomplete.
  */
+/** What to tell the resident when a report didn't go through. */
+function sendError(err: unknown): Sent {
+  if (err instanceof NotJoinedError)
+    return { state: "error", join: true, message: "Not sent: this hub only takes reports from members, and this phone isn't on its roster yet. Show your join code to an operator." };
+  const text = err instanceof Error ? err.message : "";
+  const refused = /^Hub returned 403: (.*)$/.exec(text);
+  if (refused)
+    return { state: "error", join: /unknown key/.test(refused[1]), message: `Not sent: the hub refused it (${refused[1]}).` };
+  return { state: "error", message: "Couldn't reach the hub. Your report was not sent. Check you're on the hub's Wi-Fi and try again." };
+}
+
 export function ReportForm({
   type,
   payload,
@@ -138,11 +154,13 @@ export function ReportForm({
     if (!ready) return;
     setSent({ state: "sending" });
     try {
-      const saved = await addEvent({ type, level: level!, author, payload: payload! });
-      setSent({ state: "sent", hub: saved.hub_id });
+      // Signed with this phone's key once it's on the roster (lib/sign.ts).
+      const { event, signed } = await prepare({ type, level: level!, author, payload: payload! }, hubUrl());
+      const saved = await addEvent(event);
+      setSent({ state: "sent", hub: saved.hub_id, signed });
       onSent?.();
-    } catch {
-      setSent({ state: "error", message: "Couldn't reach the hub. Your report was not sent. Check you're on the hub's Wi-Fi and try again." });
+    } catch (err) {
+      setSent(sendError(err));
     }
   }
 
@@ -178,10 +196,22 @@ export function ReportForm({
       <div aria-live="polite">
         {sent.state === "sent" && (
           <p className="rounded-lg border border-[var(--ok)] px-3 py-3">
-            Sent. Saved on {sent.hub}. You can send another.
+            Sent{sent.signed ? " and signed by this phone" : ""}. Saved on {sent.hub}. You can send another.
           </p>
         )}
-        {sent.state === "error" && <p className="rounded-lg border border-[var(--danger)] px-3 py-3">{sent.message}</p>}
+        {sent.state === "error" && (
+          <p className="rounded-lg border border-[var(--danger)] px-3 py-3">
+            {sent.message}
+            {sent.join && (
+              <>
+                {" "}
+                <Link href="/join" className="underline">
+                  Show my join code
+                </Link>
+              </>
+            )}
+          </p>
+        )}
       </div>
 
       <p className="text-xs text-[var(--muted)]">Sent as {author ?? "an anonymous handle"}. Your real name is never attached unless you type it.</p>

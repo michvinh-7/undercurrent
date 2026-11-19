@@ -103,11 +103,11 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 - [ ] By Tue night: test your board (blink an LED, read a button, read an analog pin) and post whether it works and has Wi-Fi.
   - *If it works: build the Directorate kill switch (a button that calls `POST /link`). If Tisya's board fails: it becomes the Canary box.*
 - [x] All 4 phone forms work end to end at phone width. *(Built by Michael; restyle anything. PR #19 fixed a hydration error from the random handle in `web/components/phone.tsx`: pull `main`.)*
-- [ ] `web/lib/sign.ts`: a keypair on first visit, kept in the browser; fetch `hub_id` from `GET /health`; sign every report with `canonicalBytes`.
-- [ ] `web/lib/cell.ts` first (encrypted payload shape, encrypt and decrypt), posted in the chat; then the cell message page.
+- [x] `web/lib/sign.ts`: a keypair on first visit, kept in the browser; fetch `hub_id` from `GET /health`; sign every report with `canonicalBytes`. All 4 forms sign once the phone's key is on the roster, and post unsigned ("not verified") until then while the hub allows it. `/join` shows the public key and whether it's on the roster. *(Michael, while Alanna was out. A JS-signed report verifies in the hub's Python, and a real hub with `REQUIRE_SIGNED=1` accepts it. Still to do: the QR code on `/join`, which needs one small package, `qrcode-generator`.)*
+- [x] `web/lib/cell.ts` (`{enc, nonce, ciphertext}`, tweetnacl secretbox, the shape `/truth` already reads) and the `/cell` page: send encrypted, read your cell's messages, and invite in person with a `/cell#k=…` link (the key never reaches a server). *(Michael. Taheful: `/truth` can now open real cell messages with `decrypt` + `loadCellKey` in place of its demo key; the Hollow Briefs and Feed count encrypted `case` events as sick people, so filter `severity !== "message"` there.)*
 - [ ] Test on a real phone.
-- [ ] `sim/world.json` with the agreed level pair (it still has scaffold placeholders).
-- [ ] `sim/simulate.py`: simulated canaries and residents on other levels, each with its own key, preloaded through `ROSTER_FILE`. *(Stub only; `feature/simulation` is an empty "dummy push".)*
+- [x] `sim/world.json`: hub-L34 and hub-L12 (serving L31–40 and L1–30), 4 simulated canaries on the map's mounts, 8 residents, a 26-event crisis timeline, the hidden ground truth and the Directorate's claims. *(Michael.)*
+- [x] `sim/simulate.py`: `keys`, `roster`, then `run` fills both hubs with 26 signed, verified events in 3 minutes (water on L35 → bad water on L34 → the L34 market fan stalls → L12 blackout warning); `truth` writes `sim/ground_truth/`. See `sim/README.md`. *(Michael. 5 tests against real hubs.)*
 
 **Done when:** a phone files every report type signed, and one command fills two hubs with signed alerts.
 

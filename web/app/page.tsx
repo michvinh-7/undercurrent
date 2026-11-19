@@ -6,6 +6,7 @@ const REPORTS = [
   { href: "/hazard", title: "Report a hazard", hint: "Flooding, bad air, collapse…" },
   { href: "/symptoms", title: "Report symptoms", hint: "Someone is sick or hurt" },
   { href: "/missing", title: "Missing person", hint: "Someone you can't find" },
+  { href: "/cell", title: "Cell messages", hint: "Encrypted: only your cell can read them" },
 ];
 
 export default function Home() {
@@ -26,7 +27,10 @@ export default function Home() {
           </li>
         ))}
       </ul>
-      <Link href="/dashboard" className="mt-10 inline-block py-2 text-sm text-[var(--muted)]">
+      <Link href="/join" className="mt-6 block rounded-xl border border-dashed border-[var(--border)] px-4 py-3 text-[var(--muted)]">
+        Join a cell: show your key to an operator →
+      </Link>
+      <Link href="/dashboard" className="mt-6 inline-block py-2 text-sm text-[var(--muted)]">
         Command dashboard →
       </Link>
     </main>
