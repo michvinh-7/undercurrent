@@ -59,6 +59,8 @@ export interface MapEvent {
   origin: "sensor" | "report";
   /** True when the whole feed is labelled demo data (no hub reachable). */
   demo: boolean;
+  /** A test alert made on the map page (id "test-…"), never from a hub and never verified. */
+  test: boolean;
   time: number;
 }
 
@@ -106,11 +108,11 @@ export function adaptEvent(raw: unknown, world: CityWorld, opts: AdaptOptions): 
   }
   const t = Date.parse(e.created_at);
   let verified = false;
-  try { verified = opts.isVerified(e); } catch { verified = false; }
+  try { verified = !e.id.startsWith("test-") && opts.isVerified(e); } catch { verified = false; }
   return {
     id: e.id, event: e, level, onMap, place,
     severity: severityOf(e), verified, origin: isSensor(e) ? "sensor" : "report",
-    demo: opts.demo, time: Number.isFinite(t) ? t : 0,
+    demo: opts.demo, test: e.id.startsWith("test-"), time: Number.isFinite(t) ? t : 0,
   };
 }
 

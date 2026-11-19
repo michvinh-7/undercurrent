@@ -219,3 +219,79 @@ test("classifiers: stomach → water, cough → lungs", () => {
   assert.ok(isLungReport(m({ symptoms: ["coughing", "fever"] })));
   assert.ok(!isLungReport(m({ symptoms: ["rash"] })));
 });
+
+// --- Sensors beyond flooding (blackout, bad air, heat, surface) --------------------------------
+import { activeSensorAlerts, readingOf, expectedInOf, buildingsNear, outageLedger, surfaceReading } from "./sensors.ts";
+
+const sensorEv = (over = {}, payload = {}) => adaptEvent(ev({ source: "sensor", device_id: "canary-34-market", created_at: new Date().toISOString(), ...over, payload: { kind: "bad_air", severity: "high", ...payload } }), world, opts);
+
+test("mounts: every planned box sits on a real building on its level", () => {
+  for (const id of ["canary-34", "canary-34-market", "canary-34-school", "canary-12-relay", "canary-35-clinic"]) {
+    const m = world.sensors.find((s) => s.deviceId === id);
+    assert.ok(m, `${id} is mounted`);
+  }
+  assert.equal(sensorEv().place.kind, "exact");
+});
+
+test("sensors: reading and warning time are read when present, and never invented", () => {
+  assert.equal(readingOf(sensorEv({}, { reading: { value: 1850, unit: "ppm CO₂" } })), "1850 ppm CO₂");
+  assert.equal(readingOf(sensorEv({}, { reading: { value: 39, unit: "°C" } })), "39°C");
+  assert.equal(readingOf(sensorEv()), null);
+  assert.equal(expectedInOf(sensorEv({}, { kind: "blackout", expected_in_min: 20 })), 20);
+  assert.equal(expectedInOf(sensorEv({}, { kind: "blackout" })), null);
+  assert.equal(expectedInOf(sensorEv({}, { kind: "blackout", expected_in_min: "soon" })), null);
+});
+
+test("sensors: one alert per box and kind (the newest), only sensors, only this level, only recent", () => {
+  const now = Date.now();
+  const list = [
+    sensorEv({ id: "new", created_at: new Date(now - 1000).toISOString() }),
+    sensorEv({ id: "old", created_at: new Date(now - 60000).toISOString() }),
+    sensorEv({ id: "stale", device_id: "canary-34-school", created_at: new Date(now - 48 * 3600e3).toISOString() }),
+    adaptEvent(ev({ id: "person", created_at: new Date(now).toISOString(), payload: { kind: "bad_air", severity: "high" } }), world, opts),
+    sensorEv({ id: "other-level", level: 12, device_id: "canary-12-relay" }),
+  ].sort((a, b) => b.time - a.time);
+  const got = activeSensorAlerts(list, 34, now);
+  assert.deepEqual(got.map((a) => a.event.id), ["new"]);
+  assert.ok(got[0].at, "pinned at the market mount");
+});
+
+test("sensors: a blackout darkens nearby buildings, or the whole level when the spot is unknown", () => {
+  const l34 = world.levels.find((l) => l.n === 34);
+  const some = buildingsNear(l34.buildings, l34.buildings[0].center, 10);
+  assert.ok(some.size >= 1 && some.size < l34.buildings.length);
+  assert.equal(buildingsNear(l34.buildings, null, 10).size, l34.buildings.length);
+});
+
+test("outage ledger counts real sensor alerts per level, not warnings or people's reports", () => {
+  const now = Date.now(), t = new Date(now - 1000).toISOString();
+  const rows = outageLedger([
+    sensorEv({ id: "a", created_at: t }, { kind: "blackout" }),
+    sensorEv({ id: "b", created_at: t }, { kind: "blackout", expected_in_min: 10 }),
+    adaptEvent(ev({ id: "c", created_at: t, payload: { kind: "blackout", severity: "high" } }), world, opts),
+  ], [12, 34], now);
+  assert.deepEqual(rows.find((r) => r.level === 34), { level: 34, blackouts: 1, badAir: 0, flooding: 0, heat: 0 });
+  assert.equal(rows.find((r) => r.level === 12).blackouts, 0);
+});
+
+test("surface reading comes only from the surface box", () => {
+  assert.equal(surfaceReading([sensorEv()]), null);
+  assert.equal(surfaceReading([sensorEv({ id: "s", device_id: "canary-surface", level: 1 })]).id, "s");
+});
+
+test("test alerts are never verified, even with a signature", () => {
+  const e = adaptEvent(ev({ id: "test-bad_air-1", sig: "x" }), world, opts);
+  assert.equal(e.test, true);
+  assert.equal(e.verified, false);
+});
+
+test("narrator: a coming blackout leads and says it hasn't happened; bad air and heat read plainly", () => {
+  const base = { level: 34, levelName: "Pump room", buildings: 68, flood: null, sim: null, link: null, forgery: null, sosHere: 0, reportsHere: 0, reportsElsewhere: null, demo: false, care: "the L34 Hospital on this level" };
+  const s = { where: "the L34 Market", ago: "just now", reading: null, expectedIn: null, verified: true, demo: false, test: false };
+  const soon = narrate({ ...base, sensors: [{ ...s, kind: "blackout", expectedIn: 20 }, { ...s, kind: "heat", reading: "39°C" }] });
+  assert.match(soon.title, /Blackout expected on L34 in about 20 minutes/);
+  assert.match(soon.source, /hasn't happened yet/);
+  assert.ok(soon.also.some((a) => /running hot \(39°C\)/.test(a)));
+  assert.match(narrate({ ...base, sensors: [{ ...s, kind: "bad_air", reading: "1850 ppm CO₂" }] }).title, /Bad air near the L34 Market \(1850 ppm CO₂\)/);
+  assert.match(narrate({ ...base, sensors: [{ ...s, kind: "bad_air", test: true }] }).source, /test alert/);
+});
