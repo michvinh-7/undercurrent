@@ -21,7 +21,7 @@ The demo is done when all five beats work on the flat console.
 | 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 160 of 160 edits to the database caught at the exact row by `GET /events/verify`, deleting the newest row included; a deleted row comes back from the other hub in about 1 s. The console's chain check names the edited row (PR #21) |
 | 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ✅ Real cell messages now: `web/lib/cell.ts` and the `/cell` page encrypt on the phone, and `/truth` shows them as bytes. A second phone opens them after scanning the invite QR. *(Taheful: `/truth` still adds its demo message; it can open real ones with `decrypt` + `loadCellKey`.)* |
 
-**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21), and sync puts a hub's deleted rows back from the other hub (number 2 is now 160 of 160). Since Thursday afternoon, phone signing, cell messages and the simulation are in too. Still open: the box.
+**Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21), and sync puts a hub's deleted rows back from the other hub (number 2 is now 160 of 160). On Thursday, phone signing, cell messages and the simulation went in too. Still open: the box.
 
 **Blocking the most people:**
 1. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
