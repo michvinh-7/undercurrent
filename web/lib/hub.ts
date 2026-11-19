@@ -1,11 +1,33 @@
 import type { HollowEvent, NewEvent } from "./types";
 
+const HUB_KEY = "uc-hub";
+
+/** A hub chosen with ?hub=URL on any page. Remembered on this phone, so one link sets it up. */
+function chosenHub(): string | null {
+  if (typeof window === "undefined") return null;
+  const q = new URLSearchParams(window.location.search).get("hub");
+  if (q && /^https?:\/\/[^/]+/.test(q)) {
+    try {
+      localStorage.setItem(HUB_KEY, q.replace(/\/+$/, ""));
+    } catch {}
+    return q.replace(/\/+$/, "");
+  }
+  try {
+    return localStorage.getItem(HUB_KEY);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Where the hub is. NEXT_PUBLIC_HUB_URL wins if set. Otherwise use the machine
- * that served this page on port 8000, so a phone that opened http://<laptop-ip>:3000
- * talks to http://<laptop-ip>:8000 instead of to itself.
+ * Where the hub is. In order: ?hub=URL on this page (then remembered on this phone, e.g.
+ * http://<laptop-ip>:3000/?hub=http://<laptop-ip>:8001, which demo_hubs.py up prints),
+ * NEXT_PUBLIC_HUB_URL, or the machine that served this page on port 8000, so a phone that
+ * opened http://<laptop-ip>:3000 talks to http://<laptop-ip>:8000 instead of to itself.
  */
 export function hubUrl(): string {
+  const chosen = chosenHub();
+  if (chosen) return chosen;
   if (process.env.NEXT_PUBLIC_HUB_URL) return process.env.NEXT_PUBLIC_HUB_URL;
   if (typeof window !== "undefined") return `${window.location.protocol}//${window.location.hostname}:8000`;
   return "http://localhost:8000";

@@ -14,7 +14,8 @@ chain starts over. Wiping both keeps every rehearsal clean.
 
 It only starts hubs; it adds no events. Filling them is sim/simulate.py (Alanna's).
 Databases, logs and process ids live in --dir (default hub/demo/run, ignored by git).
-Use --host 0.0.0.0 so phones on the same Wi-Fi can reach the hubs.
+Use --host 0.0.0.0 so phones on the same Wi-Fi can reach the hubs; `up` then prints the
+link to open on a phone (http://<laptop-ip>:3000/?hub=http://<laptop-ip>:8001).
 """
 
 import argparse
@@ -123,7 +124,20 @@ def up(args) -> int:
     a, b = (f"http://{local}:{h['port']}" for h in hubs)
     print(f"up: hub-L34 {a}, hub-L12 {b}, synced, signing {'required' if args.signed else 'optional'}")
     print(f"console: http://localhost:3000/dashboard?hub={b}&peer={a}")
+    if args.host == "0.0.0.0":
+        ip = lan_ip()
+        print(f"phones on this Wi-Fi: http://{ip}:3000/?hub=http://{ip}:{hubs[0]['port']}  (posts to hub-L34; remembered on the phone)")
     return 0
+
+
+def lan_ip() -> str:
+    """This machine's address on the local network (no packet is sent)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+        except OSError:
+            return "<laptop-ip>"
 
 
 def down(args) -> int:
