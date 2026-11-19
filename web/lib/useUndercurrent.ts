@@ -142,8 +142,12 @@ export function useUndercurrent() {
   }, []);
 
   // Hub status: link, rejections, chain check, roster. Polled, since none of it streams.
+  // Only once a hub has answered at least once: with no hub at all there's nothing to ask, and
+  // every refused request still shows up as a console error (some browser extensions report
+  // fetches that the code already caught). After a hub has been live, keep polling while it
+  // reconnects, so "offline" still shows.
   useEffect(() => {
-    if (mode === "demo" || hubs.length === 0) return;
+    if (mode === "demo" || hubs.length === 0 || (mode === "connecting" && !everLive.current)) return;
     let alive = true;
     const tick = async () => {
       const next = await Promise.all(hubs.map(pollHub));
