@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UserSearchIcon } from "lucide-react";
 import { Label, PhoneShell, ReportForm, TextArea, TextInput } from "@/components/phone";
 
 export default function MissingPage() {
@@ -22,7 +23,7 @@ export default function MissingPage() {
       : null;
 
   return (
-    <PhoneShell title="Report a missing person" hint="Someone you can't find.">
+    <PhoneShell title="Report a missing person" icon={<UserSearchIcon />} hint="Someone you can't find.">
       <ReportForm
         type="missing_person"
         payload={payload}

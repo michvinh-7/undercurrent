@@ -8,7 +8,7 @@
 //   5. the Directorate sniffs the channel   → Directorate view toggle (and /truth)
 // Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
-import Link from "next/link";
+import { AppBar } from "@/components/app-bar";
 import { useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
 import { isEncrypted, isSensor, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
@@ -39,6 +39,8 @@ export default function Console() {
   const primary = net.hubs.find((h) => h.role === "primary");
 
   return (
+    <>
+    <AppBar net={net} />
     <main
       className="mx-auto max-w-7xl px-4 py-6 sm:px-6"
       style={directorate ? { boxShadow: "inset 0 0 0 2px var(--directorate)" } : undefined}
@@ -97,6 +99,7 @@ export default function Console() {
         </aside>
       </div>
     </main>
+    </>
   );
 }
 
@@ -121,10 +124,6 @@ function Header({
         </h1>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <nav className="flex gap-3 text-sm text-[var(--muted)]">
-          <Link href="/hollow" className="hover:text-[var(--foreground)]">The Hollow →</Link>
-          <Link href="/truth" className="hover:text-[var(--foreground)]">Directorate view →</Link>
-        </nav>
         <ModeBadge mode={net.mode} />
         <button
           role="switch"

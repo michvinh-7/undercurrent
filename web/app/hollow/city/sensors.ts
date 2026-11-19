@@ -18,7 +18,7 @@ export const SENSOR_LOOK: Record<ZoneKind, { label: string; color: string; radiu
   flooding: { label: "Flooding", color: "#5f7f93", radius: 16, blocksStreets: true },
   bad_air: { label: "Bad air", color: "#7f8c5a", radius: 22, blocksStreets: true },
   heat: { label: "Heat", color: "#d0743c", radius: 30, blocksStreets: false },
-  blackout: { label: "Blackout", color: "#3b3f47", radius: 40, blocksStreets: false },
+  blackout: { label: "Blackout", color: "#8a93ab", radius: 40, blocksStreets: false },
 };
 
 /** The box at the top of the shaft that reads the surface air (question 13). Not on a map level. */

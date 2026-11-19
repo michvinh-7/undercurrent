@@ -5,35 +5,35 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Building, BuildingUse, Grid, Level, XZ } from "../model";
 import { CITY, PLAZA_RADIUS } from "../model";
 
-/** Calm map palette. Most of the city stays neutral; color is reserved for status. */
+/** Calm map palette, dark to match the other pages. Most of the city stays neutral; color is reserved for status. */
 export const P = {
-  sky: "#e8e5df",
-  street: "#cfcac0",
-  paving: "#e6e1d6",
-  plaza: "#ece6d9",
-  park: "#b9c7a5",
-  yard: "#d8cfbd",
-  cavern: "#aaa294",
-  wall: "#f3efe6",
-  roof: "#949ba5",
-  pipe: "#9ba3ad",
+  sky: "#10131b",
+  street: "#3a3f50",
+  paving: "#262a38",
+  plaza: "#30354a",
+  park: "#2c463a",
+  yard: "#2a2e3c",
+  cavern: "#1c1f2a",
+  wall: "#727a91",
+  roof: "#5e667e",
+  pipe: "#7c8499",
   water: "#3b82c4",
   waterSurface: "#4f8fc0",
-  dryWall: "#efd29c",
+  dryWall: "#8a6b36",
   dryRoof: "#c98f2e",
   failed: "#c2412d",
-  select: "#4f5fb3",
-  ok: "#2f7f6f",
-  ghost: "#8b8577",
+  select: "#8b7cf6",
+  ok: "#2fa58a",
+  ghost: "#4a4f60",
   flood: "#5f7f93",
-  route: "#1f8a70",
-  cutWall: "#c9c4bb",
-  cutRoof: "#7d7a74",
+  route: "#2fbf8f",
+  cutWall: "#42454f",
+  cutRoof: "#62605b",
   risk: "#b07d2a",
-  riskWall: "#efe2c4",
+  riskWall: "#7a6640",
   riskRoof: "#b9975a",
-  darkWall: "#4a4d55", // no power (blackout)
-  darkRoof: "#2f3238",
+  darkWall: "#15171d", // no power (blackout)
+  darkRoof: "#0c0d11",
 };
 
 const ROOF: Partial<Record<BuildingUse, string>> = {

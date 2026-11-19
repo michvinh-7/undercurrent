@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TriangleAlertIcon } from "lucide-react";
 import { Choice, Label, PhoneShell, ReportForm, TextArea, TextInput } from "@/components/phone";
 
 type Kind = "flooding" | "bad_air" | "bad_water" | "heat" | "blackout" | "collapse" | "other";
@@ -30,7 +31,7 @@ export default function HazardPage() {
   };
 
   return (
-    <PhoneShell title="Report a hazard" hint="Something dangerous on your level.">
+    <PhoneShell title="Report a hazard" icon={<TriangleAlertIcon />} hint="Something dangerous on your level.">
       <ReportForm
         type="hazard"
         payload={payload}
