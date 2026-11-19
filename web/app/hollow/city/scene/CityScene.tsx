@@ -82,7 +82,7 @@ export default function CityScene(props: CitySceneProps) {
     >
       <color attach="background" args={[P.sky]} />
       <fog attach="fog" args={[P.sky, 600, 1400]} />
-      <hemisphereLight args={["#ffffff", "#b9b1a2", 1.1]} />
+      <hemisphereLight args={["#ffffff", "#2b2f3c", 1.1]} />
       <directionalLight
         position={[90, 160, 70]}
         intensity={1.6}
@@ -145,17 +145,17 @@ function useLabels(p: CitySceneProps): Label[] {
     for (const st of streetGraph(world.grid).stairs)
       out.push({ id: `stairs-${st.id}`, pos: [st.at[0] + (st.at[0] < 0 ? 6 : -6), 4, st.at[1] - 7], node: <span className="map-label map-label--quiet map-label--minor">{st.name}</span>, rank: 30 });
     if (p.flood)
-      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#3f5f73" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span>, rank: 70 });
+      out.push({ id: "flood", pos: [p.flood.at[0] - 4, 2, p.flood.at[1] + 9], node: <span className="map-label map-label--minor" style={{ borderColor: "#5f7f93", color: "#8fbfd8" }}>{p.flood.spread ? "Flood (simulated spread)" : "Water detected here"}</span>, rank: 70 });
     if (layers.alerts)
       for (const z of p.zones ?? [])
         out.push({ id: `zone-${z.id}`, pos: [z.at[0], 3, z.at[1] + z.radius * 0.6], rank: 72, node: <span className="map-label" style={{ borderColor: z.color, color: z.kind === "blackout" ? "var(--foreground)" : z.color }}>{z.label}</span> });
     if (p.trace && layers.water) {
       const at = sourcePoint(world, active, p.trace.source);
-      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#7a5418" }}>Likely bad-water source (a guess)</span>, rank: 75 });
+      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#e0b36a" }}>Likely bad-water source (a guess)</span>, rank: 75 });
     }
     if (p.route) {
       const mid = p.route.points[Math.floor(p.route.points.length / 2)];
-      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label map-label--minor" style={{ borderColor: "#1f8a70", color: "#1f6a56" }}>Safe route · {p.route.minutes} min</span>, rank: 65 });
+      out.push({ id: "route", pos: [mid[0], 3, mid[1]], node: <span className="map-label map-label--minor" style={{ borderColor: "#2fbf8f", color: "#5fd6ad" }}>Safe route · {p.route.minutes} min</span>, rank: 65 });
     }
     if (layers.water && world.network.node.get(SOURCE_ID)?.level === active)
       out.push({ id: "cistern", pos: [CORE.cistern[0], 8, CORE.cistern[1]], node: <span className="map-label">Cistern</span>, rank: 50 });
@@ -517,7 +517,7 @@ function SafeRoute({ route }: { route: Route }) {
   return (
     <group>
       {/* Drawn over everything so buildings never hide the way out. */}
-      <Line points={pts} color="#ffffff" lineWidth={9} depthTest={false} renderOrder={8} transparent opacity={0.85} />
+      <Line points={pts} color={P.sky} lineWidth={9} depthTest={false} renderOrder={8} transparent opacity={0.85} />
       <Line ref={line as never} points={pts} color={P.route} lineWidth={5} dashed dashSize={3} gapSize={1.6} depthTest={false} renderOrder={9} transparent opacity={1} />
       <mesh position={[end[0], 3, end[1]]} raycast={() => null}>
         <cylinderGeometry args={[1.4, 1.4, 0.5, 24]} />
@@ -720,7 +720,7 @@ function Core(p: CitySceneProps & { level: Level }) {
         <group position={[cx, 0, cz]} onClick={click(SOURCE_ID)}>
           <mesh castShadow receiveShadow position={[0, 3, 0]}>
             <cylinderGeometry args={[CISTERN_RADIUS, CISTERN_RADIUS, 6, 40, 1, true]} />
-            <meshStandardMaterial color={sel(SOURCE_ID) ? P.select : "#bdb6a8"} roughness={0.95} side={THREE.DoubleSide} />
+            <meshStandardMaterial color={sel(SOURCE_ID) ? P.select : "#5b6276"} roughness={0.95} side={THREE.DoubleSide} />
           </mesh>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, water.failed.has(SOURCE_ID) ? 0.6 : 4.6, 0]}>
             <circleGeometry args={[CISTERN_RADIUS - 0.2, 40]} />
@@ -859,7 +859,7 @@ function Pin({ e, count, fresh, selected, onSelect }: { e: MapEvent; count: numb
     <group position={[x, 0, z]} onClick={(ev) => { ev.stopPropagation(); onSelect(); }}>
       <mesh position={[0, y + h / 2, 0]}>
         <cylinderGeometry args={[0.18, 0.18, h, 6]} />
-        <meshStandardMaterial color="#3b3f47" />
+        <meshStandardMaterial color="#8d90a6" />
       </mesh>
       <mesh position={[0, y + h, 0]}>
         <sphereGeometry args={[selected ? 1.8 : 1.5, 20, 14]} />

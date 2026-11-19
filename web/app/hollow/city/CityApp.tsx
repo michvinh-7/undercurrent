@@ -301,7 +301,7 @@ export default function CityApp() {
   // Panels sit beside the map, never on top of it, and either side can collapse.
   // Below xl the right column folds under the left one. Phone: map on top, one sheet underneath.
   return (
-    <div className="theme-paper flex h-[100dvh] w-full flex-col overflow-hidden">
+    <div className="theme-hollow flex h-[100dvh] w-full flex-col overflow-hidden">
       <AppBar net={net} />
       <TopBar
         net={net} world={world} active={level.n} sums={sums} view={view} setView={setView} follow={follow} setFollow={setFollow}
