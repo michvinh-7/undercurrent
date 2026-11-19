@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Wed 11/18 (early morning, after the live Directorate script and the fingerprint) by Michael
+**Last updated:** Thu 11/19 (early morning, after Taheful's Hollow layout, PRs #29 and #30) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -37,7 +37,7 @@ The demo is done when all five beats work on the flat console.
 | Tisya | `tisya/canary-box` |
 | Michael | `michael/sync` |
 | Alanna | `alanna/phones-and-sim` |
-| Taheful | `taheful/console` |
+| Taheful | `taheful/hollow-layout` |
 
 To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -D <your old branch>`. Then run `npm install` in `web/` and `pip install -r hub/requirements.txt`.
 
@@ -120,7 +120,8 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 - [x] Directorate view (`/truth`): wire bytes next to what a member reads. *(One labeled demo cell message until `cell.ts` lands; then it shows real ones.)*
 - [x] Fonts: Geist sans + mono in `layout.tsx`; tokens in `globals.css`.
 - [x] The Hollow map (`/hollow`), rebuilt as a city map: one level at a time with real street and building layouts (generated), a "What's happening" bubble in plain words, flood alerts that close streets and draw the safest route, bad-water reports traced up the pipes to a likely source (a guess, labelled), cough/breathing reports and check-ins per level, way to the nearest care from any building, add-a-level. Starts with L12, L34, L35. *(PR #28. No beat depends on it.)*
-- [ ] `/hollow` organized and sensor-ready *(PR #29, draft)*: three columns, a **Briefs** tab answering all 14 questions with live status and "Show me", bad air / heat / blackout on the map (one table in `sensors.ts`, boxes one line each in `model.ts`), test alerts (`?test=bad_air,blackout_soon,heat,surface`), Directorate-vs-residents counts, find someone, needs-care list, outage ledger. 35 tests pass.
+- [x] `/hollow` organized and sensor-ready *(PR #29)*: three columns, a **Briefs** tab answering all 14 questions with live status and "Show me", bad air / heat / blackout on the map (one table in `sensors.ts`, boxes one line each in `model.ts`), test alerts (`?test=bad_air,blackout_soon,heat,surface`), Directorate-vs-residents counts, find someone, needs-care list, outage ledger. 35 tests pass. *(The hub accepts the bad_air, heat and blackout alerts with their reading fields; checked against two running hubs. Test alerts never reach a hub.)*
+- [x] The web app stops polling a hub that has never answered. *(PR #30.)*
 - [ ] Check every page at phone width. *(Console, `/truth` and `/hollow` checked; phone forms are Alanna's.)*
 - [ ] Demo script, two rehearsals, record and edit the video (Thu 11/19).
 - [ ] Devpost: story, how it works, results, what it doesn't do. Submit early Fri 11/20.
