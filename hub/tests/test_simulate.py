@@ -110,6 +110,9 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
     assert {e["hub_id"] for e in events if e["level"] in (34, 35)} == {"hub-L34"}
     assert {e["hub_id"] for e in events if e["level"] == 12} == {"hub-L12"}
     assert all(e["payload"].get("simulated") is True for e in events)  # labelled, inside the signature
+    surface = [e for e in events if e.get("device_id") == "canary-surface"]
+    assert len(surface) == 3 and all(e["level"] == 1 and e["hub_id"] == "hub-L12" and e["author_pub"] in members for e in surface)
+    assert all(isinstance(e["payload"]["oxygen_pct"], int) for e in surface)
     sensors = [e for e in events if e.get("device_id")]
     assert sensors and all(e["source"] == "sensor" and e["author"] == e["device_id"] for e in sensors)
     assert c.get(f"{l34}/rejected").json()["total"] == 0

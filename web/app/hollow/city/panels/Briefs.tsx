@@ -131,7 +131,7 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
   const b13: Brief = surface
     ? {
       n: 13, q: "Prove whether the surface is safe", status: "live",
-      line: `Surface intake: ${readingOf(surface) ?? "reading in"}${typeof (surface.event.payload as { oxygen_pct?: unknown }).oxygen_pct === "number" ? ` · O₂ ${(surface.event.payload as { oxygen_pct: number }).oxygen_pct}%` : ""} · ${surface.test ? "test alert" : surface.verified ? "signed by the box ✓" : "not verified"}`,
+      line: `Surface intake: ${readingOf(surface) ?? "reading in"}${typeof (surface.event.payload as { oxygen_pct?: unknown }).oxygen_pct === "number" ? ` · O₂ ${(surface.event.payload as { oxygen_pct: number }).oxygen_pct}%` : ""} · ${surface.test ? "test alert" : surface.verified ? (surface.simulated ? "signed by a simulated box ✓" : "signed by the box ✓") : "not verified"}`,
       detail: <p className="mt-1 text-xs"><span className="text-[var(--directorate)]">Directorate: “{DIRECTORATE_SURFACE_CLAIM}.”</span> A signed reading can't be faked by either side.</p>,
     }
     : { n: 13, q: "Prove whether the surface is safe", status: "ready", line: "A box at the top of the shaft signs its air readings, so the Directorate can't fake them.", action: test("surface", "Try a reading") };

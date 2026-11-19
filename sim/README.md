@@ -3,7 +3,7 @@
 Signed canaries and residents on other levels, so the demo has more than one box talking.
 `simulate.py` plays the crisis timeline in `world.json` against the two demo hubs: water
 rises on L35, contaminated water reaches L34's taps, the L34 market fan stalls, and the L12
-relay's voltage sags. 26 events over 3 minutes by default. Every sender has its own key on
+relay's voltage sags, while a box at the top of the shaft signs surface air readings (CO₂ and oxygen, question 13). 29 events over 3 minutes by default. Every sender has its own key on
 the roster, so every event is signed and shows as verified. Tisya's real box (`canary-34`)
 is never simulated.
 
