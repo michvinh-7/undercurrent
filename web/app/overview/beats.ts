@@ -77,5 +77,21 @@ export const RESULTS = [
   { value: "160 / 160", label: "database edits caught at the row", source: "eval/run_attacks.py" },
   { value: "200 / 200", label: "alerts delivered after random cuts", source: "sync stress, simulated cuts" },
   { value: "0.81 s", label: "probe to the alert on the other hub", source: "dry run; the real box run is next" },
-  { value: "72%", label: "less SOS delay on a slow link", source: "priority queue vs first-come" },
+  { value: "72%", label: "less SOS delay on a slow link", source: "local model + priority queue vs first-come" },
+];
+
+/** Messages to try on the live triage box: a panicked SOS, an injury, and a routine check-in. */
+export const TRIAGE_EXAMPLES = [
+  { label: "Panicked SOS", text: "pls help water coming in fast lvl 34 my kid cant swim 3 of us stuck by the pumps" },
+  { label: "Injury", text: "my grandma fell on the stairs L12, bleeding from her head, cant get up, 2 of us here" },
+  { label: "All fine", text: "checking in from 35, we're ok, water still clean at the clinic" },
+];
+
+/** Triage on the held-out test split (n=149), from eval/results/RESULTS.md, 2026-11-17. */
+export const TRIAGE_RESULTS = [
+  { label: "Urgency right", ai: "87.9%", aiCi: "82.6–92.6", rules: "53.7%" },
+  { label: "SOS caught (recall)", ai: "87.9%", aiCi: "75.7–97.3", rules: "27.3%" },
+  { label: "SOS ranked first in a batch of 10", ai: "84.1%", aiCi: "74.4–91.8", rules: "37.1%" },
+  { label: "Level pulled out exactly", ai: "98.0%", aiCi: "95.3–100", rules: "63.1%" },
+  { label: "SOS delay cut by the priority queue", ai: "75.9%", aiCi: "64.5–84.7", rules: "29.8%" },
 ];

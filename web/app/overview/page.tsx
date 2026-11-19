@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, CheckIcon, CopyIcon, DropletIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
-import { BEATS, RESULTS, type BeatId } from "./beats";
+import { BEATS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
 
 type Tone = "ok" | "warn" | "danger" | "muted";
 const TONE: Record<Tone, string> = { ok: "var(--ok)", warn: "var(--warn)", danger: "var(--danger)", muted: "var(--muted)" };
@@ -153,6 +153,175 @@ function FlowArrow({ label, tone, dashed, back }: { label: string; tone: Tone; d
         {back === undefined ? <path d="M0 4h34M29 0l5 4M36 10H2M7 14l-5-4" /> : back ? <path d="M36 7H2M7 2 2 7l5 5" /> : <path d="M0 7h34M29 2l5 5-5 5" />}
       </svg>
     </div>
+  );
+}
+
+/** What POST /triage returns (hub/app/triage.py TriageRecord). */
+interface Triage {
+  type: string;
+  urgency: "sos" | "urgent" | "routine" | "fake_suspect";
+  level: number | null;
+  injuries: number | null;
+  people_count: number | null;
+  hazard: string | null;
+  priority: number;
+  source: "model" | "cloud" | "keywords";
+}
+
+const URGENCY: Record<Triage["urgency"], { label: string; color: string }> = {
+  sos: { label: "SOS", color: "var(--danger)" },
+  urgent: { label: "Urgent", color: "var(--warn)" },
+  routine: { label: "Routine", color: "var(--ok)" },
+  fake_suspect: { label: "Looks fake", color: "var(--directorate)" },
+};
+
+const SOURCE: Record<Triage["source"], string> = {
+  model: "Local AI model, running on the hub with no internet",
+  cloud: "Cloud AI model (online mirror only)",
+  keywords: "Keyword rules: no AI model was reachable, so the hub fell back",
+};
+
+/** The live triage box: type a messy message, the hub's AI reads it and scores it. */
+function TriageSection({ net }: { net: Undercurrent }) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const [text, setText] = useState(TRIAGE_EXAMPLES[0].text);
+  const [result, setResult] = useState<Triage | null>(null);
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const live = net.mode === "live" && !!primary;
+
+  async function rank(message = text) {
+    if (!primary || !message.trim()) return;
+    setState("busy");
+    try {
+      const res = await fetch(`${primary.url}/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message.trim() }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setResult((await res.json()) as Triage);
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  }
+
+  const queue = net.events.filter((e) => e.type !== "roster" && e.priority !== null);
+  const ahead = result ? queue.filter((e) => (e.priority ?? 0) > result.priority).length : 0;
+  const u = result ? URGENCY[result.urgency] : null;
+  const facts = result
+    ? [
+        ["Kind", result.hazard ? result.hazard.replace("_", " ") : result.type.replace("_", " ")],
+        ["Level", result.level ?? "not stated"],
+        ["People", result.people_count ?? "not stated"],
+        ["Injured", result.injuries ?? "not stated"],
+      ]
+    : [];
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>How the hub decides what&apos;s urgent</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">AI reads the panic, code does the math</h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          On a slow link, the most urgent message has to go first. An AI model running on the hub reads each free-text report and pulls out
+          the facts. Plain code then turns those facts into a priority and checks every number against the message, so the model never
+          invents one.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-start gap-4">
+        <Card className="min-w-0 flex-[999_1_480px] gap-4 p-6">
+          <div className="flex items-center gap-2">
+            <BrainCircuitIcon className="size-5 text-primary" aria-hidden="true" />
+            <span className="font-semibold">Try it</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {TRIAGE_EXAMPLES.map((ex) => (
+              <Button key={ex.label} variant="outline" size="sm" onClick={() => { setText(ex.text); setResult(null); }}>
+                {ex.label}
+              </Button>
+            ))}
+          </div>
+          <label htmlFor="triage-text" className="sr-only">Message to rank</label>
+          <textarea
+            id="triage-text"
+            rows={3}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={600}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base outline-none focus:border-primary"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={() => rank()} disabled={!live || state === "busy" || !text.trim()}>
+              {state === "busy" ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : <BrainCircuitIcon aria-hidden="true" />}
+              {state === "busy" ? "Reading it…" : "Rank it"}
+            </Button>
+            {!live && <span className="text-sm text-muted-foreground">Connect to a hub to try it live.</span>}
+            {state === "error" && <span className="text-sm text-[var(--danger)]">The hub didn&apos;t answer. Try again.</span>}
+          </div>
+          {result && u && (
+            <div className="flex flex-col gap-3 rounded-lg border bg-background p-4" style={{ borderColor: u.color }} aria-live="polite">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="rounded-full px-2.5 py-0.5 font-mono text-xs font-medium" style={{ color: u.color, border: `1px solid ${u.color}` }}>
+                  {u.label}
+                </span>
+                <span className="font-mono text-sm text-muted-foreground">priority {result.priority.toFixed(2)}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-accent" aria-hidden="true">
+                <div className="h-full rounded-full" style={{ width: `${Math.round(result.priority * 100)}%`, background: u.color }} />
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                {facts.map(([k, v]) => (
+                  <div key={String(k)} className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{k}</dt>
+                    <dd className="font-medium capitalize">{String(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-sm text-foreground/80">
+                {queue.length
+                  ? ahead === 0
+                    ? `It would go to the top of the queue, ahead of all ${queue.length} stored reports.`
+                    : `It would be number ${ahead + 1} of ${queue.length + 1} in the queue.`
+                  : "With nothing else waiting, it would go out first."}
+              </p>
+              <p className="text-xs text-muted-foreground">Read by: {SOURCE[result.source]}</p>
+            </div>
+          )}
+        </Card>
+        <Card className="min-w-0 flex-[1_1_340px] gap-3 p-6">
+          <span className="font-semibold">Measured on 149 held-out messages</span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th className="pb-2 font-normal"></th>
+                  <th className="pb-2 font-normal">AI</th>
+                  <th className="pb-2 font-normal">Keywords</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TRIAGE_RESULTS.map((r) => (
+                  <tr key={r.label} className="border-t border-border">
+                    <td className="py-2 pr-3">{r.label}</td>
+                    <td className="py-2 pr-3 font-mono tabular-nums">
+                      {r.ai}
+                      <span className="block whitespace-nowrap text-[11px] text-muted-foreground">{r.aiCi}</span>
+                    </td>
+                    <td className="py-2 font-mono tabular-nums text-muted-foreground">{r.rules}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            AI column: Gemini 3.1 Flash Lite, 95% intervals below each number. The small model the hub runs offline (Llama 3.2 3B) scores
+            75.8% on urgency and 87.9% on SOS recall, and cuts SOS delay by 72.4%. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
+          </p>
+        </Card>
+      </div>
+    </section>
   );
 }
 
@@ -311,6 +480,8 @@ export default function Overview() {
             })}
           </Tabs>
         </section>
+
+        <TriageSection net={net} />
 
         {/* Results */}
         <section className="flex flex-col gap-5">
