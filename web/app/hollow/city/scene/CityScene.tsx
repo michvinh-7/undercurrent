@@ -82,10 +82,10 @@ export default function CityScene(props: CitySceneProps) {
     >
       <color attach="background" args={[P.sky]} />
       <fog attach="fog" args={[P.sky, 600, 1400]} />
-      <hemisphereLight args={["#ffffff", "#2b2f3c", 1.1]} />
+      <hemisphereLight args={["#ffffff", "#4a5066", 1.5]} />
       <directionalLight
         position={[90, 160, 70]}
-        intensity={1.6}
+        intensity={1.9}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-170}

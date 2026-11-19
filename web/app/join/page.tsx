@@ -7,7 +7,9 @@
 // is shown, as text and as a QR code the operator scans.
 
 import { useCallback, useEffect, useState } from "react";
-import { PhoneShell } from "@/components/phone";
+import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, QrCodeIcon, TriangleAlertIcon } from "lucide-react";
+import { Notice, PhoneShell } from "@/components/phone";
+import { Button } from "@/components/ui/button";
 import { QR } from "@/components/qr";
 import { hubUrl } from "@/lib/hub";
 import { hubSigningInfo, loadIdentity, type HubSigningInfo } from "@/lib/sign";
@@ -47,51 +49,56 @@ export default function JoinPage() {
   const member = hub.state === "up" && !!pub && hub.members.has(pub);
 
   return (
-    <PhoneShell title="Join a cell" hint="Show this to an operator, in person. They add your key to the roster, and your reports are signed from then on.">
-      <div className="space-y-6">
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
+    <PhoneShell title="Join a cell" eyebrow="Your key" icon={<QrCodeIcon />} hint="Show this to an operator, in person. They add your key to the roster, and your reports are signed from then on.">
+      <div className="space-y-5">
+        <section aria-live="polite">
+          {hub.state === "loading" && (
+            <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-3 text-muted-foreground">
+              <LoaderCircleIcon className="size-4 animate-spin" aria-hidden="true" /> Checking the hub…
+            </div>
+          )}
+          {hub.state === "down" && <Notice tone="danger" icon={<CircleAlertIcon />}>Can&apos;t reach the hub. Check you&apos;re on its Wi-Fi.</Notice>}
+          {hub.state === "up" && member && (
+            <Notice tone="ok" icon={<CircleCheckIcon />}>
+              <strong>You&apos;re on the roster of {hub.hubId}.</strong> Your reports are signed and show as verified.
+            </Notice>
+          )}
+          {hub.state === "up" && !member && (
+            <Notice tone="warn" icon={<TriangleAlertIcon />}>
+              Not on the roster of {hub.hubId} yet.{" "}
+              {hub.requireSigned
+                ? "This hub only takes reports from members, so you can't send until you're added."
+                : "Until you're added, your reports still go through but show as not verified."}
+            </Notice>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-4">
           <p className="caption">Your public key</p>
           {pub && (
-            <div className="mt-3">
+            <div className="mt-3 rounded-lg bg-white p-2">
               <QR value={pub} label="QR code of your public key" />
             </div>
           )}
-          <p className="mt-3 select-all break-all font-mono text-lg leading-relaxed" data-testid="pub">
+          <p className="mt-3 select-all break-all rounded-lg bg-background px-3 py-2.5 font-mono text-base leading-relaxed" data-testid="pub">
             {pub ?? "…"}
           </p>
-          <button type="button" onClick={copy} className="mt-3 min-h-12 w-full rounded-lg border border-[var(--border-strong)] px-3 text-base">
+          <Button type="button" variant="outline" size="lg" onClick={copy} className="mt-3 h-12 w-full">
+            {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
             {copied ? "Copied" : "Copy key"}
-          </button>
-          <p className="mt-3 text-xs text-[var(--muted)]">
+          </Button>
+          <p className="mt-3 text-xs text-muted-foreground">
             This is the public half only. The private half stays in this browser. Clearing the browser&apos;s data makes a new key, which
             would need adding again.
           </p>
         </section>
 
-        <section aria-live="polite" className="rounded-xl border px-4 py-3" style={{ borderColor: member ? "var(--ok)" : "var(--border)" }}>
-          {hub.state === "loading" && <p>Checking the hub…</p>}
-          {hub.state === "down" && <p>Can&apos;t reach the hub. Check you&apos;re on its Wi-Fi.</p>}
-          {hub.state === "up" && member && (
-            <p>
-              <strong>You&apos;re on the roster of {hub.hubId}.</strong> Your reports are signed and show as verified.
-            </p>
-          )}
-          {hub.state === "up" && !member && (
-            <p>
-              Not on the roster of {hub.hubId} yet.{" "}
-              {hub.requireSigned
-                ? "This hub only takes reports from members, so you can't send until you're added."
-                : "Until you're added, your reports still go through but show as not verified."}
-            </p>
-          )}
-        </section>
-
-        <details className="text-sm text-[var(--muted)]">
-          <summary className="cursor-pointer py-2">For the operator</summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--panel-2)] p-3 font-mono text-xs">
+        <details className="rounded-xl border border-border px-4 text-sm text-muted-foreground">
+          <summary className="flex min-h-11 cursor-pointer items-center">For the operator</summary>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-background p-3 font-mono text-xs text-foreground/85">
             {`cd hub\n.venv/bin/python scripts/roster_tool.py add ${pub ?? "<key>"} \\\n  --hub http://localhost:8001 --operator demo/operator.key`}
           </pre>
-          <p className="mt-2">It syncs to the other hub by itself.</p>
+          <p className="py-3">It syncs to the other hub by itself.</p>
         </details>
       </div>
     </PhoneShell>

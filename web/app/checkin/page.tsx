@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { UserCheckIcon } from "lucide-react";
 import { Choice, Label, PhoneShell, ReportForm, TextArea, TextInput } from "@/components/phone";
 
 export default function CheckinPage() {
@@ -15,7 +16,7 @@ export default function CheckinPage() {
   };
 
   return (
-    <PhoneShell title="Check in" hint="Let people know where you are and how you're doing.">
+    <PhoneShell title="Check in" icon={<UserCheckIcon />} hint="Let people know where you are and how you're doing.">
       <ReportForm type="checkin" payload={payload} onSent={() => { setStatus(null); setNote(""); }}>
         <div>
           <Label>How are you?</Label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { StethoscopeIcon } from "lucide-react";
 import { Choice, Label, PhoneShell, ReportForm, TextArea, TextInput } from "@/components/phone";
 
 const SYMPTOMS = [
@@ -29,6 +30,7 @@ export default function SymptomsPage() {
   return (
     <PhoneShell
       title="Report symptoms"
+      icon={<StethoscopeIcon />}
       hint="Tell responders what you're seeing. This records symptoms. It does not diagnose."
     >
       <ReportForm type="case" payload={payload} onSent={() => { setSymptoms([]); setPeople(""); setText(""); }}>

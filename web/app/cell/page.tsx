@@ -8,7 +8,9 @@
 // it saves the key on this phone and wipes it from the address bar.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Label, PhoneShell, TextArea, useStored } from "@/components/phone";
+import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon, LockKeyholeIcon, PlusIcon, QrCodeIcon, SendIcon } from "lucide-react";
+import { Label, LevelSelect, Notice, PhoneShell, TextArea, useStored } from "@/components/phone";
+import { Button } from "@/components/ui/button";
 import { QR } from "@/components/qr";
 import { addEvent, hubUrl, listEvents } from "@/lib/hub";
 import { CELL_EVENT_TYPE, decrypt, encrypt, inviteLink, isCellPayload, keyFromHash, keyTag, loadCellKey, newCellKey, saveCellKey } from "@/lib/cell";
@@ -103,105 +105,95 @@ export default function CellPage() {
     setShowInvite(false);
   }
 
-  if (!ready) return <PhoneShell title="Cell messages">{null}</PhoneShell>;
+  const shell = { title: "Cell messages", eyebrow: "Your cell", icon: <LockKeyholeIcon /> };
+
+  if (!ready) return <PhoneShell {...shell}>{null}</PhoneShell>;
 
   if (!key)
     return (
-      <PhoneShell title="Cell messages" hint="Messages only your cell can read. The hubs carry them but can't open them.">
+      <PhoneShell {...shell} hint="Messages only your cell can read. The hubs carry them but can't open them.">
         <div className="space-y-4">
-          <p className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
-            This phone isn&apos;t in a cell. Ask a member to show you their invite, in person, and open it on this phone.
-          </p>
-          <button type="button" onClick={startCell} className="min-h-12 w-full rounded-lg border border-[var(--border-strong)] px-3 text-base">
-            Start a new cell
-          </button>
-          {others > 0 && <p className="text-sm text-[var(--muted)]">{others} sealed message{others === 1 ? "" : "s"} on the hub. Without the key they&apos;re unreadable.</p>}
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+            <QrCodeIcon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+            <p>This phone isn&apos;t in a cell. Ask a member to show you their invite, in person, and scan it with this phone&apos;s camera.</p>
+          </div>
+          <Button type="button" variant="outline" size="lg" onClick={startCell} className="h-12 w-full">
+            <PlusIcon aria-hidden="true" /> Start a new cell
+          </Button>
+          {others > 0 && <p className="text-sm text-muted-foreground">{others} sealed message{others === 1 ? "" : "s"} on the hub. Without the key they&apos;re unreadable.</p>}
         </div>
       </PhoneShell>
     );
 
   return (
-    <PhoneShell title="Cell messages" hint="Only phones holding this cell's key can read these. The hubs and anyone tapping the link see ciphertext.">
-      <div className="space-y-6">
+    <PhoneShell {...shell} hint="Only phones holding this cell's key can read these. The hubs and anyone tapping the link see ciphertext.">
+      <div className="space-y-7">
         <form onSubmit={send} className="space-y-4">
-          <label className="block">
-            <Label>Your level</Label>
-            <select
-              value={level ?? ""}
-              onChange={(e) => setLevel(e.target.value ? Number(e.target.value) : null)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-base"
-              required
-            >
-              <option value="">Choose your level</option>
-              {Array.from({ length: 40 }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  Level {n}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LevelSelect level={level} setLevel={setLevel} />
           <label className="block">
             <Label>Message to the cell</Label>
             <TextArea value={text} onChange={(e) => setText(e.target.value)} placeholder="Meet at the east stairwell, 0300." maxLength={500} />
           </label>
-          <button
-            type="submit"
-            disabled={!text.trim() || level === null || status.state === "sending"}
-            className="min-h-14 w-full rounded-lg bg-[var(--accent)] px-4 text-lg font-semibold text-white disabled:opacity-40"
-          >
-            {status.state === "sending" ? "Sending…" : "Send encrypted"}
-          </button>
-          <div aria-live="polite">
-            {status.state === "sent" && (
-              <p className="rounded-lg border border-[var(--ok)] px-3 py-3">Sent encrypted{status.signed ? " and signed" : ""}.</p>
+          <Button type="submit" size="lg" disabled={!text.trim() || level === null || status.state === "sending"} className="h-14 w-full text-lg font-semibold">
+            {status.state === "sending" ? (
+              <>
+                <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> Sending…
+              </>
+            ) : (
+              <>
+                <SendIcon aria-hidden="true" /> Send encrypted
+              </>
             )}
-            {status.state === "error" && <p className="rounded-lg border border-[var(--danger)] px-3 py-3">{status.message}</p>}
+          </Button>
+          <div aria-live="polite">
+            {status.state === "sent" && <Notice tone="ok" icon={<CircleCheckIcon />}>Sent encrypted{status.signed ? " and signed" : ""}.</Notice>}
+            {status.state === "error" && <Notice tone="danger" icon={<CircleAlertIcon />}>{status.message}</Notice>}
           </div>
         </form>
 
         <section>
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold">Messages</h2>
-            <span className="font-mono text-xs text-[var(--muted)]">cell key {keyTag(key)}</span>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="caption">Messages</p>
+            <span className="rounded-full border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">cell key {keyTag(key)}</span>
           </div>
           {hubDown && <p className="mt-2 text-sm text-[var(--danger)]">Can&apos;t reach the hub. Showing what was loaded.</p>}
-          {events === null && !hubDown && <p className="mt-2 text-[var(--muted)]">Loading…</p>}
-          {events !== null && mine.length === 0 && <p className="mt-2 text-[var(--muted)]">No messages for this cell yet.</p>}
+          {events === null && !hubDown && <p className="mt-3 text-muted-foreground">Loading…</p>}
+          {events !== null && mine.length === 0 && <p className="mt-3 text-muted-foreground">No messages for this cell yet.</p>}
           <ul className="mt-3 space-y-2">
             {mine.map(({ e, body }) => (
-              <li key={e.id} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+              <li key={e.id} className="rounded-xl border border-border bg-card px-4 py-3">
                 <p className="whitespace-pre-wrap break-words">{body}</p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
+                <p className="mt-1.5 font-mono text-xs text-muted-foreground">
                   {e.author} · L{e.level} · {timeAgo(e.created_at, Date.now())}
-                  {e.sig ? " · signed" : " · not signed"}
+                  <span style={{ color: e.sig ? "var(--ok)" : "var(--muted)" }}>{e.sig ? " · signed" : " · not signed"}</span>
                 </p>
               </li>
             ))}
           </ul>
           {others > 0 && (
-            <p className="mt-3 text-sm text-[var(--muted)]">
+            <p className="mt-3 text-sm text-muted-foreground">
               {others} more sealed message{others === 1 ? "" : "s"} on the hub for other cells.
             </p>
           )}
         </section>
 
         <section className="space-y-3">
-          <button type="button" onClick={() => setShowInvite((v) => !v)} className="min-h-12 w-full rounded-lg border border-[var(--border-strong)] px-3 text-base">
-            {showInvite ? "Hide invite" : "Invite someone (in person)"}
-          </button>
+          <Button type="button" variant="outline" size="lg" onClick={() => setShowInvite((v) => !v)} className="h-12 w-full">
+            <QrCodeIcon aria-hidden="true" /> {showInvite ? "Hide invite" : "Invite someone (in person)"}
+          </Button>
           {showInvite && (
-            <div className="rounded-xl border border-[var(--warn)] p-4">
+            <div className="rounded-xl border p-4" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, var(--panel))" }}>
               <p className="text-sm">
                 Scan this with the new member&apos;s phone camera. Anyone who opens it can read the cell, so show it face to face,
                 never send it over the hub.
               </p>
-              <div className="mt-3">
+              <div className="mt-3 rounded-lg bg-white p-2">
                 <QR value={inviteLink(key, window.location.origin)} label="QR code of the cell invite link" />
               </div>
-              <p className="mt-3 select-all break-all font-mono text-xs">{inviteLink(key, window.location.origin)}</p>
+              <p className="mt-3 select-all break-all font-mono text-xs text-foreground/80">{inviteLink(key, window.location.origin)}</p>
             </div>
           )}
-          <button type="button" onClick={leave} className="w-full py-2 text-sm text-[var(--muted)] underline">
+          <button type="button" onClick={leave} className="min-h-11 w-full text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
             Remove the cell key from this phone
           </button>
         </section>

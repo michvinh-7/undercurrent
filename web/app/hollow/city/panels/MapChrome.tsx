@@ -51,7 +51,7 @@ function LegendBody() {
     <>
       <p className="font-semibold text-[var(--foreground)]">How to read this map</p>
       <ul className="mt-2 space-y-1.5">
-        <Swatch c="#4b5266">Homes and workshops (grey roofs)</Swatch>
+        <Swatch c="#5e667e">Homes and workshops (grey roofs)</Swatch>
         <Swatch c="#9a5f55">Clinics and hospitals</Swatch>
         <Swatch c="#5f7d6b">Shelters</Swatch>
         <Swatch c="#3b82c4">Pipe carrying water; arrows show which way it flows</Swatch>
