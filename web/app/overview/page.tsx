@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import { BEATS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
+import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
+import { timeAgo } from "@/lib/format";
 
 type Tone = "ok" | "warn" | "danger" | "muted";
 const TONE: Record<Tone, string> = { ok: "var(--ok)", warn: "var(--warn)", danger: "var(--danger)", muted: "var(--muted)" };
@@ -325,6 +327,85 @@ function TriageSection({ net }: { net: Undercurrent }) {
   );
 }
 
+const SURFACE_BOX = "canary-surface";
+
+/** Question 13: is the surface safe? The Directorate's claim next to the newest signed reading from the box at the top of the shaft. */
+function SurfaceSection({ net, q }: { net: Undercurrent; q: string }) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, []);
+  const readings = net.events.filter((e) => e.device_id === SURFACE_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const latest = readings[0];
+  const p = (latest?.payload ?? {}) as { reading?: { value?: unknown; unit?: unknown }; oxygen_pct?: unknown; note?: unknown };
+  const co2 = typeof p.reading?.value === "number" ? `${p.reading.value} ${String(p.reading.unit ?? "")}`.trim() : null;
+  const o2 = typeof p.oxygen_pct === "number" ? `${p.oxygen_pct}%` : null;
+  const verified = latest ? net.isVerified(latest) : false;
+  const simulated = latest ? isSimulated(latest) : false;
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>Is the surface safe?</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Their word against a signed reading</h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          A box at the top of the shaft measures the surface air and signs every reading with its own key. Hubs refuse anything else, so
+          neither the Directorate nor anyone in the Hollow can fake what it says.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Card className="gap-3 p-6" style={{ borderColor: "color-mix(in srgb, var(--directorate) 55%, var(--border))" }}>
+          <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--directorate)]">
+            <MegaphoneIcon className="size-4" aria-hidden="true" /> The Directorate says
+          </span>
+          <p className="text-2xl font-semibold leading-snug">&ldquo;{DIRECTORATE_SURFACE_CLAIM}.&rdquo;</p>
+          <p className="text-sm text-muted-foreground">Unsigned. No reading, no sensor, no way to check it.</p>
+        </Card>
+        <Card className="gap-3 p-6" style={{ borderColor: latest ? (verified ? "var(--ok)" : "var(--warn)") : "var(--border)" }} aria-live="polite">
+          <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: latest ? "var(--ok)" : "var(--muted)" }}>
+            <CloudSunIcon className="size-4" aria-hidden="true" /> The surface box measured
+          </span>
+          {latest ? (
+            <>
+              <dl className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Oxygen</dt>
+                  <dd className="font-mono text-3xl font-medium tabular-nums">{o2 ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">CO₂</dt>
+                  <dd className="font-mono text-3xl font-medium tabular-nums">{co2 ?? "—"}</dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {verified ? <Badge variant="outline" className="border-[var(--ok)] text-[var(--ok)]">✓ Signed by the box</Badge> : <Badge variant="outline" className="border-[var(--warn)] text-[var(--warn)]">Not verified</Badge>}
+                {simulated && <Badge variant="outline" className="border-[var(--sim)] text-[var(--sim)]">Simulated</Badge>}
+                <span className="text-xs text-muted-foreground">
+                  {latest.hub_id}{now ? ` · ${timeAgo(latest.created_at, now)}` : ""} · {readings.length} reading{readings.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {simulated
+                  ? "From the simulation, signed exactly like a real box would. Normal air is about 21% oxygen and 420 ppm CO₂."
+                  : "Normal air is about 21% oxygen and 420 ppm CO₂."}
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              No surface reading yet. The simulation sends one about 30 seconds into its run (<code className="font-mono text-sm">sim/simulate.py run</code>).
+            </p>
+          )}
+          <Button asChild variant="outline" size="sm" className="self-start">
+            <Link href={`/hollow${q}`}>See it in the map&apos;s Briefs (question 13) <ArrowRightIcon /></Link>
+          </Button>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
@@ -482,6 +563,8 @@ export default function Overview() {
         </section>
 
         <TriageSection net={net} />
+
+        <SurfaceSection net={net} q={q} />
 
         {/* Results */}
         <section className="flex flex-col gap-5">
