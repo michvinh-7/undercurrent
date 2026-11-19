@@ -1,5 +1,5 @@
 {
-  "_note": "The simulated Hollow (sim/simulate.py). Level pair: hub-L34 and hub-L12, as used everywhere else. Levels 12, 34 and 35 are the ones the Hollow map shows first. Times in the timeline are seconds at --minutes 3; other lengths scale them. Readings are integers (no floats in signed payloads).",
+  "_note": "The simulated Hollow (sim/simulate.py). Level pair: hub-L34 and hub-L12, as used everywhere else. Levels 12, 34 and 35 are the ones the Hollow map shows first. Times in the timeline are seconds at --minutes 3; other lengths scale them. Readings are integers (no floats in signed payloads), so surface oxygen is rounded to a whole percent.",
   "levels": 40,
   "deep_levels": [31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
   "hubs": [
@@ -11,7 +11,8 @@
     { "device_id": "canary-35-clinic", "level": 35, "at": "clinic" },
     { "device_id": "canary-34-market", "level": 34, "at": "market" },
     { "device_id": "canary-34-school", "level": 34, "at": "school" },
-    { "device_id": "canary-12-relay", "level": 12, "at": "relay" }
+    { "device_id": "canary-12-relay", "level": 12, "at": "relay" },
+    { "device_id": "canary-surface", "level": 1, "at": "surface intake, top of the shaft" }
   ],
   "residents": [
     { "id": "res-35-a", "level": 35, "handle": "anon-35a1" },
@@ -34,6 +35,7 @@
     { "t": 12,  "by": "res-35-a", "type": "hazard", "payload": { "kind": "flooding", "severity": "medium", "location": "Cistern Row", "note": "Water coming up through the drains" } },
     { "t": 20,  "by": "canary-35-clinic", "type": "hazard", "payload": { "kind": "flooding", "severity": "high", "reading": { "value": 9, "unit": "cm" }, "note": "Water rising past the threshold" } },
     { "t": 28,  "by": "res-35-b", "type": "checkin", "payload": { "status": "need_help", "note": "Water at our door on Cistern Row. My father can't walk." } },
+    { "t": 30,  "by": "canary-surface", "type": "hazard", "payload": { "kind": "other", "severity": "low", "reading": { "value": 412, "unit": "ppm CO₂" }, "oxygen_pct": 21, "note": "Surface intake, top of the shaft: air normal" } },
     { "t": 34,  "by": "res-12-a", "type": "checkin", "payload": { "status": "ok", "note": "All fine on 12 for now" } },
     { "t": 40,  "by": "canary-35-clinic", "type": "hazard", "payload": { "kind": "flooding", "severity": "high", "reading": { "value": 17, "unit": "cm" }, "note": "Clinic ground floor flooding" } },
     { "t": 46,  "by": "res-35-a", "type": "hazard", "payload": { "kind": "flooding", "severity": "high", "location": "Central Way", "note": "Central Way is under water, can't get through" } },
@@ -42,6 +44,7 @@
     { "t": 70,  "by": "res-34-c", "type": "hazard", "payload": { "kind": "bad_water", "severity": "high", "location": "Cistern Row", "note": "Whole block's water tastes of metal" } },
     { "t": 78,  "by": "res-34-d", "type": "case", "payload": { "symptoms": ["vomiting", "stomach pain"], "people_affected": 3, "raw_text": "Three of us vomiting after drinking from the tap", "photo_id": null, "medical_card": null } },
     { "t": 86,  "by": "res-35-b", "type": "case", "payload": { "symptoms": ["diarrhea", "fever"], "people_affected": 1, "raw_text": "My father has a fever and diarrhea now", "photo_id": null, "medical_card": null } },
+    { "t": 92,  "by": "canary-surface", "type": "hazard", "payload": { "kind": "other", "severity": "low", "reading": { "value": 415, "unit": "ppm CO₂" }, "oxygen_pct": 21, "note": "Surface intake, top of the shaft: air normal" } },
     { "t": 98,  "by": "canary-34-market", "type": "hazard", "payload": { "kind": "bad_air", "severity": "medium", "reading": { "value": 1250, "unit": "ppm CO₂" }, "note": "Market fan slowing, CO₂ rising" } },
     { "t": 106, "by": "res-34-c", "type": "hazard", "payload": { "kind": "bad_air", "severity": "medium", "location": "the market", "note": "Air feels thick in the market, people coughing" } },
     { "t": 114, "by": "canary-34-market", "type": "hazard", "payload": { "kind": "bad_air", "severity": "high", "reading": { "value": 1850, "unit": "ppm CO₂" }, "note": "Fan stalled, CO₂ rising" } },
@@ -54,6 +57,7 @@
     { "t": 154, "by": "canary-34-school", "type": "hazard", "payload": { "kind": "heat", "severity": "high", "reading": { "value": 39, "unit": "°C" } } },
     { "t": 160, "by": "res-12-b", "type": "hazard", "payload": { "kind": "blackout", "severity": "medium", "location": "North Gallery", "note": "Lights flickering all along North Gallery" } },
     { "t": 166, "by": "canary-12-relay", "type": "hazard", "payload": { "kind": "blackout", "severity": "high", "expected_in_min": 20, "reading": { "value": 168, "unit": "V" }, "note": "Supply voltage dropping" } },
+    { "t": 170, "by": "canary-surface", "type": "hazard", "payload": { "kind": "other", "severity": "low", "reading": { "value": 410, "unit": "ppm CO₂" }, "oxygen_pct": 21, "note": "Surface intake, top of the shaft: air normal" } },
     { "t": 172, "by": "res-34-c", "type": "case", "payload": { "symptoms": ["cough", "dizziness"], "people_affected": 2, "raw_text": "Coughing and dizzy, we left the market", "photo_id": null, "medical_card": null } },
     { "t": 178, "by": "res-12-a", "type": "checkin", "payload": { "status": "ok", "name": "Ines Varga", "note": "Ines made it up to 12, she's with us" } }
   ],
