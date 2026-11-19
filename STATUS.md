@@ -28,7 +28,7 @@ The demo is done when all five beats work on the flat console.
 2. **A full phone run (Michael and Taheful).** Two phones on the hotspot: join, all 4 reports signed, a cell message both ways, the sim, then revoke a phone.
 3. ~~The level pair~~: L34 and L12, now in `sim/world.json` too.
 
-**Web setup (merged, PR #12):** every web dependency is in at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. Run `npm install` in `web/`. Nobody adds a dependency without posting first. *(Thu: `qrcode-generator` 1.4.4 added for the QR codes on `/join` and `/cell`.)*
+**Web setup (merged, PR #12):** every web dependency is in at an exact version (tweetnacl, three, the react-three libraries, react pinned to 19.3.1), plus `listRejected()` and `getRoster()` in `web/lib/hub.ts`. Run `npm install` in `web/`. Nobody adds a dependency without posting first. *(Thu: `qrcode-generator` 1.4.4 added for the QR codes on `/join` and `/cell`, and `three-stdlib` 2.36.1 pinned directly, since the map imports it and it only came in through drei.)*
 
 **Working branches:** renamed Tue 11/17 for the rework, all starting from that day's `main`. The old ones are deleted.
 
