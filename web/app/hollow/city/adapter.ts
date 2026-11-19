@@ -61,6 +61,8 @@ export interface MapEvent {
   demo: boolean;
   /** A test alert made on the map page (id "test-…"), never from a hub and never verified. */
   test: boolean;
+  /** Sent by the simulation (payload.simulated, inside the signature): verified, but not a real box or resident. */
+  simulated: boolean;
   time: number;
 }
 
@@ -112,7 +114,7 @@ export function adaptEvent(raw: unknown, world: CityWorld, opts: AdaptOptions): 
   return {
     id: e.id, event: e, level, onMap, place,
     severity: severityOf(e), verified, origin: isSensor(e) ? "sensor" : "report",
-    demo: opts.demo, test: e.id.startsWith("test-"), time: Number.isFinite(t) ? t : 0,
+    demo: opts.demo, test: e.id.startsWith("test-"), simulated: payloadOf(e).simulated === true, time: Number.isFinite(t) ? t : 0,
   };
 }
 

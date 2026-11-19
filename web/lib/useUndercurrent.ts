@@ -88,6 +88,8 @@ const emptyHub = (role: HubState["role"], url: string): HubState => ({
 /** A cell message: its payload is ciphertext only members can open. */
 export const isEncrypted = (e: Pick<HollowEvent, "payload">) => e.payload?.enc === true;
 export const isSensor = (e: Pick<HollowEvent, "source">) => e.source === "sensor";
+/** Sent by sim/simulate.py: "simulated": true sits inside the signed payload, so nobody else can add or strip it. */
+export const isSimulated = (e: Pick<HollowEvent, "payload">) => e.payload?.simulated === true;
 export const SOS_PRIORITY = 0.9; // matches the SOS band in hub/app/triage.py score()
 export const isSOS = (e: HollowEvent) =>
   (e.priority ?? 0) >= SOS_PRIORITY || (e.type === "checkin" && e.payload.status === "need_help");

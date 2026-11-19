@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
-import { isEncrypted, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
+import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import { BEATS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
 
 type Tone = "ok" | "warn" | "danger" | "muted";
@@ -54,7 +54,7 @@ function useProofs(net: Undercurrent): Record<BeatId, Proof> {
   return useMemo(() => {
     const live = net.mode === "live";
     const box = net.events.filter((e) => e.device_id === REAL_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    const simBoxes = new Set(net.events.filter((e) => e.device_id && e.device_id !== REAL_BOX).map((e) => e.device_id));
+    const simBoxes = new Set(net.events.filter((e) => e.device_id && e.device_id !== REAL_BOX && isSimulated(e)).map((e) => e.device_id));
     const link = net.sendingHub?.link ?? null;
     const sealed = net.events.filter(isEncrypted).length;
     const intact = net.chain ? net.chain.chain_intact : null;

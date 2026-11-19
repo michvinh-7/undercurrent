@@ -61,14 +61,19 @@ export default function CityApp() {
   const demo = net.mode === "demo";
   // Test alerts made on this page (sensor kinds the hardware doesn't send yet). Never sent to a hub.
   const [tests, setTests] = useState<HollowEvent[]>([]);
+  // The "Test a sensor alert" panel shows only with ?test= in the address, so a stray click
+  // during the live demo can't put fake alerts on the map.
+  const [testMode, setTestMode] = useState(false);
   const events = useMemo(() => adaptEvents([...net.events, ...tests], world, { isVerified: net.isVerified, demo }), [net.events, tests, net.isVerified, world, demo]);
   const fresh = useMemo(() => {
     const now = Date.now();
     return new Set(events.filter((e) => net.isFresh(e.id) || (e.test && now - e.time < 8000)).map((e) => e.id));
   }, [events, net]);
-  // ?test=bad_air,blackout_soon preloads test alerts (for checking and filming). Presets: see TestAlerts.
+  // ?test= shows the test panel; ?test=bad_air,blackout_soon also preloads those alerts. Presets: see TestAlerts.
   useEffect(() => {
     const list = new URLSearchParams(window.location.search).get("test");
+    if (list === null) return;
+    setTestMode(true);
     if (!list) return;
     const now = Date.now();
     setTests(list.split(",").filter((p): p is TestPreset => isPreset(p)).map((p, i) => testEvent(p, now - i * 1000)));
@@ -289,7 +294,7 @@ export default function CityApp() {
       whatIf={
         <div className="flex flex-col gap-3">
           <WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} />
-          <TestAlerts onSend={sendTest} onClear={() => setTests([])} count={tests.length} />
+          {testMode && <TestAlerts onSend={sendTest} onClear={() => setTests([])} count={tests.length} />}
         </div>
       }
       feed={<Feed events={events} fresh={fresh} demo={demo} onPick={feedPick} onDemoAlert={() => net.actions.demoSensorAlert(34)} filter={feedFilter} setFilter={setFeedFilter} query={query} setQuery={setQuery} />}
