@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Thu 11/19 (afternoon, after phone signing, cell messages and the simulation) by Michael
+**Last updated:** Thu 11/19 (evening, after the judges' overview, the shared top bar and one theme across every page) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
