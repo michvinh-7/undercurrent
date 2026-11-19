@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Thu 11/19 (evening, after the judges' overview, the shared top bar and one theme across every page) by Michael
+**Last updated:** Thu 11/19 (afternoon, after the AI triage on `/overview` and the demo clean-up; all of it merged to `main` as PR #36) by Michael
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -15,18 +15,18 @@ The demo is done when all five beats work on the flat console.
 
 | Demo beat | Status |
 |---|---|
-| 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ The box isn't started. The hub side is ready: it checks the signature and the roster before storing anything |
+| 1. Water touches the probe on level 34's box; the alert lands on the other hub with a "verified" badge | ❌ No box code pushed yet (`tisya/canary-box` has nothing new since Tue). The hub side is ready. **Fallback if the box misses the video:** the sim's boxes (tagged "Simulated") plus a phone filing a signed "I need help" check-in show the same path: signed, checked, synced, verified on the other hub |
 | 2. The Directorate cuts the link; alerts queue and all arrive on reconnect, none duplicated | ✅ Hub side merged (PRs #14, #19): 200 of 200 alerts on both hubs after 26 random cuts, 0 duplicates. Tested by hand on `/dashboard`: during a cut the sending hub shows "3 waiting to send" and none arrive; after restore all arrive. The console now shows the sending hub's backlog (PR #21) |
 | 3. A forged "all clear" is rejected and the "forgeries blocked" counter goes up | ✅ Hub side done: 0 of 300 forged and replayed messages accepted, all counted in `GET /rejected`. The console's "forgeries blocked" counter is in (PR #21) |
 | 4. An edited record: the chain check points to the exact row | ✅ Hub side done: 160 of 160 edits to the database caught at the exact row by `GET /events/verify`, deleting the newest row included; a deleted row comes back from the other hub in about 1 s. The console's chain check names the edited row (PR #21) |
-| 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ✅ Real cell messages now: `web/lib/cell.ts` and the `/cell` page encrypt on the phone, and `/truth` shows them as bytes. A second phone opens them after scanning the invite QR. *(Taheful: `/truth` still adds its demo message; it can open real ones with `decrypt` + `loadCellKey`.)* |
+| 5. The Directorate sniffs the channel: cell messages are gibberish, public alerts readable | ✅ Real cell messages now: `web/lib/cell.ts` and the `/cell` page encrypt on the phone, and `/truth` shows them as bytes. A second phone opens them after scanning the invite QR. *(Live, `/truth` now shows only real traffic; its demo message appears only when no hub answers.)* |
 
 **Tuesday-night checkpoint (the channel works between two hubs):** the signed-event schema, the hub checks and sync are merged. Since then the console, Directorate view and 3D map are in (PR #21), and sync puts a hub's deleted rows back from the other hub (number 2 is now 160 of 160). On Thursday, phone signing, cell messages and the simulation went in too. Still open: the box.
 
 **Blocking the most people:**
 1. **The Canary box (Tisya).** Beat 1 and headline number 4 need it, and it's the one piece that can't move to someone else.
 2. **A full phone run (Michael and Taheful).** Two phones on the hotspot: join, all 4 reports signed, a cell message both ways, the sim, then revoke a phone.
-3. ~~The level pair~~: L34 and L12, now in `sim/world.json` too.
+3. **The video (Taheful, today).** Script, rehearse twice, record on a production build, not `next dev`.
 
 **Judges' front door (Thu, Michael; front end only):** `/overview` explains the project, shows how one alert travels, and walks the five beats with live proof from the hubs and the exact command for each. A shared top bar on every laptop page (Overview · Console · Map · Directorate view · Phones) shows both hubs, the link, "hubs agree", forgeries blocked, the chain and signing, and keeps `?hub=&peer=` across pages. Built with shadcn/ui (`web/components/ui/`), lucide icons and sonner toasts; the shadcn colours map onto the existing tokens, so nothing else changes colour. *(Taheful: only your old nav links were swapped for the bar in `/dashboard`, `/truth` and the Hollow `TopBar`/`CityApp`.)* The Hollow map now uses the same dark theme (its light `.theme-paper` tokens are kept, unused). The phone pages (home, the 4 reports, `/join`, `/cell`) got the same look: wordmark bar with a hub/signing chip, icons, cards and the shared buttons; no logic changed. Demo clean-up: `/truth` shows its labelled demo cell message only when no hub answers; the map's "Test a sensor alert" panel appears only with `?test=` in the address; the Directorate's figures are labelled as the simulation's bulletin (same numbers as `sim/world.json`). `/overview` also has "How the hub decides what's urgent": type a messy message, the hub's AI triage (`POST /triage`) ranks it live and shows the extracted facts, the priority, where it lands in the queue and which model read it (or "keyword rules" when none is reachable), next to the measured triage numbers.
 
@@ -134,8 +134,8 @@ The priority queue cuts SOS delay by 72% against first-come-first-served on the 
 
 ## Open questions between people
 
-- **Everyone, now:** run `pip install -r hub/requirements.txt` again; it adds `pynacl`. Torch is no longer in it.
-- **Everyone:** pick the level pair (L34/L12 or L38/L12) in the chat.
-- **Everyone:** check the Discord for the submission deadline and the video length limit.
-- **Keep or cut:** the judges' online mirror, and photos with the encrypted medical card. Both were in the old contract; the rework plan doesn't mention them.
+- **Tisya:** is the box going to make the video? If not, say so in the chat now and we film beat 1 with the sim plus a phone SOS (see the beat table).
+- **Everyone:** the video length limit and the submission deadline (judging closes Fri 11/20 11:59 PM EST).
+- **Keep or cut:** the judges' online mirror, and photos with the encrypted medical card. Neither is built; both go under "future work" unless someone picks them up.
 - **Sign-off:** each person ticks their box in the reworked team contract once they've read it.
+- ~~Level pair~~: L34 and L12. ~~`pip install` for pynacl~~: done.
