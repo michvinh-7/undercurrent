@@ -74,7 +74,7 @@ export default function CityScene(props: CitySceneProps) {
   return (
     <div className="relative h-full w-full">
     <Canvas
-      shadows
+      shadows="percentage"
       dpr={[1, 2]}
       camera={{ position: [150, 190, 230], fov: 35, near: 1, far: 3000 }}
       onPointerMissed={() => props.onSelect(null)}

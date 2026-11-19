@@ -55,7 +55,8 @@ function flat(polys: XZ[][], y: number, depth = 0): THREE.BufferGeometry | null 
     const g = depth > 0 ? new THREE.ExtrudeGeometry(shapeOf(p), { depth, bevelEnabled: false }) : new THREE.ShapeGeometry(shapeOf(p));
     g.rotateX(-Math.PI / 2);
     g.translate(0, y, 0);
-    return depth > 0 ? g.toNonIndexed() : g;
+    // Only indexed geometry needs converting (three warns, once per shape, otherwise).
+    return depth > 0 && g.index ? g.toNonIndexed() : g;
   });
   const out = mergeGeometries(geos, false);
   geos.forEach((g) => g.dispose());
