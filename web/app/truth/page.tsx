@@ -7,7 +7,7 @@
 // Until web/lib/cell.ts lands, one labeled demo cell message is encrypted here in the browser
 // with tweetnacl secretbox and a demo key, so its ciphertext is real, not drawn.
 
-import Link from "next/link";
+import { AppBar } from "@/components/app-bar";
 import { useEffect, useMemo, useState } from "react";
 import nacl from "tweetnacl";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
@@ -82,6 +82,8 @@ export default function Truth() {
   const pub = traffic.length - encrypted;
 
   return (
+    <>
+    <AppBar net={net} />
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -93,10 +95,6 @@ export default function Truth() {
             without the cell key, including the hubs that carry them.
           </p>
         </div>
-        <nav className="flex gap-3 text-sm text-[var(--muted)]">
-          <Link href="/dashboard" className="hover:text-[var(--foreground)]">← Console</Link>
-          <Link href="/hollow" className="hover:text-[var(--foreground)]">The Hollow →</Link>
-        </nav>
       </header>
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -132,6 +130,7 @@ export default function Truth() {
         </ul>
       </section>
     </main>
+    </>
   );
 }
 

@@ -2,7 +2,6 @@
 
 // Top bar: the level tabs (the only navigation), add a level, and the view controls.
 
-import Link from "next/link";
 import { useState } from "react";
 import type { Undercurrent } from "@/lib/useUndercurrent";
 import type { summarize } from "../adapter";
@@ -60,8 +59,6 @@ export default function TopBar(p: {
         <label className="hidden items-center gap-1.5 text-xs text-[var(--muted)] lg:flex">
           <input type="checkbox" checked={p.follow} onChange={(e) => p.setFollow(e.target.checked)} /> Follow alerts
         </label>
-        <Link href="/dashboard" className="hidden text-xs text-[var(--muted)] underline-offset-2 hover:underline sm:inline">Console</Link>
-        <Link href="/truth" className="hidden text-xs text-[var(--muted)] underline-offset-2 hover:underline sm:inline">Directorate view</Link>
       </div>
     </header>
   );

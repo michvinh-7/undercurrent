@@ -1,0 +1,353 @@
+"use client";
+
+// The judges' front door: what Undercurrent is, how one alert travels, and each of the five
+// demo beats with live proof from the hubs and the exact command that shows it. Nothing
+// here is made up: counts come from useUndercurrent (the same data as the console), and
+// "Waiting for the box" stays until the real canary-34 sends something.
+
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast, Toaster } from "sonner";
+import {
+  ArrowLeftRightIcon, ArrowRightIcon, CheckIcon, CopyIcon, DropletIcon, ServerIcon, SmartphoneIcon,
+} from "lucide-react";
+import { AppBar, useCarriedQuery } from "@/components/app-bar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAgreement } from "@/lib/useAgreement";
+import { isEncrypted, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
+import { BEATS, RESULTS, type BeatId } from "./beats";
+
+type Tone = "ok" | "warn" | "danger" | "muted";
+const TONE: Record<Tone, string> = { ok: "var(--ok)", warn: "var(--warn)", danger: "var(--danger)", muted: "var(--muted)" };
+interface Proof { tone: Tone; short: string; headline: string; detail: string }
+
+const REAL_BOX = "canary-34";
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">{children}</p>;
+}
+
+function Dot({ tone }: { tone: Tone }) {
+  return <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: TONE[tone] }} aria-hidden="true" />;
+}
+
+/** Remembers the most alerts that waited during the current or last cut, so "3 queued, 3 delivered" survives the restore. */
+function useLastCut(net: Undercurrent) {
+  const link = net.sendingHub?.link ?? null;
+  const [last, setLast] = useState<{ peak: number; open: boolean } | null>(null);
+  useEffect(() => {
+    if (!link) return;
+    setLast((cur) => {
+      if (link.cut) return { peak: Math.max(cur?.open ? cur.peak : 0, link.queued), open: true };
+      if (cur?.open) return { peak: cur.peak, open: false };
+      return cur;
+    });
+  }, [link]);
+  return last;
+}
+
+function useProofs(net: Undercurrent): Record<BeatId, Proof> {
+  const lastCut = useLastCut(net);
+  return useMemo(() => {
+    const live = net.mode === "live";
+    const box = net.events.filter((e) => e.device_id === REAL_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const simBoxes = new Set(net.events.filter((e) => e.device_id && e.device_id !== REAL_BOX).map((e) => e.device_id));
+    const link = net.sendingHub?.link ?? null;
+    const sealed = net.events.filter(isEncrypted).length;
+    const intact = net.chain ? net.chain.chain_intact : null;
+    const reason = net.rejected[0]?.reason;
+    return {
+      box: box
+        ? { tone: net.isVerified(box) ? "ok" : "warn", short: net.isVerified(box) ? "Box verified" : "Box not verified",
+            headline: `${String(box.payload.kind ?? "alert")} from ${REAL_BOX}`, detail: `${box.hub_id} · ${new Date(box.created_at).toLocaleTimeString()}${net.isVerified(box) ? " · verified" : " · signature not on the roster"}` }
+        : { tone: "warn", short: "Waiting for the box", headline: "Waiting for the box",
+            detail: simBoxes.size ? `${simBoxes.size} simulated box${simBoxes.size === 1 ? " is" : "es are"} reporting, labelled simulated.` : "No sensor alerts yet. The sim can fill the hubs while the box is away." },
+      cut: !link
+        ? { tone: "muted", short: "No link info", headline: "Link status unavailable", detail: live ? "The sending hub hasn't reported its link yet." : "Connect to the hubs to see the link." }
+        : link.cut
+          ? { tone: "warn", short: `${link.queued} waiting`, headline: `Link cut · ${link.queued} waiting`, detail: "Nothing is lost: they sit in the sending hub's queue until the link is back." }
+          : lastCut && !lastCut.open && lastCut.peak > 0
+            ? { tone: link.queued ? "warn" : "ok", short: link.queued ? `${link.queued} still sending` : "Link up", headline: link.queued ? `Restored · ${link.queued} still sending` : `Last cut: ${lastCut.peak} queued, all delivered`, detail: "The waiting count dropped to zero after the restore." }
+            : { tone: "ok", short: "Link up", headline: `Link up · ${link.queued} waiting`, detail: "Cut it to show the queue fill and drain." },
+      forge: net.forgeriesBlocked > 0
+        ? { tone: "ok", short: `${net.forgeriesBlocked} blocked`, headline: `${net.forgeriesBlocked} ${net.forgeriesBlocked === 1 ? "forgery" : "forgeries"} blocked`, detail: reason ? `Latest reason: ${reason}.` : "Each one is listed with its reason." }
+        : { tone: "muted", short: "None tried yet", headline: "No forgeries tried yet", detail: "Send one: it's refused and counted." },
+      edit: intact === false
+        ? { tone: "danger", short: "Row flagged", headline: `Chain broken at ${net.chain?.first_bad_event?.slice(0, 8) ?? "a row"}`, detail: "The other hub still holds the original, so the truth survives the edit." }
+        : intact === true
+          ? { tone: "ok", short: "Chain intact", headline: "Chain intact", detail: "Every row's hash matches the row before it." }
+          : { tone: "muted", short: "Not checked yet", headline: "Chain not checked yet", detail: "The console checks it every few seconds." },
+      sniff: sealed > 0
+        ? { tone: "ok", short: `${sealed} sealed`, headline: `${sealed} sealed cell message${sealed === 1 ? "" : "s"} · ${net.events.length - sealed} public`, detail: "Hubs relay the sealed ones without being able to open them." }
+        : { tone: "muted", short: "None sent yet", headline: "No cell messages yet", detail: "Send one from a phone's Cell messages page." },
+    };
+  }, [net, lastCut]);
+}
+
+/** Toasts for things that happen after the page has loaded, never for the stored backlog. */
+function useLiveToasts(net: Undercurrent) {
+  const seen = useRef<{ forgeries: number; cut: boolean; intact: boolean | null; box: string | null } | null>(null);
+  useEffect(() => {
+    if (net.mode !== "live") return;
+    const box = net.events.filter((e) => e.device_id === REAL_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const now = { forgeries: net.forgeriesBlocked, cut: !!net.sendingHub?.link?.cut, intact: net.chain ? net.chain.chain_intact : null, box: box?.id ?? null };
+    const before = seen.current;
+    seen.current = now;
+    if (!before) return; // first live snapshot: remember, don't announce
+    if (now.forgeries > before.forgeries) toast.error(`Forgery refused${net.rejected[0]?.reason ? `: ${net.rejected[0].reason}` : ""}`, { description: `${now.forgeries} blocked so far` });
+    if (now.cut && !before.cut) toast.warning("Link cut", { description: "Alerts now queue on the sending hub." });
+    if (!now.cut && before.cut) toast.success("Link restored", { description: "Queued alerts are on their way." });
+    if (now.intact === false && before.intact !== false) toast.error("Chain broken", { description: `Edited record at ${net.chain?.first_bad_event?.slice(0, 8) ?? "a row"}` });
+    if (now.intact === true && before.intact === false) toast.success("Chain intact again");
+    if (now.box && now.box !== before.box && box && net.isFresh(box.id)) toast.success(`Box alert: ${String(box.payload.kind ?? "alert")}`, { description: `${REAL_BOX} → ${box.hub_id}${net.isVerified(box) ? ", verified" : ""}` });
+  }, [net]);
+}
+
+function CopyCommand({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const isCommand = !text.startsWith("Phone:");
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-border bg-background p-2.5 pl-3">
+      <code className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-[12.5px] leading-relaxed text-foreground/85">{text}</code>
+      {isCommand && (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Copy command"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function FlowNode({ icon, title, body, tone }: { icon: React.ReactNode; title: string; body: string; tone: Tone }) {
+  return (
+    <div className="flex min-w-0 flex-[1_1_170px] flex-col gap-1.5 rounded-lg border bg-background p-3.5" style={{ borderColor: TONE[tone] }}>
+      {icon}
+      <span className="font-semibold">{title}</span>
+      <span className="text-[13px] text-muted-foreground">{body}</span>
+    </div>
+  );
+}
+
+function FlowArrow({ label, tone, dashed, back }: { label: string; tone: Tone; dashed?: boolean; back?: boolean }) {
+  return (
+    <div className="hidden flex-none flex-col items-center justify-center gap-0.5 self-center font-mono text-[11px] sm:flex" style={{ color: tone === "muted" ? "var(--muted)" : TONE[tone] }}>
+      {label}
+      <svg aria-hidden="true" width="36" height="14" viewBox="0 0 36 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={dashed ? "4 4" : undefined}>
+        {back === undefined ? <path d="M0 4h34M29 0l5 4M36 10H2M7 14l-5-4" /> : back ? <path d="M36 7H2M7 2 2 7l5 5" /> : <path d="M0 7h34M29 2l5 5-5 5" />}
+      </svg>
+    </div>
+  );
+}
+
+export default function Overview() {
+  const net = useUndercurrent();
+  const q = useCarriedQuery();
+  const proofs = useProofs(net);
+  useLiveToasts(net);
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const agreement = useAgreement(primary?.url ?? null, net.mode === "live" && net.hubs.length > 1);
+
+  const verified = net.events.filter(net.isVerified).length;
+  const sealed = net.events.filter(isEncrypted).length;
+  const queued = net.sendingHub?.link?.queued ?? 0;
+  const cut = !!net.sendingHub?.link?.cut;
+  const hubsUp = net.hubs.length > 0 && net.hubs.every((h) => h.online);
+  const boxSeen = net.events.some((e) => e.device_id === REAL_BOX);
+  const syncTone: Tone = cut ? "warn" : agreement.agrees === true ? "ok" : agreement.agrees === false ? "warn" : "muted";
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AppBar net={net} />
+      <Toaster theme="dark" position="bottom-right" richColors closeButton />
+      <main className="mx-auto flex max-w-7xl flex-col gap-16 px-4 pb-24 sm:px-6">
+        {/* Hero */}
+        <section className="flex flex-wrap items-end gap-10 pt-14">
+          <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
+            <p className="caption">The Hollow · 40 levels underground · Patriot Hackfest 2026</p>
+            <h1 className="max-w-[15ch] text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+              The network the Directorate can&apos;t read, fake or shut off.
+            </h1>
+            <p className="max-w-[62ch] text-lg text-foreground/75">
+              A Canary sensor box and residents&apos; phones sign every alert. Two hubs check each one and keep identical copies, so a
+              forged alert is refused, an edited record is caught, and cutting the link loses nothing.
+            </p>
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <Button asChild size="lg">
+                <a href="#beats">
+                  Start the walkthrough <ArrowRightIcon />
+                </a>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href={`/hollow${q}`}>Open the 3D map</Link>
+              </Button>
+            </div>
+          </div>
+          <Card className="min-w-0 flex-[1_1_320px] gap-0 p-5">
+            <p className="caption mb-3">{net.mode === "demo" ? "Sample data (no hub reachable)" : "Right now, on the hubs"}</p>
+            <dl className="grid grid-cols-2 gap-x-5 gap-y-4">
+              {[
+                { v: net.events.length, l: "events stored", c: "var(--foreground)" },
+                { v: verified, l: "signed and verified", c: "var(--ok)" },
+                { v: sealed, l: "sealed cell messages", c: "var(--accent)" },
+                { v: queued, l: "waiting to send", c: queued ? "var(--warn)" : "var(--foreground)" },
+              ].map((m) => (
+                <div key={m.l} className="flex flex-col gap-0.5">
+                  <dd className="font-mono text-3xl font-medium tabular-nums" style={{ color: m.c }}>{m.v}</dd>
+                  <dt className="order-last text-[13px] text-muted-foreground">{m.l}</dt>
+                </div>
+              ))}
+            </dl>
+          </Card>
+        </section>
+
+        {/* How it works */}
+        <section className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>How it works</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">One alert, from the water probe to every hub</h2>
+          </div>
+          <Card className="gap-6 p-6 sm:p-7">
+            <div className="flex flex-wrap items-stretch gap-2.5">
+              <FlowNode tone={boxSeen ? "ok" : "warn"} icon={<DropletIcon className="size-5 text-[var(--water)]" aria-hidden="true" />} title="Canary box, L34"
+                body={boxSeen ? "Water probe trips. The box signs the alert with its own key." : "Water probe trips; the box signs the alert. Waiting for the real box."} />
+              <FlowArrow label="signed" tone="muted" back={false} />
+              <FlowNode tone={net.hubs.find((h) => h.hubId === "hub-L34")?.online ? "ok" : "muted"} icon={<ServerIcon className="size-5 text-primary" aria-hidden="true" />} title="Hub L34"
+                body="Checks the signature, the roster and the time, then adds the alert to its own hash chain." />
+              <FlowArrow label={cut ? "link cut" : "sync"} tone={syncTone} dashed={cut} />
+              <FlowNode tone={net.hubs.find((h) => h.hubId === "hub-L12")?.online ? "ok" : "muted"} icon={<ServerIcon className="size-5 text-primary" aria-hidden="true" />} title="Hub L12"
+                body={agreement.agrees ? `Same checks. Both hubs hold the same events: fingerprint ${agreement.fingerprint?.slice(0, 6)}.` : "Runs the same checks. Both hubs end up with the same events, proven by one fingerprint."} />
+              <FlowArrow label="signed" tone="muted" back />
+              <FlowNode tone={hubsUp ? "ok" : "muted"} icon={<SmartphoneIcon className="size-5 text-foreground" aria-hidden="true" />} title="Residents' phones"
+                body="Joined in person by QR. Reports are signed; cell messages are sealed." />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5 border-t border-dashed border-border-strong pt-4 text-foreground/75">
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--directorate)]">The Directorate tries</span>
+              <span>Sniff the link → <strong className="font-medium text-foreground">sees ciphertext</strong></span>
+              <span>Forge an all-clear → <strong className="font-medium text-foreground">refused</strong></span>
+              <span>Edit a record → <strong className="font-medium text-foreground">caught at that row</strong></span>
+              <span>Cut the link → <strong className="font-medium text-foreground">queued, then delivered</strong></span>
+            </div>
+          </Card>
+        </section>
+
+        {/* The five beats */}
+        <section id="beats" className="flex scroll-mt-6 flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>The demo, in five beats</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Each one checked live against the hubs</h2>
+          </div>
+          <Tabs defaultValue="box">
+            <TabsList className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {BEATS.map((b, i) => (
+                <TabsTrigger
+                  key={b.id}
+                  value={b.id}
+                  className="flex min-h-11 flex-col items-start justify-start gap-1 rounded-xl border border-border bg-card p-3.5 text-left data-[state=active]:border-primary data-[state=active]:bg-accent"
+                >
+                  <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground"><Dot tone={proofs[b.id].tone} />Beat {i + 1}</span>
+                  <span className="text-[15px] font-semibold text-foreground">{b.title}</span>
+                  <span className="text-[13px] font-normal" style={{ color: TONE[proofs[b.id].tone] }}>{proofs[b.id].short}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {BEATS.map((b) => {
+              const p = proofs[b.id];
+              return (
+                <TabsContent key={b.id} value={b.id}>
+                  <Card className="flex-row flex-wrap gap-7 p-6 sm:p-7">
+                    <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <p className="caption">What happens</p>
+                        <p className="max-w-[58ch] text-lg">{b.what}</p>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <p className="caption">Watch for</p>
+                        <p className="max-w-[58ch] text-foreground/75">{b.watch}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 rounded-lg border bg-background px-4 py-3.5" style={{ borderColor: TONE[p.tone] }} aria-live="polite">
+                        <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: TONE[p.tone] }}>
+                          <Dot tone={p.tone} />Live proof
+                        </span>
+                        <span className="text-xl font-semibold">{p.headline}</span>
+                        <span className="text-[13px] text-muted-foreground">{p.detail}</span>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-3.5">
+                      <p className="caption">Show it</p>
+                      <Button asChild variant="outline" size="lg" className="justify-between">
+                        <Link href={`${b.open.href}${q}`}>
+                          {b.open.label} <ArrowRightIcon />
+                        </Link>
+                      </Button>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[13px] text-muted-foreground">{b.commandLabel}</span>
+                        <CopyCommand text={b.command} />
+                      </div>
+                      <div className="flex flex-col gap-0.5 pt-1">
+                        <span className="text-[13px] text-muted-foreground">Measured</span>
+                        <span className="font-mono text-[15px]">{b.measured}</span>
+                      </div>
+                    </div>
+                  </Card>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        </section>
+
+        {/* Results */}
+        <section className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>What we measured</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The numbers behind each beat</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-5">
+            {RESULTS.map((r) => (
+              <Card key={r.label} className="gap-1.5 p-4 sm:p-5">
+                <span className="font-mono text-2xl font-medium tabular-nums sm:text-3xl">{r.value}</span>
+                <span className="text-sm">{r.label}</span>
+                <span className="text-xs text-muted-foreground">{r.source}</span>
+              </Card>
+            ))}
+          </div>
+          <p className="max-w-[90ch] text-sm text-muted-foreground">
+            What it doesn&apos;t do: hubs can see who sent a cell message and when, just not what it says. The Directorate can still cut
+            power to a hub; nothing is lost, but nothing moves until it&apos;s back. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
+          </p>
+        </section>
+
+        {/* Try it */}
+        <Card className="flex-row flex-wrap items-center gap-x-8 gap-y-4 p-6 sm:p-7">
+          <div className="flex min-w-0 flex-[999_1_420px] flex-col gap-1.5">
+            <span className="text-lg font-semibold">Try it on your phone</span>
+            <span className="text-foreground/75">
+              Join the hotspot, open the phone link that <code className="font-mono text-sm">demo_hubs.py up --host 0.0.0.0</code> prints, and show your
+              join code to the operator. Your reports arrive signed and verified.
+            </span>
+          </div>
+          <div className="flex flex-[1_1_280px] flex-wrap items-center gap-2">
+            <Badge variant="secondary"><ArrowLeftRightIcon />Same Wi-Fi as the hubs</Badge>
+            <Badge variant="secondary">No internet needed</Badge>
+          </div>
+        </Card>
+      </main>
+    </div>
+  );
+}

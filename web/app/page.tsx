@@ -32,8 +32,8 @@ export default function Home() {
       <Link href="/join" className="mt-6 block rounded-xl border border-dashed border-[var(--border)] px-4 py-3 text-[var(--muted)]">
         Join a cell: show your key to an operator →
       </Link>
-      <Link href="/dashboard" className="mt-6 inline-block py-2 text-sm text-[var(--muted)]">
-        Command dashboard →
+      <Link href="/overview" className="mt-6 inline-block py-2 text-sm text-[var(--muted)]">
+        Overview for judges →
       </Link>
     </main>
   );

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { timeAgo } from "@/lib/format";
 import { useUndercurrent } from "@/lib/useUndercurrent";
+import { AppBar } from "@/components/app-bar";
 import { adaptEvents, checkinStatus, isLungReport, isWaterReport, peopleIn, pinOf, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
 import {
   addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, levelInlet, safeRoute, streetGraph, streetMain, traceSource, upstream,
@@ -301,6 +302,7 @@ export default function CityApp() {
   // Below xl the right column folds under the left one. Phone: map on top, one sheet underneath.
   return (
     <div className="theme-paper flex h-[100dvh] w-full flex-col overflow-hidden">
+      <AppBar net={net} />
       <TopBar
         net={net} world={world} active={level.n} sums={sums} view={view} setView={setView} follow={follow} setFollow={setFollow}
         onLevel={goLevel} onReset={() => { setFocus(null); select(null); setResetKey((k) => k + 1); }}
