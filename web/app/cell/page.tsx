@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Label, PhoneShell, TextArea, useStored } from "@/components/phone";
+import { QR } from "@/components/qr";
 import { addEvent, hubUrl, listEvents } from "@/lib/hub";
 import { CELL_EVENT_TYPE, decrypt, encrypt, inviteLink, isCellPayload, keyFromHash, keyTag, loadCellKey, newCellKey, saveCellKey } from "@/lib/cell";
 import { timeAgo } from "@/lib/format";
@@ -191,9 +192,13 @@ export default function CellPage() {
           {showInvite && (
             <div className="rounded-xl border border-[var(--warn)] p-4">
               <p className="text-sm">
-                Anyone who opens this link can read the cell. Show it face to face, never send it over the hub.
+                Scan this with the new member&apos;s phone camera. Anyone who opens it can read the cell, so show it face to face,
+                never send it over the hub.
               </p>
-              <p className="mt-2 select-all break-all font-mono text-xs">{inviteLink(key, window.location.origin)}</p>
+              <div className="mt-3">
+                <QR value={inviteLink(key, window.location.origin)} label="QR code of the cell invite link" />
+              </div>
+              <p className="mt-3 select-all break-all font-mono text-xs">{inviteLink(key, window.location.origin)}</p>
             </div>
           )}
           <button type="button" onClick={leave} className="w-full py-2 text-sm text-[var(--muted)] underline">

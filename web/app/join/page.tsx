@@ -4,10 +4,11 @@
 // person: the resident shows this page, an operator adds the public key to the roster with
 // hub/scripts/roster_tool.py add, and from then on this phone's reports are signed and
 // verified. The key is made on first visit and never leaves the phone; only the public half
-// is shown.
+// is shown, as text and as a QR code the operator scans.
 
 import { useCallback, useEffect, useState } from "react";
 import { PhoneShell } from "@/components/phone";
+import { QR } from "@/components/qr";
 import { hubUrl } from "@/lib/hub";
 import { hubSigningInfo, loadIdentity, type HubSigningInfo } from "@/lib/sign";
 
@@ -50,7 +51,12 @@ export default function JoinPage() {
       <div className="space-y-6">
         <section className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
           <p className="caption">Your public key</p>
-          <p className="mt-2 select-all break-all font-mono text-lg leading-relaxed" data-testid="pub">
+          {pub && (
+            <div className="mt-3">
+              <QR value={pub} label="QR code of your public key" />
+            </div>
+          )}
+          <p className="mt-3 select-all break-all font-mono text-lg leading-relaxed" data-testid="pub">
             {pub ?? "…"}
           </p>
           <button type="button" onClick={copy} className="mt-3 min-h-12 w-full rounded-lg border border-[var(--border-strong)] px-3 text-base">
