@@ -137,12 +137,21 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
     : { n: 13, q: "Prove whether the surface is safe", status: "ready", line: "A box at the top of the shaft signs its air readings, so the Directorate can't fake them.", action: test("surface", "Try a reading") };
 
   const planned = (n: number, q: string, line: string): Brief => ({ n, q, status: "planned", line });
+
+  // 6 and 12 · the Have / Need board (type "exchange", hub/app/exchange.py): posts of one kind
+  const board = (n: number, q: string, kinds: string[], what: string): Brief => {
+    const posts = events.filter((e) => e.event.type === "exchange" && kinds.includes(String((e.event.payload as { category?: unknown }).category)));
+    const side = (sd: string) => posts.filter((e) => (e.event.payload as { side?: unknown }).side === sd).length;
+    return posts.length
+      ? { n, q, status: "live", line: `Have / Need board: ${side("need")} ${what} needed, ${side("have")} offered · the hub pairs each need with the nearest offer`, action: { label: "See the posts", run: () => go.openFeed("all") } }
+      : { n, q, status: "ready", line: `Have / Need board: residents post ${what} they need or can spare from their phone; the hub pairs them across levels.` };
+  };
   return [
     b1, b2, b3, b4, b5,
-    planned(6, "Find or share living space", "Have / Need board: post a spare room or a bed, signed like any report. Needs the event type (Michael) and a phone page (Alanna)."),
+    board(6, "Find or share living space", ["space"], "beds or rooms"),
     b7, b8, b9, b10,
     planned(11, "Track what no sunlight does to people", "Optional sleep and mood on the check-in, shown as a trend per level. Needs the field on the phone page (Alanna)."),
-    planned(12, "Grow and share food locally", "Same Have / Need board: food and seeds offered and asked for, per level."),
+    board(12, "Grow and share food locally", ["food"], "food or seeds"),
     b13,
     { n: 14, q: "Choose suits, domes or outposts for going up", status: "design", line: "The same signed boxes inside each trial suit, dome and outpost would compare them on real readings. Not built." },
   ];

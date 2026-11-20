@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-EventType = Literal["checkin", "hazard", "case", "missing_person", "roster"]
+EventType = Literal["checkin", "hazard", "case", "missing_person", "roster", "exchange"]
 Source = Literal["resident", "sensor"]
 
 # What a signature covers, and (plus sig) what the chain hash covers. Fields that are

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, ArrowRightLeftIcon as SwapIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -574,6 +574,88 @@ function ForecastSection({ net }: { net: Undercurrent }) {
   );
 }
 
+interface BoardPost { id: string; side: "have" | "need"; category: string; item: string; quantity: number | null; level: number; waiting_s: number; simulated: boolean; signed: boolean; matched: boolean }
+interface BoardMatch { need_id: string; have_id: string; category: string; need_level: number; have_level: number; levels_apart: number; need_item: string; have_item: string }
+interface BoardView { needs: BoardPost[]; haves: BoardPost[]; matches: BoardMatch[]; unmet: string[]; closed: number }
+
+const CATEGORY_TONE: Record<string, string> = { medicine: "var(--danger)", water: "var(--water)", food: "var(--ok)", power: "var(--warn)", space: "var(--accent)", other: "var(--muted)" };
+
+/** Questions 2, 6, 10 and 12: the Have / Need board, live from the primary hub (GET /exchange). */
+function ExchangeSection({ net }: { net: Undercurrent }) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const [b, setB] = useState<BoardView | null>(null);
+  useEffect(() => {
+    if (net.mode !== "live" || !primary) return;
+    let stop = false;
+    async function poll() {
+      try {
+        const res = await fetch(`${primary!.url}/exchange`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
+        if (res.ok && !stop) setB((await res.json()) as BoardView);
+      } catch {}
+    }
+    poll();
+    const t = setInterval(poll, 4000);
+    return () => { stop = true; clearInterval(t); };
+  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unmet = b ? b.needs.filter((n) => !n.matched) : [];
+  const simulated = b ? [...b.needs, ...b.haves].some((p) => p.simulated) : false;
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>Share what&apos;s left · questions 2, 6, 10 and 12</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">A Have / Need board the Directorate can&apos;t ration</h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          Residents post what they can spare and what they need: a bed, food or seeds, water, medicine, hours of power. Every post is
+          signed and synced like an alert. The hub pairs each need with the nearest offer of the same kind, medicine and water first, then
+          whoever has waited longest, so the deep levels aren&apos;t always last. Only the person who posted can mark it done.
+        </p>
+      </div>
+      <Card className="gap-4 p-6">
+        {!b ? (
+          <p className="text-muted-foreground">
+            {net.mode === "live" ? "Loading the board…" : "Connect to a hub to see the live board."}
+          </p>
+        ) : b.needs.length + b.haves.length === 0 ? (
+          <p className="text-muted-foreground">
+            Nothing posted yet. Post from a phone (<code className="font-mono text-sm">/exchange</code>), or run the simulation, which posts
+            7 simulated needs and offers.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-sm">
+              <span><span className="text-[var(--warn)]">{b.needs.length}</span> needs</span>
+              <span><span className="text-[var(--ok)]">{b.haves.length}</span> offers</span>
+              <span><span className="text-primary">{b.matches.length}</span> matched</span>
+              <span>{unmet.length} still waiting</span>
+              {b.closed > 0 && <span className="text-muted-foreground">{b.closed} done</span>}
+              {simulated && <Badge variant="outline" className="border-[var(--sim)] text-[var(--sim)]">Includes simulated posts</Badge>}
+            </div>
+            <ul className="flex flex-col gap-2">
+              {b.matches.map((m) => (
+                <li key={m.need_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-background px-4 py-3">
+                  <span className="rounded-full px-2 py-0.5 font-mono text-xs" style={{ color: CATEGORY_TONE[m.category] ?? "var(--muted)", border: `1px solid ${CATEGORY_TONE[m.category] ?? "var(--border)"}` }}>{m.category}</span>
+                  <span className="min-w-0"><span className="text-[var(--warn)]">L{m.need_level} needs</span> {m.need_item}</span>
+                  <SwapIcon className="size-4 shrink-0 text-muted-foreground" aria-label="matched with" />
+                  <span className="min-w-0"><span className="text-[var(--ok)]">L{m.have_level} has</span> {m.have_item}</span>
+                  <span className="ml-auto font-mono text-xs text-muted-foreground">{m.levels_apart} level{m.levels_apart === 1 ? "" : "s"} apart</span>
+                </li>
+              ))}
+              {unmet.map((n) => (
+                <li key={n.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-border-strong px-4 py-3">
+                  <span className="rounded-full px-2 py-0.5 font-mono text-xs" style={{ color: CATEGORY_TONE[n.category] ?? "var(--muted)", border: `1px solid ${CATEGORY_TONE[n.category] ?? "var(--border)"}` }}>{n.category}</span>
+                  <span className="min-w-0"><span className="text-[var(--warn)]">L{n.level} needs</span> {n.item}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">no offer yet · waiting {Math.max(1, Math.round(n.waiting_s / 60))} min</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Card>
+    </section>
+  );
+}
+
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
@@ -733,6 +815,8 @@ export default function Overview() {
         <TriageSection net={net} />
 
         <ForecastSection net={net} />
+
+        <ExchangeSection net={net} />
 
         <SurfaceSection net={net} q={q} />
 

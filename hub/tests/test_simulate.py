@@ -121,6 +121,13 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
     assert relay["slope_v_per_min"] < 0 and relay["eta_low_s"] <= relay["eta_s"] <= relay["eta_high_s"]
     warnings = [e for e in events if e.get("device_id") == "canary-12-relay" and e["payload"]["kind"] == "blackout"]
     assert len(warnings) == 2 and all(isinstance(e["payload"].get("expected_in_min"), int) for e in warnings)
+    # the Have / Need board: posts from both levels meet on either hub, matched across levels
+    for url in (l34, l12):
+        b = c.get(f"{url}/exchange").json()
+        assert {m["category"] for m in b["matches"]} == {"medicine", "space", "food"}
+        assert all(m["need_level"] in (34, 35) and m["have_level"] == 12 for m in b["matches"])
+        assert [n["category"] for n in b["needs"] if not n["matched"]] == ["power"]
+        assert all(p["signed"] and p["simulated"] for p in b["needs"] + b["haves"])
     sensors = [e for e in events if e.get("device_id")]
     assert sensors and all(e["source"] == "sensor" and e["author"] == e["device_id"] for e in sensors)
     assert c.get(f"{l34}/rejected").json()["total"] == 0

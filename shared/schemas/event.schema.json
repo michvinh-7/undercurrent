@@ -7,7 +7,7 @@
   "required": ["id", "type", "hub_id", "level", "created_at", "author", "payload", "prev_hash", "hash"],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
-    "type": { "enum": ["checkin", "hazard", "case", "missing_person", "roster"] },
+    "type": { "enum": ["checkin", "hazard", "case", "missing_person", "roster", "exchange"] },
     "hub_id": { "type": "string", "examples": ["hub-L38"] },
     "level": { "type": "integer", "minimum": 1, "maximum": 40 },
     "created_at": { "type": "string", "format": "date-time" },
@@ -61,6 +61,19 @@
         "last_seen_at": { "type": "string", "format": "date-time" },
         "description": { "type": "string" },
         "photo_id": { "type": ["string", "null"] }
+      }
+    },
+    "exchange": {
+      "type": "object",
+      "description": "The Have / Need board (hub/app/exchange.py). A post, or a close of the same signer's earlier post",
+      "properties": {
+        "side": { "enum": ["have", "need"] },
+        "category": { "enum": ["space", "food", "water", "medicine", "power", "other"] },
+        "item": { "type": "string", "description": "What, in a few words" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "location": { "type": "string" },
+        "note": { "type": "string" },
+        "closes": { "type": "string", "description": "Id of an earlier post by the same key: it's done" }
       }
     },
     "roster": {

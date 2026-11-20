@@ -882,6 +882,7 @@ export function pinTitle(e: MapEvent): string {
   if (e.severity === "sos") return "Needs help";
   if (e.severity === "message") return "Private message";
   const t = e.event.type;
+  if (t === "exchange") return typeof p.closes === "string" ? "Have / Need: done" : `${p.side === "have" ? "Has" : "Needs"} ${typeof p.category === "string" ? p.category : "something"}`;
   return t === "case" ? "Sickness report" : t === "missing_person" ? "Missing person" : t === "checkin" ? "Check-in" : String(t);
 }
 

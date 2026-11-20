@@ -12,6 +12,7 @@ Set TRIAGE_ON_INGEST=0 to switch this off.
 
 import os
 
+from .exchange import exchange_priority
 from .models import EventIn
 from .triage import triage
 
@@ -32,6 +33,8 @@ def message_text(e: EventIn) -> str:
         head = f"Symptoms: {symptoms}." if symptoms else "Someone is sick."
         if people:
             head += f" {people} people affected."
+    elif e.type == "exchange":
+        head = f"{'Has' if p.get('side') == 'have' else 'Needs'} {p.get('item', p.get('category', 'something'))}."
     else:  # missing_person
         head = f"Missing person: {p.get('name', 'unknown')}, last seen on level {p.get('last_seen_level', '?')}."
     return f"Level {e.level}. {head} {raw}".strip()
@@ -39,6 +42,10 @@ def message_text(e: EventIn) -> str:
 
 def score(e: EventIn) -> EventIn:
     """The same event with a priority, unless it already has one (e.g. synced from another hub)."""
-    if e.priority is not None or os.getenv("TRIAGE_ON_INGEST", "1") == "0":
+    if e.priority is not None:
+        return e
+    if e.type == "exchange":  # a board post, not an emergency: a fixed rule, never the model
+        return e.model_copy(update={"priority": exchange_priority(e.payload)})
+    if os.getenv("TRIAGE_ON_INGEST", "1") == "0":
         return e
     return e.model_copy(update={"priority": triage(message_text(e), level_hint=e.level).priority})

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRightIcon, LockKeyholeIcon, QrCodeIcon, StethoscopeIcon, TriangleAlertIcon, UserCheckIcon, UserSearchIcon } from "lucide-react";
+import { ArrowRightLeftIcon, ChevronRightIcon, LockKeyholeIcon, QrCodeIcon, StethoscopeIcon, TriangleAlertIcon, UserCheckIcon, UserSearchIcon } from "lucide-react";
 import { PhoneHeader, RememberHub } from "@/components/phone";
 
 // The hub's home page on a resident's phone: pick what to report.
@@ -8,6 +8,7 @@ const REPORTS = [
   { href: "/hazard", title: "Report a hazard", hint: "Flooding, bad air, collapse…", icon: TriangleAlertIcon },
   { href: "/symptoms", title: "Report symptoms", hint: "Someone is sick or hurt", icon: StethoscopeIcon },
   { href: "/missing", title: "Missing person", hint: "Someone you can't find", icon: UserSearchIcon },
+  { href: "/exchange", title: "Have / Need", hint: "Share space, food, water, medicine, power", icon: ArrowRightLeftIcon },
 ];
 
 function Row({ href, title, hint, icon: Icon, accent }: { href: string; title: string; hint: string; icon: typeof UserCheckIcon; accent?: boolean }) {
