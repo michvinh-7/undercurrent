@@ -42,11 +42,11 @@ export const SLIDES: Slide[] = [
   },
   {
     id: "box", seconds: 20, kicker: "The Canary box",
-    title: "It starts with a box on the wall.",
-    sub: "An Arduino UNO Q that is its own hub: a water probe, an SOS button, a buzzer, heat and a fan monitor.",
-    purpose: "Show the hardware: real sensors, and signing at the source.",
-    takeaway: "Real sensors, signed at the source.",
-    say: "It starts with a box on the wall. Water touches the probe, it beeps, and the board signs the alert itself, so nobody can fake it in transit. Within a second it lands on the other level's hub, verified.",
+    title: "It starts with a sensor box on the wall.",
+    sub: "Designed around an Arduino UNO Q: a water probe, an SOS button, a buzzer, heat and a fan monitor. In this demo the boxes are simulated and labelled.",
+    purpose: "Show where an alert starts: a box that signs at the source. Say plainly that the boxes in this demo are simulated.",
+    takeaway: "Signed at the source, so nobody can fake it in transit.",
+    say: "It starts with a sensor box on the wall. Water touches the probe, and the box signs the alert itself, so nobody can fake it in transit. In this demo the boxes are simulated, and labelled that way, but they sign and send exactly as the hardware would. Within a second the alert lands on the other level's hub, verified.",
     doNote: "Dip the probe if the box is on the table; otherwise the simulated boxes are labelled.",
   },
   {
@@ -122,7 +122,7 @@ export const THREATS = [
   { verb: "Cuts", what: "the line, and rewrites the numbers" },
 ];
 
-/** The Canary box (slide 3): Tisya's hardware. */
+/** The Canary box design (slide 3). The boxes in the demo are simulated. */
 export const BOX_PARTS = [
   { part: "Water probe", does: "wet past its threshold for 3 s → flooding alert" },
   { part: "SOS button", does: "a signed call for help" },
@@ -145,7 +145,7 @@ export const PROOF = [
 export const STACK = [
   "Next.js 15", "React 19", "Tailwind 4", "shadcn/ui", "three.js + React Three Fiber",
   "FastAPI", "SQLite hash chain", "Ed25519 (PyNaCl, tweetnacl)", "XSalsa20-Poly1305 cells",
-  "Ollama · Llama 3.2 3B (offline)", "Gemini (eval)", "Arduino UNO Q",
+  "Ollama · Llama 3.2 3B (offline)", "Gemini (eval)", "Arduino UNO Q (box design)",
 ];
 
 /** FILL IN BEFORE RECORDING: who built what. Shown on the last slide with a marker until edited. */

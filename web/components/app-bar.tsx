@@ -20,7 +20,6 @@ const PAGES = [
   { href: "/overview", label: "Overview" },
   { href: "/dashboard", label: "Console" },
   { href: "/hollow", label: "Map" },
-  { href: "/truth", label: "Directorate view" },
   { href: "/pitch", label: "Pitch" },
 ] as const;
 
