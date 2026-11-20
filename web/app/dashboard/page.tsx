@@ -6,7 +6,7 @@
 //   3. a forged "all clear" is rejected     → Forgeries blocked counter
 //   4. an edited record                     → Chain card names the exact row
 //   5. the Directorate sniffs the channel   → Directorate view toggle (and /truth): their control room,
-//      where every command they fire is a real request, stamped with what the hubs actually did
+//      where every command is a real request, stamped with what the hubs actually did
 // Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
 import { AppBar } from "@/components/app-bar";
@@ -68,9 +68,9 @@ export default function Console() {
         kicker={directorate ? "Directorate · Network control" : "Console"}
         kickerColor={directorate ? "var(--directorate)" : undefined}
         questions={[7, 9, 10]}
-        title={directorate ? "Their screen says every command went through." : "Every report, most urgent first, checked by both hubs."}
+        title={directorate ? "They act like they own the network. Here's what each command actually did." : "Every report, most urgent first, checked by both hubs."}
         sub={directorate
-          ? "The Directorate's own control room, on the same feed. Under each command, stamped in green: what the residents' network actually did, from the hubs' real answer."
+          ? "The Directorate's control room, on the same feed. Each command is a real request to the hubs; under it, stamped in green, is what the residents' network did with it."
           : "What the operator sees: signed alerts ranked by the hub's AI, and every attack the Directorate tries, refused or caught."}
         actions={<HeaderControls net={net} directorate={directorate} setDirectorate={setDirectorate} />}
         right={directorate ? <TallyStrip tally={tally} net={net} /> : <StatStrip net={net} />}

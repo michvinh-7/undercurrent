@@ -56,7 +56,7 @@ export const SLIDES: Slide[] = [
     purpose: "Prove the security claims under attack, on camera, with numbers.",
     takeaway: "Attacks fail on camera, and we measured it.",
     say: "Now we play the Directorate. A forged all-clear: refused, and the counter goes up. Cut the link: alerts wait in line, then every one arrives. Edit a stored record: the chain points to the exact row. Across 300 forgeries we accepted zero, and caught 160 of 160 edits.",
-    doNote: "Terminal, from hub/: directorate.py forge, then cut, a phone SOS, restore, then edit, then scripts/verify.py --hub … --hub … --roster demo/roster.json: a separate checker that uses none of the hub's code names the edited row.",
+    doNote: "Terminal, from hub/: directorate.py forge, then cut, a phone SOS, restore, then edit, then scripts/verify.py --hub … --hub … --roster demo/roster.json: a separate checker that uses none of the hub's code names the edited row. Or, more visual: the console's Directorate view, where Send, Re-send, Rewrite, Cut and Decrypt each come back BLOCKED, HELD or UNREADABLE, and the tally stays at 'took effect: 0'.",
   },
   {
     id: "thinks", seconds: 25, kicker: "It thinks",

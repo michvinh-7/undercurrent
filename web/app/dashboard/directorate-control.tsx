@@ -1,10 +1,11 @@
 "use client";
 
 // The Directorate view's right column: their control room. Every command is a real request to
-// the hubs. Each card shows two layers: what the Directorate's own screen claims ("✓ sent"),
-// and, stamped over it, what the residents' network actually did, from the hubs' answer
+// the hubs. Each card shows two layers: what the Directorate tried, and, stamped under it,
+// what the residents' network actually did, from the hubs' answer
 // (refusal reason, counter, queue, chain row). Nothing here is staged: a command the hubs
-// accepted would show as "TOOK EFFECT", and the tally would say so.
+// accepted would show as "TOOK EFFECT", and the tally would say so. (Their own tool would see the
+// refusals too: this shows intent against outcome, not a fooled Directorate.)
 
 import { useState } from "react";
 import { isEncrypted, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
@@ -41,9 +42,9 @@ function Card({ title, action, outcome, children }: {
         {action}
       </div>
       <div className="px-4 pb-3 pt-2">
-        <p className="caption !text-[var(--faint)]">Their screen</p>
+        <p className="caption !text-[var(--faint)]">What they tried</p>
         <p className="font-mono text-sm" style={{ color: outcome ? "var(--directorate)" : "var(--muted)" }}>
-          {outcome ? outcome.claim : "Awaiting command"}
+          {outcome ? outcome.claim : "Nothing yet"}
         </p>
       </div>
       {outcome && stamp && (
@@ -99,8 +100,8 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
         action={<Fire busy={busy === "forge"} onClick={() => run("forge", async () => {
           const r = await net.actions.injectForgery(target, level);
           return r.ok
-            ? { claim: `✓ All-clear broadcast to level ${level}`, verdict: "took effect", detail: "the hub stored it" }
-            : { claim: `✓ All-clear broadcast to level ${level}`, verdict: "blocked",
+            ? { claim: `Broadcast an all-clear to level ${level}`, verdict: "took effect", detail: "the hub stored it" }
+            : { claim: `Broadcast an all-clear to level ${level}`, verdict: "blocked",
                 detail: `refused: ${r.reason}. Their key is on no roster, so the alert never reaches a phone.` };
         })}>Send</Fire>}
       />
@@ -111,8 +112,8 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
         action={<Fire busy={busy === "replay"} onClick={() => run("replay", async () => {
           const r = await net.actions.reuseAlert(target, "replay");
           return r.ok
-            ? { claim: "✓ Old alert re-sent", verdict: "took effect", detail: "the hub stored it a second time" }
-            : { claim: "✓ Old alert re-sent to stir panic", verdict: "blocked", detail: `refused: ${r.reason}. Every alert is stored once.` };
+            ? { claim: "Re-send an old alert", verdict: "took effect", detail: "the hub stored it a second time" }
+            : { claim: "Re-send an old alert to stir panic", verdict: "blocked", detail: `refused: ${r.reason}. Every alert is stored once.` };
         })}>Re-send</Fire>}
       />
 
@@ -122,8 +123,8 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
         action={<Fire busy={busy === "tamper"} onClick={() => run("tamper", async () => {
           const r = await net.actions.reuseAlert(target, "tamper");
           return r.ok
-            ? { claim: "✓ Alert rewritten to \"all clear\"", verdict: "took effect", detail: "the hub stored the rewrite" }
-            : { claim: "✓ Alert rewritten to \"all clear\"", verdict: "blocked",
+            ? { claim: "Rewrite a resident's alert to \"all clear\"", verdict: "took effect", detail: "the hub stored the rewrite" }
+            : { claim: "Rewrite a resident's alert to \"all clear\"", verdict: "blocked",
                 detail: `refused: ${r.reason}. The resident's signature covers the words; change one and it no longer matches.` };
         })}>Rewrite</Fire>}
       />
@@ -135,9 +136,9 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
           <Fire busy={busy === "cut"} onClick={() => run("cut", async () => {
             await net.actions.setLink(target, { cut: !cut });
             return cut
-              ? { claim: `✓ Line to level ${level} restored`, verdict: "held",
+              ? { claim: `Give level ${level} its line back`, verdict: "held",
                   detail: `everything that waited during the cut is crossing now, none lost, none doubled.` }
-              : { claim: `✓ Level ${level} silenced`, verdict: "held",
+              : { claim: `Silence level ${level}: cut its line`, verdict: "held",
                   detail: `phones on level ${level} still reach their own hub; their alerts wait in line and all arrive when the line is back.` };
           })}>{cut ? "Restore" : "Cut"}</Fire>
         ) : null}
@@ -153,7 +154,7 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
         title="Read the cell messages"
         outcome={out.read ?? null}
         action={<Fire onClick={() => done("read", {
-          claim: `✓ ${cells.length} cell message${cells.length === 1 ? "" : "s"} intercepted, decrypting…`,
+          claim: `Decrypt ${cells.length} intercepted cell message${cells.length === 1 ? "" : "s"}`,
           verdict: "unreadable",
           detail: cells.length
             ? `ciphertext only (XSalsa20-Poly1305). The key never touches a hub: it passes phone to phone, by QR, in person.`
@@ -170,7 +171,7 @@ export function DirectorateControl({ net, onCommand }: { net: Undercurrent; onCo
       <Card
         title="Rewrite a stored record"
         outcome={chain && !chain.chain_intact
-          ? { claim: "✓ Record changed in the hub's database", verdict: "caught",
+          ? { claim: "Change a record in the hub's database", verdict: "caught",
               detail: `the chain check names the exact row (${chain.first_bad_event?.slice(0, 8) ?? "?"}…), and the other hub still holds the original.` }
           : null}
         action={<span className="caption !text-[var(--faint)]">needs the server&apos;s disk</span>}
