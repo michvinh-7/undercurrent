@@ -82,7 +82,7 @@ export const SLIDES: Slide[] = [
     sub: "Built on the same signed channel, with designs for the last two: the move back up.",
     purpose: "Show breadth after the proof, so it lands as earned.",
     takeaway: "One system, not fifteen features.",
-    say: "Because it's one trusted channel, it reaches 13 of the brief's 15 questions, twelve of them live, and the last two, the move back to the surface, are designed on top of it.",
+    say: "Because it's one trusted channel, it answers 13 of the brief's 15 questions live, and the last two, the move back to the surface, are designed on top of it.",
   },
   {
     id: "proof", seconds: 25, kicker: "Measured, not claimed",
@@ -109,7 +109,7 @@ export const QUESTIONS: { n: number; short: string; status: "live" | "partial" |
   { n: 9, short: "Real outbreak numbers", status: "live" },
   { n: 10, short: "Care that reaches people", status: "live" },
   { n: 11, short: "Life without sunlight", status: "live" },
-  { n: 12, short: "Grow and share food", status: "partial" },
+  { n: 12, short: "Grow and share food", status: "live" },
   { n: 13, short: "Is the surface safe?", status: "live" },
   { n: 14, short: "Suits, domes or outposts", status: "design" },
   { n: 15, short: "Plan the move up", status: "design" },

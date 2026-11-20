@@ -115,3 +115,23 @@ def test_the_sim_scenario_ranks_levels_like_the_ground_truth():
     assert lv[1]["band"] == "livable"
     ids = {e.id for e in events}
     assert all(i in ids for x in r["levels"] for d in x["dimensions"].values() for i in d["events"])
+
+
+def test_food_is_the_median_days_at_home_and_unmet_food_requests_pull_it_down():
+    """Question 12: each person's latest answer counts once; 7+ days is 100."""
+    events = [ev(34, type="checkin", who=w, status="ok", food_days=d) for w, d in (("a", 1), ("b", 2), ("c", 5))]
+    events.append(ev(34, type="checkin", who="a", minutes=55, status="ok", food_days=0))  # a's newer answer replaces the old one
+    lv = by_level(livability(events, now=NOW))[34]
+    food = lv["dimensions"]["food"]
+    assert food["score"] == 29 and "2 days of food at home, median of 3 people" in food["why"]  # median of 0, 2, 5
+    events.append(ev(34, type="exchange", side="need", category="food", item="rice", minutes=40))
+    food = by_level(livability(events, now=NOW))[34]["dimensions"]["food"]
+    assert food["score"] == 4 and "1 unmet food request" in food["why"] and "exchange" in food["from"]
+
+
+def test_one_household_alone_doesnt_show_and_food_needs_dont_count_twice():
+    one = [ev(12, type="checkin", who="a", status="ok", food_days=0)]
+    assert 12 not in by_level(livability(one, now=NOW))  # fewer than 2 people: no food score
+    need = [ev(12, type="exchange", side="need", category="food", item="flour", minutes=40)]
+    lv = by_level(livability(need, now=NOW))[12]
+    assert lv["dimensions"]["food"]["score"] == 75 and "needs" not in lv["dimensions"]

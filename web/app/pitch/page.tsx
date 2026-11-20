@@ -40,7 +40,7 @@ function QuestionsGrid() {
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm">
         <span><span style={{ color: STATUS_COLOR.live }}>■</span> {count("live")} built and live</span>
-        <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>
+        {count("partial") > 0 && <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>}
         <span><span style={{ color: STATUS_COLOR.design }}>■</span> {count("design")} designed</span>
       </div>
     </div>

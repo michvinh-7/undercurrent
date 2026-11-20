@@ -35,3 +35,4 @@ def test_the_story_the_playback_tells():
     assert at("06:00", 12)["band"] == "livable"  # recycler fixed
     assert at("07:00", 34)["band"] != "unsafe"  # fan fixed
     assert all(f["1"]["band"] == "livable" for f in frames.values())
+    assert at("08:00", 35)["band"] == "unsafe" and at("08:00", 35)["by"] == "food"  # the flood spoiled the stores
