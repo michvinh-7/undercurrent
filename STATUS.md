@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Thu 11/19 (afternoon, after the simulated surface box and its card on `/overview`) by Michael
+**Last updated:** Thu 11/19 (evening) by Michael. Everything below is on `main` (through PR #37); no other branch has unmerged work.
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
@@ -8,6 +8,16 @@ The plan is now the rework: the Canary box plus a signed, encrypted channel ([`R
 **How to update:** edit only your own section when you finish something. Michael updates the date line. Keep notes to one line.
 
 ---
+
+## How it all fits, in plain English
+
+1. **Senders sign.** The Canary box (Tisya's, not built yet), residents' phones and the simulation each hold their own key and sign every alert. Phones get onto the roster in person by showing a QR code to an operator.
+2. **Hubs check.** Two hubs (L34 and L12) refuse anything not signed by a key on the roster, anything replayed, and anything stale. Every refusal is counted ("forgeries blocked").
+3. **Hubs remember.** Each hub chains every record to the one before it, so an edit is caught at the exact row, and keeps a list of what it wrote, so a deleted row comes back from the other hub.
+4. **Hubs sync.** They swap events over one link. Cut it and alerts wait; restore it and all arrive, none twice. A fingerprint shows both hold the same events.
+5. **AI sorts.** A small model on the hub (offline) reads free text and pulls out the facts; code turns them into a priority, so the most urgent message crosses a slow link first.
+6. **Cells stay private.** Members' messages are encrypted on the phone; hubs carry them without reading them.
+7. **People see it.** `/overview` explains it and proves each beat live; the console, the 3D map and the Directorate view show the same data from different sides. Anything simulated is labelled.
 
 ## Where the demo stands
 
