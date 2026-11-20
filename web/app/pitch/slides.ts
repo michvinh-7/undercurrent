@@ -90,7 +90,7 @@ export const SLIDES: Slide[] = [
     sub: "Every number is from a real run in eval/results.",
     purpose: "Close on evidence and the team: why it should win.",
     takeaway: "Every claim has a number behind it.",
-    say: "Zero of 300 forgeries accepted. 160 of 160 edits caught. Then an AI and a fuzzer played the Directorate: 40,000 attacks, none got through, and they found a bug we fixed. Offline AI triage gets urgency right 76 percent of the time, against 54 for keyword rules. Built by four of us. Undercurrent: the network they can't take away.",
+    say: "Zero of 300 forgeries accepted. 160 of 160 edits caught. Across 40 hubs with the deep levels cut off, not one alert lost. An AI and a fuzzer played the Directorate: 40,000 attacks, none got through. Offline AI triage gets urgency right 76 percent of the time. Built by four of us. Undercurrent: the network they can't take away.",
   },
 ];
 
@@ -136,6 +136,7 @@ export const PROOF = [
   { value: "0 / 300", label: "forged or replayed alerts accepted" },
   { value: "160 / 160", label: "edits caught at the exact row" },
   { value: "200 / 200", label: "alerts delivered through link cuts" },
+  { value: "0 / 1,120", label: "alerts lost across 40 hubs, deep levels cut off" },
   { value: "0 breaches", label: "in 40,156 attacks by an AI and a fuzzer" },
   { value: "76%", label: "offline AI triage urgency (54% keywords)" },
   { value: "6 min", label: "blackout forecast error an hour out (27 for a guess)" },
