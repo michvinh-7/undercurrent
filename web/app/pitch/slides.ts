@@ -1,8 +1,11 @@
-// The 2-minute pitch (/pitch): six slides, each with one live component. Edit the words here;
-// page.tsx only lays them out. Durations add up to 120 s and drive auto-play (P or ?auto=1).
+// The 3-minute pitch (/pitch): eight slides, each with one live component. Edit the words here;
+// page.tsx only lays them out. Durations add up to 180 s and drive auto-play (P or ?auto=1).
 // Narration is sized at about 150 words a minute.
+//
+// The arc: the stakes → the answer → the box → proof under attack → intelligence → human
+// impact → breadth (earned, after the proof) → why it wins. Each slide hands off to the next.
 
-export type SlideId = "problem" | "how" | "holds" | "thinks" | "shares" | "proof";
+export type SlideId = "problem" | "answer" | "box" | "holds" | "thinks" | "shares" | "reach" | "proof";
 
 export interface Slide {
   id: SlideId;
@@ -10,6 +13,10 @@ export interface Slide {
   kicker: string;
   title: string;
   sub: string;
+  /** Why this slide exists, for the presenter (in the speaker notes). */
+  purpose: string;
+  /** The one line a judge should leave the slide with (shown at the slide's foot). */
+  takeaway: string;
   /** Speaker notes: what to say while this slide is up (N toggles them). */
   say: string;
   /** What to do on screen or in the terminal during this slide, if anything. */
@@ -18,42 +25,71 @@ export interface Slide {
 
 export const SLIDES: Slide[] = [
   {
-    id: "problem", seconds: 15, kicker: "The Hollow · 40 levels underground",
+    id: "problem", seconds: 20, kicker: "The Hollow · 40 levels underground",
     title: "The Directorate owns the only network.",
-    sub: "Undercurrent is the one it can't read, fake or shut off, and it takes on 13 of the brief's 15 questions, with designs for the last 2.",
-    say: "Forty levels underground, the Directorate owns the only network. It can read every message, fake an all-clear, or cut the line. Undercurrent is the network it can't, and it reaches across almost every problem in the brief.",
+    sub: "Billions live underground, and every message, alarm and number goes through them.",
+    purpose: "Set the stakes in one breath: three concrete things they do to the network.",
+    takeaway: "Whoever controls the network controls the truth.",
+    say: "Forty levels underground, the Directorate owns the only network. They read every message. They post fake all-clears when the water's rising. And when it suits them, they cut the line, and their numbers say nobody is sick.",
   },
   {
-    id: "how", seconds: 20, kicker: "How it works",
-    title: "Every alert is signed, checked by two hubs, and shared.",
-    sub: "A sensor box and residents' phones sign with their own keys. Two hubs check every signature, chain every record and stay in sync.",
-    say: "A Canary sensor box and residents' phones sign every alert with their own key. Two hubs, one per level, refuse anything unsigned or off the roster, chain every record to the last, and sync with each other. These chips are live from the hubs.",
+    id: "answer", seconds: 20, kicker: "Undercurrent",
+    title: "So we built one they can't read, fake or shut off.",
+    sub: "A sensor box and residents' phones sign every alert. Two hubs check each one and keep identical copies.",
+    purpose: "Give the whole answer in one picture before any detail.",
+    takeaway: "Every alert is signed, checked twice, and shared.",
+    say: "Undercurrent is the residents' own network. A Canary sensor box and people's phones sign every alert with their own key. Two hubs, one per level, refuse anything unsigned, chain every record, and sync. These chips are live from the hubs.",
   },
   {
-    id: "holds", seconds: 25, kicker: "Attack it live",
+    id: "box", seconds: 20, kicker: "The Canary box",
+    title: "It starts with a box on the wall.",
+    sub: "An Arduino UNO Q that is its own hub: a water probe, an SOS button, a buzzer, heat and a fan monitor.",
+    purpose: "Show the hardware: real sensors, and signing at the source.",
+    takeaway: "Real sensors, signed at the source.",
+    say: "It starts with a box on the wall. Water touches the probe, it beeps, and the board signs the alert itself, so nobody can fake it in transit. Within a second it lands on the other level's hub, verified.",
+    doNote: "Dip the probe if the box is on the table; otherwise the simulated boxes are labelled.",
+  },
+  {
+    id: "holds", seconds: 30, kicker: "Attack it live",
     title: "Forge it, cut it, edit it. It holds.",
     sub: "Each tile is the hubs' live state. Below each, what we measured.",
-    say: "Now we play the Directorate. A forged all-clear: refused, and the counter goes up. Cut the link: alerts wait, then all arrive. Edit a stored record: the chain points to the exact row. Across 300 forgeries we accepted zero.",
+    purpose: "Prove the security claims under attack, on camera, with numbers.",
+    takeaway: "Attacks fail on camera, and we measured it.",
+    say: "Now we play the Directorate. A forged all-clear: refused, and the counter goes up. Cut the link: alerts wait in line, then every one arrives. Edit a stored record: the chain points to the exact row. Across 300 forgeries we accepted zero, and caught 160 of 160 edits.",
     doNote: "Terminal, from hub/: directorate.py forge, then cut, a phone SOS, restore, then edit.",
   },
   {
     id: "thinks", seconds: 25, kicker: "It thinks",
     title: "Urgent first. Blackouts before they hit.",
     sub: "An AI model on the hub, offline, reads each report; code does the math. A line fit on voltage predicts the blackout.",
-    say: "On a slow link the SOS has to go first. A small model on the hub reads messy text and pulls out the facts, and plain code scores it, so it never invents a number. And from a relay's voltage, the hub predicts when the power drops out, with a range.",
+    purpose: "Show the intelligence: triage and prediction, both honest about how they work.",
+    takeaway: "It predicts, not just reports.",
+    say: "On a slow link the SOS has to go first. A small model on the hub reads messy text and pulls out the facts, and plain code scores it, so it never invents a number. And from the relay's voltage, the hub predicts when the power drops out, with a range.",
     doNote: "Click Panicked SOS, then Rank it.",
   },
   {
-    id: "shares", seconds: 20, kicker: "It shares",
+    id: "shares", seconds: 25, kicker: "It shares",
     title: "It shares what's left and sees who's struggling.",
     sub: "Needs meet offers across levels, medicine first. Daily check-ins show the deep levels sleeping hours less.",
-    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. The same check-ins track sleep and mood: the deep levels sleep three hours less. All signed, so the Directorate can't hide it.",
+    purpose: "Bring it back to people: fairness and wellbeing.",
+    takeaway: "It makes life underground fairer.",
+    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. The same check-ins track sleep and mood: the deep levels sleep three hours less. And a box at the top of the shaft says the surface air is breathable.",
   },
   {
-    id: "proof", seconds: 15, kicker: "Measured, not claimed",
+    id: "reach", seconds: 15, kicker: "The brief",
+    title: "One network, 13 of the 15 questions.",
+    sub: "Built on the same signed channel, with designs for the last two: the move back up.",
+    purpose: "Show breadth after the proof, so it lands as earned.",
+    takeaway: "One system, not fifteen features.",
+    say: "Because it's one trusted channel, it reaches 13 of the brief's 15 questions, eleven of them live, and the last two, the move back to the surface, are designed on top of it.",
+  },
+  {
+    id: "proof", seconds: 25, kicker: "Measured, not claimed",
     title: "Built to be trusted underground.",
     sub: "Every number is from a real run in eval/results.",
-    say: "Zero of 300 forgeries accepted, 160 of 160 edits caught, 200 of 200 alerts through link cuts. Undercurrent: the network they can't take away.",
+    purpose: "Close on evidence and the team: why it should win.",
+    takeaway: "Every claim has a number behind it.",
+    say: "Zero of 300 forgeries accepted. 160 of 160 edits caught. 200 of 200 alerts through link cuts. AI triage right 88 percent of the time. Built by four of us. Undercurrent: the network they can't take away.",
   },
 ];
 
@@ -76,6 +112,22 @@ export const QUESTIONS: { n: number; short: string; status: "live" | "partial" |
   { n: 13, short: "Is the surface safe?", status: "live" },
   { n: 14, short: "Suits, domes or outposts", status: "design" },
   { n: 15, short: "Plan the move up", status: "design" },
+];
+
+/** What the Directorate does to the network (slide 1). */
+export const THREATS = [
+  { verb: "Reads", what: "every message on the only network" },
+  { verb: "Fakes", what: "all-clears while the water rises" },
+  { verb: "Cuts", what: "the line, and rewrites the numbers" },
+];
+
+/** The Canary box (slide 3): Tisya's hardware. */
+export const BOX_PARTS = [
+  { part: "Water probe", does: "wet past its threshold for 3 s → flooding alert" },
+  { part: "SOS button", does: "a signed call for help" },
+  { part: "LED and buzzer", does: "the alarm people hear on the level" },
+  { part: "Temperature and fan", does: "heat, and a cooling fan that stalls" },
+  { part: "Linux side", does: "signs every alert (Ed25519) and runs its own hub" },
 ];
 
 /** Headline numbers for the last slide, from eval/results/RESULTS.md. */
