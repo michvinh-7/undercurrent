@@ -14,10 +14,77 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isEncrypted, useUndercurrent } from "@/lib/useUndercurrent";
 import { BEATS, RESULTS } from "./beats";
+import { QUESTIONS } from "../pitch/slides";
 import {
   CopyCommand, Dot, Eyebrow, ExchangeSection, ForecastSection, HowItWorks, SurfaceReturnSection, SurfaceSection, TONE,
   TriageSection, useLiveToasts, useProofs, WellbeingSection,
 } from "./sections";
+
+/** Where each of the brief's 15 questions is proven: a section on this page, or another page. */
+const PROVEN_AT: Record<number, { label: string; href: string }> = {
+  1: { label: "Forecast", href: "#forecast" }, 2: { label: "Have / Need", href: "#exchange" }, 3: { label: "3D map", href: "/hollow" },
+  4: { label: "3D map", href: "/hollow" }, 5: { label: "Beat 1", href: "#beats" }, 6: { label: "Have / Need", href: "#exchange" },
+  7: { label: "How it works", href: "#how" }, 8: { label: "People", href: "#wellbeing" }, 9: { label: "Console", href: "/dashboard" },
+  10: { label: "Have / Need", href: "#exchange" }, 11: { label: "People", href: "#wellbeing" }, 12: { label: "Have / Need", href: "#exchange" },
+  13: { label: "Surface", href: "#surface" }, 14: { label: "Next", href: "#next" }, 15: { label: "Next", href: "#next" },
+};
+const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(--muted)" } as const;
+
+const SECTIONS = [
+  { id: "how", label: "How it works" }, { id: "beats", label: "Attack it" }, { id: "triage", label: "AI triage" },
+  { id: "forecast", label: "Forecast" }, { id: "exchange", label: "Have / Need" }, { id: "wellbeing", label: "People" },
+  { id: "surface", label: "Surface" }, { id: "next", label: "Next: going up" }, { id: "proof", label: "Proof" },
+];
+
+/** The 15 questions as this page's index: each tile jumps to where it's proven. */
+function QuestionIndex({ q }: { q: string }) {
+  const count = (st: string) => QUESTIONS.filter((x) => x.status === st).length;
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-lg font-semibold">The 15 questions, and where each is proven</h2>
+        <span className="text-[13px] text-muted-foreground">click one to jump to it</span>
+        <span className="ml-auto flex flex-wrap gap-x-4 font-mono text-xs">
+          <span><span style={{ color: STATUS_COLOR.live }}>■</span> {count("live")} live</span>
+          <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>
+          <span><span style={{ color: STATUS_COLOR.design }}>■</span> {count("design")} designed</span>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {QUESTIONS.map((x) => {
+          const at = PROVEN_AT[x.n];
+          const href = at.href.startsWith("#") ? at.href : `${at.href}${q}`;
+          const tile = (
+            <>
+              <span className="font-mono text-[11px]" style={{ color: STATUS_COLOR[x.status] }}>{x.n} → {at.label}</span>
+              <span className="text-sm leading-snug text-foreground">{x.short}</span>
+            </>
+          );
+          const cls = "flex min-h-[4.25rem] flex-col justify-between gap-1.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent";
+          const style = { borderColor: `color-mix(in srgb, ${STATUS_COLOR[x.status]} 55%, var(--border))` };
+          return at.href.startsWith("#")
+            ? <a key={x.n} href={href} className={cls} style={style}>{tile}</a>
+            : <Link key={x.n} href={href} className={cls} style={style}>{tile}</Link>;
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Jump links that stay at the top while the page scrolls. */
+function SectionBar() {
+  return (
+    <nav aria-label="Sections" className="sticky top-0 z-[var(--z-header)] -mx-4 border-b border-border bg-background/90 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
+      <div className="flex gap-1 overflow-x-auto">
+        {SECTIONS.map((x) => (
+          <a key={x.id} href={`#${x.id}`} className="shrink-0 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            {x.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 export default function Overview() {
   const net = useUndercurrent();
@@ -33,7 +100,7 @@ export default function Overview() {
     <div className="min-h-screen bg-background">
       <AppBar net={net} />
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
-      <main className="mx-auto flex max-w-7xl flex-col gap-16 px-4 pb-24 sm:px-6">
+      <main className="mx-auto flex max-w-7xl flex-col gap-14 px-4 pb-24 sm:px-6">
         {/* Hero */}
         <section className="flex flex-wrap items-end gap-10 pt-14">
           <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
@@ -47,9 +114,12 @@ export default function Overview() {
             </p>
             <div className="flex flex-wrap gap-2.5 pt-1">
               <Button asChild size="lg">
-                <a href="#beats">
-                  Start the walkthrough <ArrowRightIcon />
-                </a>
+                <Link href={`/pitch${q}`}>
+                  Watch the 2-minute pitch <ArrowRightIcon />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <a href="#beats">Walk through the demo</a>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href={`/hollow${q}`}>Open the 3D map</Link>
@@ -74,19 +144,23 @@ export default function Overview() {
           </Card>
         </section>
 
+        <QuestionIndex q={q} />
+
+        <SectionBar />
+
         {/* How it works */}
-        <section className="flex flex-col gap-5">
+        <section id="how" className="flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>How it works</Eyebrow>
+            <Eyebrow>How it works · question 7</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">One alert, from the water probe to every hub</h2>
           </div>
           <HowItWorks net={net} />
         </section>
 
         {/* The five beats */}
-        <section id="beats" className="flex scroll-mt-6 flex-col gap-5">
+        <section id="beats" className="flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>The demo, in five beats</Eyebrow>
+            <Eyebrow>The demo, in five beats · questions 5 and 7</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Each one checked live against the hubs</h2>
           </div>
           <Tabs defaultValue="box">
@@ -148,20 +222,20 @@ export default function Overview() {
           </Tabs>
         </section>
 
-        <TriageSection net={net} />
+        <div id="triage" className="scroll-mt-16"><TriageSection net={net} /></div>
 
-        <ForecastSection net={net} />
+        <div id="forecast" className="scroll-mt-16"><ForecastSection net={net} /></div>
 
-        <ExchangeSection net={net} />
+        <div id="exchange" className="scroll-mt-16"><ExchangeSection net={net} /></div>
 
-        <WellbeingSection net={net} />
+        <div id="wellbeing" className="scroll-mt-16"><WellbeingSection net={net} /></div>
 
-        <SurfaceSection net={net} q={q} />
+        <div id="surface" className="scroll-mt-16"><SurfaceSection net={net} q={q} /></div>
 
-        <SurfaceReturnSection net={net} />
+        <div id="next" className="scroll-mt-16"><SurfaceReturnSection net={net} /></div>
 
         {/* Results */}
-        <section className="flex flex-col gap-5">
+        <section id="proof" className="flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <Eyebrow>What we measured</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The numbers behind each beat</h2>
