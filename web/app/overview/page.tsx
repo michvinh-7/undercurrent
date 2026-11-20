@@ -17,12 +17,12 @@ import { BEATS, RESULTS } from "./beats";
 import { QUESTIONS } from "../pitch/slides";
 import {
   CopyCommand, Dot, Eyebrow, ExchangeSection, ForecastSection, HowItWorks, SurfaceReturnSection, SurfaceSection, TONE,
-  TriageSection, useLiveToasts, useProofs, WellbeingSection,
+  LivabilitySection, TriageSection, useLiveToasts, useProofs, WellbeingSection,
 } from "./sections";
 
 /** Where each of the brief's 15 questions is proven: a section on this page, or another page. */
 const PROVEN_AT: Record<number, { label: string; href: string }> = {
-  1: { label: "Forecast", href: "#forecast" }, 2: { label: "Have / Need", href: "#exchange" }, 3: { label: "3D map", href: "/hollow" },
+  1: { label: "Forecast", href: "#forecast" }, 2: { label: "Have / Need", href: "#exchange" }, 3: { label: "Livability", href: "#livability" },
   4: { label: "3D map", href: "/hollow" }, 5: { label: "Beat 1", href: "#beats" }, 6: { label: "Have / Need", href: "#exchange" },
   7: { label: "How it works", href: "#how" }, 8: { label: "People", href: "#wellbeing" }, 9: { label: "Console", href: "/dashboard" },
   10: { label: "Have / Need", href: "#exchange" }, 11: { label: "People", href: "#wellbeing" }, 12: { label: "Have / Need", href: "#exchange" },
@@ -33,7 +33,7 @@ const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(-
 const SECTIONS = [
   { id: "how", label: "How it works" }, { id: "beats", label: "Attack it" }, { id: "triage", label: "AI triage" },
   { id: "forecast", label: "Forecast" }, { id: "exchange", label: "Have / Need" }, { id: "wellbeing", label: "People" },
-  { id: "surface", label: "Surface" }, { id: "next", label: "Next: going up" }, { id: "proof", label: "Proof" },
+  { id: "livability", label: "Livability" }, { id: "surface", label: "Surface" }, { id: "next", label: "Next: going up" }, { id: "proof", label: "Proof" },
 ];
 
 /** The 15 questions as this page's index: each tile jumps to where it's proven. */
@@ -229,6 +229,8 @@ export default function Overview() {
         <div id="exchange" className="scroll-mt-16"><ExchangeSection net={net} /></div>
 
         <div id="wellbeing" className="scroll-mt-16"><WellbeingSection net={net} /></div>
+
+        <div id="livability" className="scroll-mt-16"><LivabilitySection net={net} /></div>
 
         <div id="surface" className="scroll-mt-16"><SurfaceSection net={net} q={q} /></div>
 

@@ -39,6 +39,8 @@ Every hub runs the same checks on every event, whether it comes from a phone, a 
 
 Anything that fails goes on a rejected list with its reason. That list is the console's "forgeries blocked" counter.
 
+**Don't trust the hub: check it.** `hub/scripts/verify.py` is an independent audit that imports none of the hub's code: about 300 lines of standard library plus PyNaCl. Give it a live hub, a hub's database file or an export, plus the roster you got in person. It recomputes every hash and signature, replays the roster to check that each signer was a member when it signed, finds forks and deleted rows, and cross-checks two hubs event by event. It can sign its report with the auditor's own key, so the verdict can be passed on and checked too.
+
 **What runs on top:**
 
 | Feature | What it does | Where |
@@ -46,18 +48,19 @@ Anything that fails goes on a rejected list with its reason. That list is the co
 | AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first | `hub/app/triage.py`, `POST /triage` |
 | Blackout forecast | A least-squares line through a relay box's last 8 voltage readings predicts when the supply drops to 180 V, with a range; it only warns when the fall is clear of the noise | `hub/app/forecast.py`, `GET /forecast` |
 | Have / Need board | Signed offers and requests (space, food, water, medicine, power), matched to the nearest offer, medicine and water first, then the longest-waiting; only the poster can close a post | `hub/app/exchange.py`, `GET /exchange` |
+| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events | `hub/app/livability.py`, `GET /livability` |
 | Sleep, mood and roll call | Optional answers on the daily check-in, averaged per level only once 2+ people answer; plus who hasn't been heard from today | `hub/app/wellbeing.py`, `GET /wellbeing` |
 | Cell messages | XSalsa20-Poly1305 (tweetnacl secretbox) under a key shared in person by QR | `web/lib/cell.ts`, `/cell` |
 | Surface check | A box at the top of the shaft signs CO₂ and oxygen, next to the Directorate's "the air kills in minutes" | `/overview`, map Briefs #13 |
 
 ## The 15 questions
 
-The brief asks 15 questions. Undercurrent answers 11 with working features, 2 partly, and has designs for the last 2, all on the same signed network.
+The brief asks 15 questions. Undercurrent answers 12 with working features, 1 partly, and has designs for the last 2, all on the same signed network.
 
 | | Questions |
 |---|---|
-| **Built and live** | 1 warn before blackouts · 2 share fairly · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 13 is the surface safe |
-| **Partly** | 3 keep levels livable (heat readings, no cooling response) · 12 grow food (shared on the board, nothing helps grow it) |
+| **Built and live** | 1 warn before blackouts · 2 share fairly · 3 keep levels livable (the Livability Index) · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 13 is the surface safe |
+| **Partly** | 12 grow food (shared on the board, nothing helps grow it) |
 | **Designed, not built** | 14 suits, domes or outposts · 15 plan the move up (both on `/overview`) |
 
 ## What we measured
@@ -69,9 +72,10 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 | Forged and replayed messages accepted | **0 of 300**; all 40 real member alerts accepted | `eval/run_attacks.py`, real hub, generated attacks |
 | Edited database records caught at the exact row | **160 of 160**, deleting the newest row included | same script, direct edits to the hub's database |
 | Deleted rows put back by the other hub | **20 of 20**, chain intact | same script, two real hubs synced |
+| Adaptive attackers, isolated episodes | **0 breaches** in 40,000 fuzzer attempts (2,000 episodes) and 20 episodes of a local LLM playing the Directorate; every database edit flagged or put back by sync; reset **0.9 ms**, identical to the starting hub 2,020 of 2,020 times. It found and we fixed a crash: a row edited to level 999999 took the hub's pages down | `eval/run_directorate_gym.py` |
 | Alerts delivered after random link cuts | **200 of 200** after 26 cuts, 0 duplicates | `eval/run_sync_stress.py`, two real hubs, simulated cuts |
 | Water on the probe to the alert on the other hub | **0.81 s** median, 30 of 30 | `eval/run_probe_latency.py`, dry run with a simulated box; `--real` with the Canary box |
-| AI triage urgency accuracy | **88%** (Gemini) and **76%** (local Llama) vs **54%** for keyword rules, 149 held-out messages | `eval/run_triage_eval.py` |
+| AI triage urgency accuracy | **76%** offline (local Llama 3.2 3B, the model the hub runs) vs **54%** for keyword rules, 149 held-out messages. Cloud Gemini: 88%. Microsoft's Phi-4-mini, also offline: 77%, but worse at ranking SOS first (55% vs 62%), so the hub keeps Llama | `eval/run_triage_eval.py` |
 | SOS delay with the priority queue | **72–76% shorter** than first-come-first-served | same, simulated arrivals |
 | Blackout forecast, an hour before drop-out | **6 min** off vs 27 min for a two-reading guess; **0%** false alarms on steady power vs 35% | `eval/run_forecast_eval.py`, 1,000 synthetic sags |
 
@@ -79,6 +83,7 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 - **Metadata is visible.** Hubs can see who sent a cell message, when, and from which level. Hiding that, the way Tor does, is out of scope.
 - **A stolen phone can sign** until an operator removes its key (one roster event, synced to every hub).
 - **A hub's own priority score isn't protected** by the hash, on purpose: the hub sets it on arrival.
+- **One hub alone can't see some deletions.** With the laptop, deleting the newest row together with the hub's record of writing it, or deleting rows of the *other* hub's chain, looks to that hub like rows that haven't arrived yet. The other hub still holds them, and the next sync round puts them back (found and measured by the Directorate gym).
 - **Cutting the power to a hub** stops it; nothing is lost, but nothing moves until it's back.
 
 ---
@@ -163,6 +168,8 @@ cd hub
 .venv/bin/python scripts/directorate.py edit      # change a stored record → the chain check names the row
 .venv/bin/python scripts/directorate.py delete    # delete the newest record → flagged, then put back
 .venv/bin/python scripts/directorate.py status    # both hubs: counter, fingerprint, do they agree
+.venv/bin/python scripts/verify.py --hub http://127.0.0.1:8001 --hub http://127.0.0.1:8002 --roster demo/roster.json
+                                                   # independent audit: PASS, or the exact row that fails
 ```
 
 **5. Tests and numbers**
@@ -227,6 +234,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 | GET | `/forecast` | Per voltage-reporting box: trend, status and when it reaches the cutoff (`?cutoff=180`) |
 | GET | `/exchange` | The Have / Need board: open needs and offers, matches, counts per level |
 | GET | `/wellbeing` | Sleep and mood per level (2+ answers only) and the roll call (`?window_h=24`) |
+| GET | `/livability` | The Livability Index: a 0-100 score per level, each dimension with its reason and the signed events behind it (`?window_h=6`) |
 
 ## How we work
 

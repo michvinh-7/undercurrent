@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .ai_routes import router as ai_router
 from .exchange import board as exchange_board
 from .forecast import CUTOFF_V, forecast_all
+from .livability import livability
 from .wellbeing import wellbeing
 from .gate import Gate, Rejected
 from .link import Link
@@ -125,6 +126,14 @@ def sleep_mood_roll_call(window_h: float = Query(default=24, gt=0, le=24 * 7, de
     answered), and the roll call: residents heard from this week but not in the window
     (hub/app/wellbeing.py)."""
     return wellbeing(log.list(), window_h)
+
+
+@app.get("/livability")
+def livability_index(window_h: float = Query(default=6, gt=0, le=24 * 7, description="Hours of readings and reports that count")):
+    """The Livability Index: one 0-100 score per level from signed readings, reports, the
+    blackout forecast, the Have / Need board and check-ins, each number traceable to its
+    events (hub/app/livability.py)."""
+    return livability(log.list(), window_h)
 
 
 @app.get("/events/verify")

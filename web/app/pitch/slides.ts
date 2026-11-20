@@ -56,7 +56,7 @@ export const SLIDES: Slide[] = [
     purpose: "Prove the security claims under attack, on camera, with numbers.",
     takeaway: "Attacks fail on camera, and we measured it.",
     say: "Now we play the Directorate. A forged all-clear: refused, and the counter goes up. Cut the link: alerts wait in line, then every one arrives. Edit a stored record: the chain points to the exact row. Across 300 forgeries we accepted zero, and caught 160 of 160 edits.",
-    doNote: "Terminal, from hub/: directorate.py forge, then cut, a phone SOS, restore, then edit.",
+    doNote: "Terminal, from hub/: directorate.py forge, then cut, a phone SOS, restore, then edit, then scripts/verify.py --hub … --hub … --roster demo/roster.json: a separate checker that uses none of the hub's code names the edited row.",
   },
   {
     id: "thinks", seconds: 25, kicker: "It thinks",
@@ -70,10 +70,10 @@ export const SLIDES: Slide[] = [
   {
     id: "shares", seconds: 25, kicker: "It shares",
     title: "It shares what's left and sees who's struggling.",
-    sub: "Needs meet offers across levels, medicine first. Daily check-ins show the deep levels sleeping hours less.",
-    purpose: "Bring it back to people: fairness and wellbeing.",
+    sub: "Needs meet offers across levels, medicine first. Check-ins track sleep. One score per level says which is failing, and why.",
+    purpose: "Bring it back to people: fairness, wellbeing, and which level needs help first.",
     takeaway: "It makes life underground fairer.",
-    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. The same check-ins track sleep and mood: the deep levels sleep three hours less. And a box at the top of the shaft says the surface air is breathable.",
+    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. Check-ins show the deep levels sleep three hours less. And it all adds up to one score per level: level 34 is unsafe, and it says why, the air.",
   },
   {
     id: "reach", seconds: 15, kicker: "The brief",
@@ -81,7 +81,7 @@ export const SLIDES: Slide[] = [
     sub: "Built on the same signed channel, with designs for the last two: the move back up.",
     purpose: "Show breadth after the proof, so it lands as earned.",
     takeaway: "One system, not fifteen features.",
-    say: "Because it's one trusted channel, it reaches 13 of the brief's 15 questions, eleven of them live, and the last two, the move back to the surface, are designed on top of it.",
+    say: "Because it's one trusted channel, it reaches 13 of the brief's 15 questions, twelve of them live, and the last two, the move back to the surface, are designed on top of it.",
   },
   {
     id: "proof", seconds: 25, kicker: "Measured, not claimed",
@@ -89,7 +89,7 @@ export const SLIDES: Slide[] = [
     sub: "Every number is from a real run in eval/results.",
     purpose: "Close on evidence and the team: why it should win.",
     takeaway: "Every claim has a number behind it.",
-    say: "Zero of 300 forgeries accepted. 160 of 160 edits caught. 200 of 200 alerts through link cuts. AI triage right 88 percent of the time. Built by four of us. Undercurrent: the network they can't take away.",
+    say: "Zero of 300 forgeries accepted. 160 of 160 edits caught. Then an AI and a fuzzer played the Directorate: 40,000 attacks, none got through, and they found a bug we fixed. Offline AI triage gets urgency right 76 percent of the time, against 54 for keyword rules. Built by four of us. Undercurrent: the network they can't take away.",
   },
 ];
 
@@ -99,7 +99,7 @@ export const TOTAL_SECONDS = SLIDES.reduce((t, s) => t + s.seconds, 0);
 export const QUESTIONS: { n: number; short: string; status: "live" | "partial" | "design" }[] = [
   { n: 1, short: "Warn before blackouts", status: "live" },
   { n: 2, short: "Share fairly", status: "live" },
-  { n: 3, short: "Keep levels livable", status: "partial" },
+  { n: 3, short: "Keep levels livable", status: "live" },
   { n: 4, short: "Catch bad water", status: "live" },
   { n: 5, short: "Safe tunnels", status: "live" },
   { n: 6, short: "Share space", status: "live" },
@@ -135,7 +135,8 @@ export const PROOF = [
   { value: "0 / 300", label: "forged or replayed alerts accepted" },
   { value: "160 / 160", label: "edits caught at the exact row" },
   { value: "200 / 200", label: "alerts delivered through link cuts" },
-  { value: "88%", label: "AI triage urgency (54% keywords)" },
+  { value: "0 breaches", label: "in 40,156 attacks by an AI and a fuzzer" },
+  { value: "76%", label: "offline AI triage urgency (54% keywords)" },
   { value: "6 min", label: "blackout forecast error an hour out (27 for a guess)" },
 ];
 

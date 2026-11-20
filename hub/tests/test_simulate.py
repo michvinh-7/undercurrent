@@ -133,6 +133,11 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
     assert (wb[34]["people"], wb[34]["sleep_avg_h"], wb[34]["mood_avg"]) == (3, 4.3, 1.7)
     assert (wb[35]["sleep_avg_h"], wb[35]["mood_avg"]) == (3.5, 1.5)
     assert (wb[12]["sleep_avg_h"], wb[12]["mood_avg"]) == (7.0, 4.5)
+    # the Livability Index ranks the levels like the hidden truth, every number traced to a stored event
+    li = c.get(f"{l12}/livability").json()["levels"]
+    assert [x["level"] for x in li] == [34, 35, 12, 1] and li[0]["band"] == "unsafe" and li[-1]["band"] == "livable"
+    stored = {e["id"] for e in events}
+    assert all(i in stored for x in li for d in x["dimensions"].values() for i in d["events"])
     sensors = [e for e in events if e.get("device_id")]
     assert sensors and all(e["source"] == "sensor" and e["author"] == e["device_id"] for e in sensors)
     assert c.get(f"{l34}/rejected").json()["total"] == 0

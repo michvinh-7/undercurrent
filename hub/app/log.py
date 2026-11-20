@@ -161,7 +161,7 @@ class EventLog:
 
     def get(self, event_id: str) -> Event | None:
         row = self._db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-        return self._row_to_event(row) if row else None
+        return self._readable(row) if row else None
 
     def ids(self) -> list[str]:
         return [r[0] for r in self._db.execute("SELECT id FROM events ORDER BY seq")]
@@ -203,7 +203,7 @@ class EventLog:
             query += " AND created_at > ?"
             params.append(since)
         rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
-        return [self._row_to_event(r) for r in rows]
+        return [e for r in rows if (e := self._readable(r)) is not None]
 
     def after(self, seq: int, type: str | None = None, level: int | None = None) -> list[tuple[int, Event]]:
         """Events stored after position `seq`, with their positions. Used by the live stream:
@@ -217,7 +217,7 @@ class EventLog:
             params.append(level)
         with self._lock:
             rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
-        return [(row["seq"], self._row_to_event(row)) for row in rows]
+        return [(row["seq"], e) for row in rows if (e := self._readable(row)) is not None]
 
     def fingerprint(self) -> str:
         """One short hash of every event this hub holds, in any order: two hubs that hold
@@ -245,32 +245,46 @@ class EventLog:
           reported only if nothing above was found, since a later row already points at it
         Not bad: another hub's event whose predecessor hasn't arrived yet. Counted in `gaps`.
         """
-        events = [self._row_to_event(r) for r in self._db.execute("SELECT * FROM events ORDER BY seq")]
+        rows = self._db.execute("SELECT * FROM events ORDER BY seq").fetchall()
         hashes: dict[str, set[str]] = {}
-        for e in events:
-            hashes.setdefault(e.hub_id, set()).add(e.hash)
+        for r in rows:
+            hashes.setdefault(r["hub_id"], set()).add(r["hash"])
         seen_prev: set[tuple[str, str]] = set()
         gaps: dict[str, int] = {}
         first_bad = None
-        for e in events:
-            fields = e.model_dump()
-            bad = compute_hash(fields, e.prev_hash) != e.hash or (e.sig is not None and not crypto.verify(fields))
-            if (e.hub_id, e.prev_hash) in seen_prev:
+        for r in rows:
+            e = self._readable(r)
+            if e is None:  # edited into something that isn't an event (a level of 999999, a broken payload)
+                bad = True
+            else:
+                fields = e.model_dump()
+                bad = compute_hash(fields, e.prev_hash) != e.hash or (e.sig is not None and not crypto.verify(fields))
+            if (r["hub_id"], r["prev_hash"]) in seen_prev:
                 bad = True  # fork: a second event claims the same predecessor
-            seen_prev.add((e.hub_id, e.prev_hash))
-            if e.prev_hash != GENESIS and e.prev_hash not in hashes[e.hub_id]:
-                if e.hub_id == self.hub_id:
+            seen_prev.add((r["hub_id"], r["prev_hash"]))
+            if r["prev_hash"] != GENESIS and r["prev_hash"] not in hashes[r["hub_id"]]:
+                if r["hub_id"] == self.hub_id:
                     bad = True  # a row of our own chain is missing
                 else:
-                    gaps[e.hub_id] = gaps.get(e.hub_id, 0) + 1
+                    gaps[r["hub_id"]] = gaps.get(r["hub_id"], 0) + 1
             if bad and first_bad is None:
-                first_bad = e.id
+                first_bad = r["id"]
         if first_bad is None:
             missing = self._db.execute(
                 "SELECT event_id FROM own_hashes WHERE event_id NOT IN (SELECT id FROM events) ORDER BY n LIMIT 1"
             ).fetchone()
             first_bad = missing["event_id"] if missing else None
         return {"chain_intact": first_bad is None, "first_bad_event": first_bad, "gaps": gaps}
+
+    @classmethod
+    def _readable(cls, row: sqlite3.Row) -> Event | None:
+        """The row as an Event, or None if someone edited it into something that isn't one.
+        Such a row is skipped when listing (so one bad row can't take the hub's pages down)
+        and named as bad by verify_report()."""
+        try:
+            return cls._row_to_event(row)
+        except (ValueError, TypeError):  # pydantic's ValidationError and JSONDecodeError are ValueErrors
+            return None
 
     @staticmethod
     def _row_to_event(row: sqlite3.Row) -> Event:
