@@ -136,7 +136,24 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
     }
     : { n: 13, q: "Prove whether the surface is safe", status: "ready", line: "A box at the top of the shaft signs its air readings, so the Directorate can't fake them.", action: test("surface", "Try a reading") };
 
-  const planned = (n: number, q: string, line: string): Brief => ({ n, q, status: "planned", line });
+
+  // 11 · sleep and mood from the daily check-in (each person's latest answer; a level only with 2+ people)
+  const sleepByLevel = (() => {
+    const latest = new Map<string, MapEvent>();
+    for (const e of events) {
+      const p = e.event.payload as { sleep_h?: unknown };
+      if (e.event.type !== "checkin" || typeof p.sleep_h !== "number") continue;
+      const who = e.event.author_pub ?? e.event.author;
+      const prev = latest.get(who);
+      if (!prev || e.event.created_at > prev.event.created_at) latest.set(who, e);
+    }
+    const per = new Map<number, number[]>();
+    for (const e of latest.values()) if (e.level !== null) per.set(e.level, [...(per.get(e.level) ?? []), (e.event.payload as { sleep_h: number }).sleep_h]);
+    return [...per].filter(([, xs]) => xs.length >= 2).map(([n, xs]) => ({ n, avg: xs.reduce((a, b) => a + b, 0) / xs.length })).sort((a, b) => a.avg - b.avg);
+  })();
+  const b11: Brief = sleepByLevel.length
+    ? { n: 11, q: "Track what no sunlight does to people", status: "live", line: `Daily check-ins: ${sleepByLevel.map((x) => `L${x.n} sleeps ${x.avg.toFixed(1)} h`).join(" · ")} (levels with 2+ answers)`, action: { label: "Who checked in", run: () => go.openFeed("people") } }
+    : { n: 11, q: "Track what no sunlight does to people", status: "ready", line: "The daily check-in asks hours slept and mood; each level's average shows once 2 or more people answer." };
 
   // 6 and 12 · the Have / Need board (type "exchange", hub/app/exchange.py): posts of one kind
   const board = (n: number, q: string, kinds: string[], what: string): Brief => {
@@ -150,7 +167,7 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
     b1, b2, b3, b4, b5,
     board(6, "Find or share living space", ["space"], "beds or rooms"),
     b7, b8, b9, b10,
-    planned(11, "Track what no sunlight does to people", "Optional sleep and mood on the check-in, shown as a trend per level. Needs the field on the phone page (Alanna)."),
+    b11,
     board(12, "Grow and share food locally", ["food"], "food or seeds"),
     b13,
     { n: 14, q: "Choose suits, domes or outposts for going up", status: "design", line: "The same signed boxes inside each trial suit, dome and outpost would compare them on real readings. Not built." },
