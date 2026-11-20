@@ -5,6 +5,7 @@
 // deep dives. The live sections live in ./sections.tsx and are shared with /pitch.
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { ArrowLeftRightIcon, ArrowRightIcon } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
@@ -14,7 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isEncrypted, useUndercurrent } from "@/lib/useUndercurrent";
 import { BEATS, RESULTS } from "./beats";
-import { QUESTIONS } from "../pitch/slides";
+import { PROOF, QUESTIONS } from "../pitch/slides";
 import {
   CopyCommand, Dot, Eyebrow, ExchangeSection, ForecastSection, HowItWorks, SurfaceReturnSection, SurfaceSection, TONE,
   LivabilitySection, TriageSection, useLiveToasts, useProofs, WellbeingSection,
@@ -31,10 +32,53 @@ const PROVEN_AT: Record<number, { label: string; href: string }> = {
 const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(--muted)" } as const;
 
 const SECTIONS = [
-  { id: "how", label: "How it works" }, { id: "beats", label: "Attack it" }, { id: "triage", label: "AI triage" },
-  { id: "forecast", label: "Forecast" }, { id: "exchange", label: "Have / Need" }, { id: "wellbeing", label: "People" },
-  { id: "livability", label: "Livability" }, { id: "surface", label: "Surface" }, { id: "next", label: "Next: going up" }, { id: "proof", label: "Proof" },
+  { id: "beats", label: "Attack it" }, { id: "how", label: "How it works" }, { id: "layers", label: "Built on top" },
+  { id: "proof", label: "Proof" }, { id: "why", label: "Why it wins" }, { id: "questions", label: "The 15 questions" },
 ];
+
+/** The features built on the signed channel, one visible at a time. Each id is also the old #anchor,
+ * so links such as #forecast still land on the right tab. */
+const LAYERS = [
+  { id: "triage", label: "AI triage", q: "Q9, Q10" }, { id: "forecast", label: "Blackout forecast", q: "Q1" },
+  { id: "exchange", label: "Have / Need", q: "Q2, Q6, Q12" }, { id: "wellbeing", label: "People", q: "Q8, Q11" },
+  { id: "livability", label: "Livability", q: "Q3" }, { id: "surface", label: "Surface air", q: "Q13" },
+  { id: "next", label: "Going up", q: "Q14, Q15" },
+] as const;
+
+/** An optional demo video, shown only when NEXT_PUBLIC_DEMO_VIDEO_URL is set (an .mp4 or an embed link). */
+function DemoVideo() {
+  const url = process.env.NEXT_PUBLIC_DEMO_VIDEO_URL;
+  if (!url) return null;
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/\.(mp4|webm)(\?|$)/.test(url)
+        ? <video src={url} controls preload="metadata" className="aspect-video w-full" />
+        : <iframe src={url} title="Undercurrent demo video" allow="fullscreen; picture-in-picture" allowFullScreen className="aspect-video w-full" />}
+    </div>
+  );
+}
+
+/** Four headline numbers, above the fold. */
+function ProofStrip() {
+  return (
+    <dl className="grid max-w-3xl grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-5 sm:grid-cols-4">
+      {PROOF.slice(0, 4).map((r) => (
+        <div key={r.label} className="flex flex-col gap-1">
+          <dd className="font-mono text-2xl font-medium tabular-nums sm:text-3xl">{r.value}</dd>
+          <dt className="order-last text-[13px] leading-snug text-muted-foreground">{r.label}</dt>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Why this should win, in the four things judges grade. */
+const WHY = [
+  { head: "It answers the brief", body: "One signed channel answers 12 of the 15 questions live, 1 partly, and designs the last 2. Question 7 (organise without the Directorate) and 13 (is the surface safe?) are central, not bolted on." },
+  { head: "It is hard engineering", body: "Ed25519 signing at the source, an in-person roster, replay defence, per-hub hash chains repaired from the peer, sync that survives cuts, end-to-end cells, and a verifier that shares no code with the hub." },
+  { head: "It is measured", body: "0 of 300 forgeries accepted, 160 of 160 edits caught at the row, 0 of 1,120 alerts lost across 40 hubs. Our own adaptive attackers made 40,156 attempts against our hubs with 0 breaches. Every number reruns from eval/." },
+  { head: "It is honest about limits", body: "Boxes and city data are simulated and labelled. Hubs can see who sent a cell message and when. A physical cut stops movement until it is restored. The offline AI misjudges urgency about 1 time in 4, so code and signatures carry the safety." },
+] as const;
 
 /** The 15 questions as this page's index: each tile jumps to where it's proven. */
 function QuestionIndex({ q }: { q: string }) {
@@ -89,6 +133,23 @@ function SectionBar() {
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
+  const [layer, setLayer] = useState<string>("triage");
+  useEffect(() => {
+    // The old anchors (#forecast, #exchange, ...) now name tabs: open the tab, then scroll to the block.
+    const open = () => {
+      const id = window.location.hash.slice(1);
+      if (LAYERS.some((l) => l.id === id)) {
+        setLayer(id);
+        requestAnimationFrame(() => document.getElementById("layers")?.scrollIntoView({ behavior: "smooth" }));
+      } else if (id === "questions") {
+        const d = document.querySelector<HTMLDetailsElement>("#questions details");
+        if (d) d.open = true;
+      }
+    };
+    open();
+    window.addEventListener("hashchange", open);
+    return () => window.removeEventListener("hashchange", open);
+  }, []);
   const proofs = useProofs(net);
   useLiveToasts(net);
 
@@ -109,7 +170,7 @@ export default function Overview() {
               The network the Directorate can&apos;t read, fake or shut off.
             </h1>
             <p className="max-w-[62ch] text-lg text-foreground/75">
-              A Canary sensor box and residents&apos; phones sign every alert. Two hubs check each one and keep identical copies, so a
+              Canary sensor boxes (simulated in this demo) and residents&apos; phones sign every alert. Two hubs check each one and keep identical copies, so a
               forged alert is refused, an edited record is caught, and cutting the link loses nothing.
             </p>
             <div className="flex flex-wrap gap-2.5 pt-1">
@@ -125,6 +186,7 @@ export default function Overview() {
                 <Link href={`/hollow${q}`}>Open the 3D map</Link>
               </Button>
             </div>
+            <ProofStrip />
           </div>
           <Card className="min-w-0 flex-[1_1_320px] gap-0 p-5">
             <p className="caption mb-3">{net.mode === "demo" ? "Sample data (no hub reachable)" : "Right now, on the hubs"}</p>
@@ -144,18 +206,9 @@ export default function Overview() {
           </Card>
         </section>
 
-        <QuestionIndex q={q} />
+        <DemoVideo />
 
         <SectionBar />
-
-        {/* How it works */}
-        <section id="how" className="flex scroll-mt-16 flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
-            <Eyebrow>How it works · question 7</Eyebrow>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">One alert, from the water probe to every hub</h2>
-          </div>
-          <HowItWorks net={net} />
-        </section>
 
         {/* The five beats */}
         <section id="beats" className="flex scroll-mt-16 flex-col gap-5">
@@ -222,19 +275,39 @@ export default function Overview() {
           </Tabs>
         </section>
 
-        <div id="triage" className="scroll-mt-16"><TriageSection net={net} /></div>
+        {/* How it works */}
+        <section id="how" className="flex scroll-mt-16 flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>How it works · question 7</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">One alert, from the water probe to every hub</h2>
+          </div>
+          <HowItWorks net={net} />
+        </section>
 
-        <div id="forecast" className="scroll-mt-16"><ForecastSection net={net} /></div>
-
-        <div id="exchange" className="scroll-mt-16"><ExchangeSection net={net} /></div>
-
-        <div id="wellbeing" className="scroll-mt-16"><WellbeingSection net={net} /></div>
-
-        <div id="livability" className="scroll-mt-16"><LivabilitySection net={net} /></div>
-
-        <div id="surface" className="scroll-mt-16"><SurfaceSection net={net} q={q} /></div>
-
-        <div id="next" className="scroll-mt-16"><SurfaceReturnSection net={net} /></div>
+        {/* Everything built on the signed channel, one at a time */}
+        <section id="layers" className="flex scroll-mt-16 flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>Built on the same signed channel</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Seven more answers to the brief, from the same data</h2>
+          </div>
+          <Tabs value={layer} onValueChange={setLayer}>
+            <TabsList className="flex flex-wrap gap-2">
+              {LAYERS.map((l) => (
+                <TabsTrigger key={l.id} value={l.id} className="min-h-11 flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-2 data-[state=active]:border-primary">
+                  <span className="text-[15px] font-semibold text-foreground">{l.label}</span>
+                  <span className="font-mono text-[11px] font-normal text-muted-foreground">{l.q}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <TabsContent value="triage" className="mt-3"><TriageSection net={net} /></TabsContent>
+            <TabsContent value="forecast" className="mt-3"><ForecastSection net={net} /></TabsContent>
+            <TabsContent value="exchange" className="mt-3"><ExchangeSection net={net} /></TabsContent>
+            <TabsContent value="wellbeing" className="mt-3"><WellbeingSection net={net} /></TabsContent>
+            <TabsContent value="livability" className="mt-3"><LivabilitySection net={net} /></TabsContent>
+            <TabsContent value="surface" className="mt-3"><SurfaceSection net={net} q={q} /></TabsContent>
+            <TabsContent value="next" className="mt-3"><SurfaceReturnSection net={net} /></TabsContent>
+          </Tabs>
+        </section>
 
         {/* Results */}
         <section id="proof" className="flex scroll-mt-16 flex-col gap-5">
@@ -255,6 +328,32 @@ export default function Overview() {
             What it doesn&apos;t do: hubs can see who sent a cell message and when, just not what it says. The Directorate can still cut
             power to a hub; nothing is lost, but nothing moves until it&apos;s back. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
           </p>
+        </section>
+
+        {/* Why it should win */}
+        <section id="why" className="flex scroll-mt-16 flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>Why Undercurrent should win</Eyebrow>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">What a judge can check in five minutes</h2>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {WHY.map((w) => (
+              <Card key={w.head} className="gap-2 p-5 sm:p-6">
+                <span className="text-lg font-semibold">{w.head}</span>
+                <span className="text-foreground/75">{w.body}</span>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* The 15 questions */}
+        <section id="questions" className="scroll-mt-16">
+          <details className="rounded-xl border border-border bg-card">
+            <summary className="cursor-pointer select-none px-5 py-4 text-lg font-semibold">
+              The brief&apos;s 15 questions: {QUESTIONS.filter((x) => x.status === "live").length} live, {QUESTIONS.filter((x) => x.status === "partial").length} partly, {QUESTIONS.filter((x) => x.status === "design").length} designed
+            </summary>
+            <div className="px-5 pb-5"><QuestionIndex q={q} /></div>
+          </details>
         </section>
 
         {/* Try it */}

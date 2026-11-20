@@ -63,7 +63,7 @@ export const BEATS: Beat[] = [
     id: "sniff",
     title: "Sniffing the link",
     what: "The Directorate taps the link. Public alerts are readable on purpose; cell messages are ciphertext to everyone without the cell key, the hubs included.",
-    watch: "On the Directorate view the left column shows bytes; a member's phone shows the words.",
+    watch: "On the Directorate view the left column shows bytes; a member's phone shows the words. On the console, flip to the Directorate view: it's their control room, and every command they fire (forge, replay, rewrite, cut, decrypt) is stamped with what the hubs actually did.",
     open: { href: "/truth", label: "Open the Directorate view" },
     commandLabel: "Send a sealed message from a phone",
     command: "Phone: Cell messages → Send encrypted",

@@ -288,6 +288,49 @@ export function useUndercurrent() {
     [live],
   );
 
+  /**
+   * The Directorate reuses a real alert: "replay" sends a real signed alert again, exactly as
+   * it was; "tamper" rewrites its words to an all-clear but keeps the resident's signature.
+   * Real requests to the hub; it refuses them ("replay: duplicate id", "bad signature").
+   */
+  const reuseAlert = useCallback(
+    async (hub: HubState | undefined, how: "replay" | "tamper") => {
+      const target = eventList
+        .filter((e) => e.sig && e.type !== "roster" && !isEncrypted(e) && (!hub?.hubId || e.hub_id === hub.hubId))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      const demoReason = how === "replay" ? "replay: duplicate id" : "bad signature";
+      if (!live || !hub || !target) {
+        if (live && !target) return { ok: false, reason: "no signed alert to reuse yet" };
+        setDemo((d) => d && {
+          ...d,
+          rejected: {
+            total: d.rejected.total + 1,
+            rejected: [
+              { seq: d.rejected.total + 1, received_at: new Date().toISOString(), reason: demoReason, via: "post",
+                event: { type: "hazard", level: 34, author: "directorate", payload: { kind: "other", severity: "low", note: "All clear, level 34" } } },
+              ...d.rejected.rejected,
+            ],
+          },
+        });
+        return { ok: false, reason: `${demoReason} (demo)` };
+      }
+      const fields = ["id", "type", "hub_id", "level", "created_at", "author", "payload", "author_pub", "source", "device_id", "sig"] as const;
+      const body: Record<string, unknown> = Object.fromEntries(fields.map((f) => [f, (target as unknown as Record<string, unknown>)[f] ?? null]));
+      if (how === "tamper") {
+        body.id = crypto.randomUUID(); // a new id, so it isn't caught as a replay: only the signature can catch it
+        body.payload = { ...(target.payload ?? {}), severity: "low", note: "All clear. Stay in your homes." };
+      }
+      const res = await fetch(`${hub.url}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const out = await res.json().catch(() => ({}));
+      return { ok: res.ok, reason: res.ok ? "accepted (!)" : String(out.detail ?? res.status), target: target.id };
+    },
+    [live, eventList],
+  );
+
   /** Demo mode only: a new sensor alert, so the offline showcase can show beat 1. */
   const demoSensorAlert = useCallback((level = 34) => {
     if (live) return;
@@ -313,7 +356,7 @@ export function useUndercurrent() {
     forgeriesBlocked,
     rejected: rejectedAll,
     chain,
-    actions: { setLink, injectForgery, demoSensorAlert },
+    actions: { setLink, injectForgery, reuseAlert, demoSensorAlert },
   };
 }
 

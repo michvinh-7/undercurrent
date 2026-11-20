@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightLeftIcon, ChevronRightIcon, LockKeyholeIcon, QrCodeIcon, StethoscopeIcon, TriangleAlertIcon, UserCheckIcon, UserSearchIcon } from "lucide-react";
+import { DesktopRedirect } from "@/components/desktop-redirect";
 import { PhoneHeader, RememberHub } from "@/components/phone";
 
 // The hub's home page on a resident's phone: pick what to report.
@@ -37,6 +38,7 @@ export default function Home() {
   return (
     <div className="min-h-[100dvh] bg-background">
       <RememberHub />
+      <DesktopRedirect />
       <PhoneHeader />
       <main className="mx-auto flex max-w-md flex-col gap-8 px-4 pb-16 pt-7">
         <div>

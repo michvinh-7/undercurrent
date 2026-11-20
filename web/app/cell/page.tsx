@@ -20,6 +20,40 @@ import type { HollowEvent } from "@/lib/types";
 
 type Status = { state: "idle" } | { state: "sending" } | { state: "sent"; signed: boolean } | { state: "error"; message: string };
 
+const LOCAL = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * The address a phone can open: this page's own, unless it was opened on localhost (a laptop),
+ * where a QR code would point the phone at itself. Then use the laptop's network address
+ * (from /api/lan) for both the page and the hub. "none": no network to share.
+ */
+function usePhoneReachable(active: boolean): { origin: string; hub: string; swapped: string | null } | "none" | null {
+  const [out, setOut] = useState<{ origin: string; hub: string; swapped: string | null } | "none" | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const here = window.location;
+    const hub = hubUrl();
+    if (!LOCAL.has(here.hostname)) {
+      setOut({ origin: here.origin, hub, swapped: null });
+      return;
+    }
+    let live = true;
+    fetch("/api/lan", { cache: "no-store" })
+      .then((r) => r.json())
+      .then(({ addresses }: { addresses: string[] }) => {
+        if (!live) return;
+        const ip = addresses?.[0];
+        if (!ip) return setOut("none");
+        const h = new URL(hub);
+        if (LOCAL.has(h.hostname)) h.hostname = ip;
+        setOut({ origin: `${here.protocol}//${ip}${here.port ? `:${here.port}` : ""}`, hub: h.origin, swapped: ip });
+      })
+      .catch(() => live && setOut("none"));
+    return () => { live = false; };
+  }, [active]);
+  return out;
+}
+
 const newHandle = () => `anon-${Math.random().toString(16).slice(2, 6)}`;
 
 export default function CellPage() {
@@ -30,6 +64,7 @@ export default function CellPage() {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [showInvite, setShowInvite] = useState(false);
+  const reach = usePhoneReachable(showInvite);
   const [level, setLevel] = useStored<number | null>("uc-level", null);
   const [author] = useStored("uc-author", newHandle);
 
@@ -187,10 +222,25 @@ export default function CellPage() {
                 Scan this with the new member&apos;s phone camera. Anyone who opens it can read the cell, so show it face to face,
                 never send it over the hub.
               </p>
-              <div className="mt-3 rounded-lg bg-white p-2">
-                <QR value={inviteLink(key, window.location.origin)} label="QR code of the cell invite link" />
-              </div>
-              <p className="mt-3 select-all break-all font-mono text-xs text-foreground/80">{inviteLink(key, window.location.origin)}</p>
+              {reach === null ? (
+                <p className="mt-3 text-sm text-muted-foreground">Finding this laptop&apos;s network address…</p>
+              ) : reach === "none" ? (
+                <p className="mt-3 text-sm text-[var(--danger)]">
+                  This page is open on localhost, and this laptop has no network address a phone could reach. Join Wi-Fi or a hotspot, then try again.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-3 rounded-lg bg-white p-2">
+                    <QR value={inviteLink(key, reach.origin, reach.hub)} label="QR code of the cell invite link" />
+                  </div>
+                  <p className="mt-3 select-all break-all font-mono text-xs text-foreground/80">{inviteLink(key, reach.origin, reach.hub)}</p>
+                  {reach.swapped && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Uses this laptop&apos;s network address ({reach.swapped}) instead of localhost, so the phone can open it. The phone must be on the same Wi-Fi or hotspot.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
           <button type="button" onClick={leave} className="min-h-11 w-full text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
