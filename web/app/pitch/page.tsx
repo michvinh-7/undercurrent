@@ -1,9 +1,9 @@
 "use client";
 
-// The 2-minute pitch: six full-screen slides, each built on a live component from /overview
+// The 3-minute pitch: eight full-screen slides, each built on a live component from /overview
 // (./sections.tsx), so judges watch the real hubs react. Words live in ./slides.ts.
 //
-// Keys: → / Space next · ← back · 1-6 jump · N speaker notes · P auto-play · F full screen.
+// Keys: → / Space next · ← back · 1-8 jump · N speaker notes · P auto-play · F full screen.
 // URL: ?slide=3 opens slide 3; ?auto=1 starts auto-play; ?hub= and ?peer= are kept.
 
 import Link from "next/link";
@@ -18,7 +18,7 @@ import { isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUnderc
 import {
   Dot, ExchangeSection, ForecastSection, HowItWorks, TONE, TriageSection, useLiveToasts, useProofs, WellbeingSection,
 } from "../overview/sections";
-import { PROOF, QUESTIONS, SLIDES, STACK, TEAM, TEAM_PLACEHOLDER, TOTAL_SECONDS } from "./slides";
+import { BOX_PARTS, PROOF, QUESTIONS, SLIDES, STACK, TEAM, TEAM_PLACEHOLDER, THREATS, TOTAL_SECONDS } from "./slides";
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(--muted)" } as const;
@@ -41,6 +41,53 @@ function QuestionsGrid() {
         <span><span style={{ color: STATUS_COLOR.live }}>■</span> {count("live")} built and live</span>
         <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>
         <span><span style={{ color: STATUS_COLOR.design }}>■</span> {count("design")} designed</span>
+      </div>
+    </div>
+  );
+}
+
+function ThreatSlide() {
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {THREATS.map((t) => (
+        <Card key={t.verb} className="gap-2 p-6" style={{ borderColor: "color-mix(in srgb, var(--directorate) 55%, var(--border))" }}>
+          <span className="font-mono text-xs uppercase tracking-[0.16em] text-[var(--directorate)]">The Directorate</span>
+          <span className="text-3xl font-semibold">{t.verb}</span>
+          <span className="text-lg text-foreground/80">{t.what}</span>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function BoxSlide({ net }: { net: Undercurrent }) {
+  const p = useProofs(net);
+  return (
+    <div className="grid items-start gap-3 lg:grid-cols-[1.2fr_1fr]">
+      <Card className="gap-3 p-6">
+        <span className="caption">Arduino UNO Q · Tisya&apos;s build</span>
+        <ul className="flex flex-col divide-y divide-border">
+          {BOX_PARTS.map((b) => (
+            <li key={b.part} className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 py-2.5">
+              <span className="w-44 shrink-0 font-semibold">{b.part}</span>
+              <span className="min-w-0 flex-1 text-foreground/80">{b.does}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <div className="flex flex-col gap-3">
+        <Card className="gap-2 p-6" style={{ borderColor: TONE[p.box.tone] }} aria-live="polite">
+          <span className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em]" style={{ color: TONE[p.box.tone] }}>
+            <Dot tone={p.box.tone} /> Live from the hubs
+          </span>
+          <span className="text-2xl font-semibold leading-snug">{p.box.headline}</span>
+          <span className="text-sm text-muted-foreground">{p.box.detail}</span>
+        </Card>
+        <Card className="gap-1 p-6">
+          <span className="font-mono text-3xl font-medium tabular-nums">0.81 s</span>
+          <span className="text-foreground/80">water on the probe to the alert on the other hub</span>
+          <span className="text-xs text-muted-foreground">median of 30, dry run with a simulated box; the real-box run uses the same script</span>
+        </Card>
       </div>
     </div>
   );
@@ -128,8 +175,10 @@ function ProofSlide() {
 
 function Body({ id, net }: { id: (typeof SLIDES)[number]["id"]; net: Undercurrent }) {
   switch (id) {
-    case "problem": return <QuestionsGrid />;
-    case "how": return <HowSlide net={net} />;
+    case "problem": return <ThreatSlide />;
+    case "answer": return <HowSlide net={net} />;
+    case "box": return <BoxSlide net={net} />;
+    case "reach": return <QuestionsGrid />;
     case "holds": return <HoldsSlide net={net} />;
     case "thinks":
       return (
@@ -196,7 +245,7 @@ export default function Pitch() {
       if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable)) return;
       if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); go(i + 1); }
       else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(i - 1); }
-      else if (/^[1-6]$/.test(e.key)) go(Number(e.key) - 1);
+      else if (/^[1-9]$/.test(e.key) && Number(e.key) <= SLIDES.length) go(Number(e.key) - 1);
       else if (e.key === "n" || e.key === "N") setNotes((v) => !v);
       else if (e.key === "p" || e.key === "P") { setAuto((v) => !v); setStartedAt((s) => s ?? Date.now()); }
       else if (e.key === "f" || e.key === "F") document.documentElement.requestFullscreen?.().catch(() => {});
@@ -239,13 +288,18 @@ export default function Pitch() {
           <div className="min-w-0">
             <Body id={s.id} net={net} />
           </div>
+          <p className="flex items-baseline gap-3 border-l-2 border-primary pl-4 text-lg font-medium lg:text-xl">
+            <span className="font-mono text-xs uppercase tracking-[0.16em] text-primary">Takeaway</span>
+            {s.takeaway}
+          </p>
           </div>
         </main>
 
         {/* speaker notes */}
         {notes && (
           <aside className="shrink-0 border-t border-border bg-card px-6 py-3 sm:px-12 lg:px-20" aria-label="Speaker notes">
-            <p className="text-sm leading-relaxed"><span className="caption mr-2">Say ({s.seconds} s)</span>{s.say}</p>
+            <p className="text-sm text-muted-foreground"><span className="caption mr-2">Why this slide</span>{s.purpose}</p>
+            <p className="mt-1 text-sm leading-relaxed"><span className="caption mr-2">Say ({s.seconds} s)</span>{s.say}</p>
             {s.doNote && <p className="mt-1 text-sm text-muted-foreground"><span className="caption mr-2">Do</span>{s.doNote}</p>}
           </aside>
         )}

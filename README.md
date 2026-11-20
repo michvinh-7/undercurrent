@@ -89,7 +89,7 @@ Start the web app (below) and open http://localhost:3000. Laptop pages take `?hu
 
 | Page | For | Shows |
 |---|---|---|
-| `/pitch` | Judges, 2 minutes | Six full-screen slides, each with a live component. → / Space next, N speaker notes, P auto-play, F full screen |
+| `/pitch` | Judges, 3 minutes | Eight full-screen slides (the stakes, the answer, the Canary box, attacks live, AI and the forecast, sharing and wellbeing, the 15 questions, the numbers and team), each with a live component and a takeaway. → / Space next, N speaker notes, P auto-play, F full screen |
 | `/overview` | Judges, the deep dive | How it works, the five demo beats with live proof and the command for each, AI triage, the forecast, the board, sleep and mood, the surface, the designs for 14 and 15, the numbers |
 | `/dashboard` | The operator | Priority queue, forgeries, the link (with a cut button), the chain check, missing persons |
 | `/hollow` | Everyone | The 3D city, one level at a time, with alerts where they happened and a Briefs tab for all 15 questions |

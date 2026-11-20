@@ -1,6 +1,6 @@
 "use client";
 
-// The live sections of the judges' front door (/overview), shared with the 2-minute presenter
+// The live sections of the judges' front door (/overview), shared with the 3-minute presenter
 // mode (/pitch). Each section takes `compact`: true shows only its live card, without the
 // heading or the "measured" card, so a slide can hold it. Nothing here is made up: counts
 // come from useUndercurrent (the same data as the console) and the hubs' own endpoints.

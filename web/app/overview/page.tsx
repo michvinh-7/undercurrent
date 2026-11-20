@@ -115,7 +115,7 @@ export default function Overview() {
             <div className="flex flex-wrap gap-2.5 pt-1">
               <Button asChild size="lg">
                 <Link href={`/pitch${q}`}>
-                  Watch the 2-minute pitch <ArrowRightIcon />
+                  Watch the 3-minute pitch <ArrowRightIcon />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
