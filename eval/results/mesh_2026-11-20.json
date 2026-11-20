@@ -1,0 +1,105 @@
+{
+ "date": "2026-11-20",
+ "args": {
+  "hubs": 40,
+  "history": 25,
+  "cut_rounds": 30,
+  "per_round": 4,
+  "quiet": 5,
+  "sizes": "1000,10000,100000",
+  "origins": 40,
+  "seed": 2087,
+  "out": "/Users/MV/undercurrent/eval/results"
+ },
+ "runs": {
+  "ids": {
+   "mode": "ids",
+   "hubs": 40,
+   "links": 78,
+   "events": 1120,
+   "history_events": 1000,
+   "alerts_during_cut": 120,
+   "rounds_to_agree_history": 39,
+   "sides_agree_during_cut": true,
+   "deep_only_alerts_held_back": 69,
+   "rounds_to_agree_after_reconnect": 20,
+   "lost": 0,
+   "duplicated": 0,
+   "chains_intact": true,
+   "refused": 0,
+   "bytes": {
+    "history": {
+     "question": 80785562,
+     "events": 45500821
+    },
+    "cut": {
+     "question": 222010920,
+     "events": 2593560
+    },
+    "reconnect": {
+     "question": 68063160,
+     "events": 2871760
+    },
+    "quiet_per_round": {
+     "question": 3499158.0,
+     "events": 0.0
+    },
+    "total": 439321573
+   },
+   "seconds": 125.2
+  },
+  "summary": {
+   "mode": "summary",
+   "hubs": 40,
+   "links": 78,
+   "events": 1120,
+   "history_events": 1000,
+   "alerts_during_cut": 120,
+   "rounds_to_agree_history": 39,
+   "sides_agree_during_cut": true,
+   "deep_only_alerts_held_back": 69,
+   "rounds_to_agree_after_reconnect": 20,
+   "lost": 0,
+   "duplicated": 0,
+   "chains_intact": true,
+   "refused": 0,
+   "bytes": {
+    "history": {
+     "question": 4345172,
+     "events": 45500821
+    },
+    "cut": {
+     "question": 7489454,
+     "events": 2593560
+    },
+    "reconnect": {
+     "question": 380562,
+     "events": 2871760
+    },
+    "quiet_per_round": {
+     "question": 6708.0,
+     "events": 0.0
+    },
+    "total": 63214869
+   },
+   "seconds": 188.5
+  }
+ },
+ "question_sizes": [
+  {
+   "events": 1000,
+   "ids_bytes": 40061,
+   "summary_bytes": 3225
+  },
+  {
+   "events": 10000,
+   "ids_bytes": 400061,
+   "summary_bytes": 3265
+  },
+  {
+   "events": 100000,
+   "ids_bytes": 4000061,
+   "summary_bytes": 3305
+  }
+ ]
+}

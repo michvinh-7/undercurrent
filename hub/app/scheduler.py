@@ -9,9 +9,8 @@ than a set limit.
     3. Otherwise, highest priority first; ties go to whoever arrived first.
 
 Works on anything with the fields hub/app/link.py queues carry: `priority`,
-`enqueued_at`, `order` and `event.level`. To turn it on in a hub later, Link
-picks with `pick()` instead of plain highest-priority (one change in link.py,
-Tisya's call). Until then the eval uses it through a subclass.
+`enqueued_at`, `order` and `event.level`. On in every hub: Link(fair_max_wait_s=60)
+picks with `pick()` (main.py; LINK_FAIR_MAX_WAIT_S=0 turns it off).
 """
 
 from collections.abc import Sequence
