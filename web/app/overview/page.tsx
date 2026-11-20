@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, ArrowRightLeftIcon as SwapIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, ArrowRightLeftIcon as SwapIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, MoonIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -656,6 +656,111 @@ function ExchangeSection({ net }: { net: Undercurrent }) {
   );
 }
 
+interface WellbeingLevel { level: number; people: number; hidden?: string; sleep_avg_h?: number; short_sleep_share?: number; mood_avg?: number; low_mood_share?: number }
+interface WellbeingView { window_h: number; min_people: number; levels: WellbeingLevel[]; heard_from: number; known: number; unaccounted: { author: string; level: number; last_heard_h: number }[] }
+
+function Bar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-accent" role="img" aria-label={label}>
+        <div className="h-full rounded-full" style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: color }} />
+      </div>
+      <span className="w-14 shrink-0 text-right font-mono text-sm tabular-nums">{label}</span>
+    </div>
+  );
+}
+
+/** Question 11 (sleep and mood underground) and question 8 (the roll call), live from GET /wellbeing. */
+function WellbeingSection({ net }: { net: Undercurrent }) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const [w, setW] = useState<WellbeingView | null>(null);
+  useEffect(() => {
+    if (net.mode !== "live" || !primary) return;
+    let stop = false;
+    async function poll() {
+      try {
+        const res = await fetch(`${primary!.url}/wellbeing`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
+        if (res.ok && !stop) setW((await res.json()) as WellbeingView);
+      } catch {}
+    }
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => { stop = true; clearInterval(t); };
+  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shown = w?.levels.filter((l) => !l.hidden) ?? [];
+  const deep = shown.filter((l) => l.level >= 31 && l.sleep_avg_h !== undefined);
+  const upper = shown.filter((l) => l.level < 31 && l.sleep_avg_h !== undefined);
+  const avg = (ls: WellbeingLevel[]) => ls.reduce((t, l) => t + (l.sleep_avg_h ?? 0), 0) / ls.length;
+  const gap = deep.length && upper.length ? avg(upper) - avg(deep) : null;
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>What living underground does to people · questions 11 and 8</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {gap !== null && gap > 0.5 ? `The deep levels sleep ${gap.toFixed(1)} hours less` : "Sleep and mood, level by level"}
+        </h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          The daily check-in asks two optional questions: hours slept and mood from 1 to 5. Each person&apos;s latest answer counts once, and
+          a level&apos;s average only shows once at least {w?.min_people ?? 2} people have answered, so nobody can be singled out. The same
+          check-ins give a roll call: who has been heard from today, and who hasn&apos;t.
+        </p>
+      </div>
+      <Card className="gap-4 p-6">
+        {!w ? (
+          <p className="text-muted-foreground">{net.mode === "live" ? "Loading…" : "Connect to a hub to see sleep and mood."}</p>
+        ) : w.levels.length === 0 ? (
+          <p className="text-muted-foreground">No sleep or mood answers today yet. Check in from a phone, or run the simulation.</p>
+        ) : (
+          <>
+            <div className="hidden grid-cols-[4rem_1fr_1fr_6rem] gap-4 text-xs text-muted-foreground sm:grid">
+              <span>Level</span><span>Hours slept (avg)</span><span>Mood, 1 to 5 (avg)</span><span className="text-right">Low mood</span>
+            </div>
+            <ul className="flex flex-col gap-3">
+              {w.levels.map((l) => (
+                <li key={l.level} className="grid grid-cols-[4rem_1fr] items-center gap-x-4 gap-y-2 sm:grid-cols-[4rem_1fr_1fr_6rem]">
+                  <span className="font-mono text-sm">
+                    L{l.level}
+                    <span className="block text-xs text-muted-foreground">{l.people} {l.people === 1 ? "person" : "people"}</span>
+                  </span>
+                  {l.hidden ? (
+                    <span className="text-sm text-muted-foreground sm:col-span-3">Hidden: {l.hidden}</span>
+                  ) : (
+                    <>
+                      {l.sleep_avg_h !== undefined ? <Bar value={l.sleep_avg_h} max={9} color={l.sleep_avg_h < 6 ? "var(--warn)" : "var(--ok)"} label={`${l.sleep_avg_h} h`} /> : <span className="text-sm text-muted-foreground">–</span>}
+                      {l.mood_avg !== undefined ? <Bar value={l.mood_avg} max={5} color={l.mood_avg <= 2 ? "var(--danger)" : l.mood_avg < 3.5 ? "var(--warn)" : "var(--ok)"} label={`${l.mood_avg} / 5`} /> : <span className="text-sm text-muted-foreground">–</span>}
+                      <span className="col-start-2 font-mono text-sm tabular-nums text-muted-foreground sm:col-start-auto sm:text-right">
+                        {l.low_mood_share !== undefined ? `${Math.round(l.low_mood_share * 100)}%` : "–"}
+                      </span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {w && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-sm">
+            <MoonIcon className="size-4 text-primary" aria-hidden="true" />
+            <span>
+              Roll call: <strong className="font-semibold">{w.heard_from}</strong> of {w.known} residents heard from in the last {w.window_h} h.
+            </span>
+            {w.unaccounted.length > 0 ? (
+              <span className="text-[var(--warn)]">
+                Not heard from: {w.unaccounted.slice(0, 4).map((u) => `${u.author} (L${u.level}, ${Math.round(u.last_heard_h)} h)`).join(", ")}
+                {w.unaccounted.length > 4 ? ` and ${w.unaccounted.length - 4} more` : ""}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Everyone heard from this week has checked in today.</span>
+            )}
+          </div>
+        )}
+      </Card>
+    </section>
+  );
+}
+
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
@@ -817,6 +922,8 @@ export default function Overview() {
         <ForecastSection net={net} />
 
         <ExchangeSection net={net} />
+
+        <WellbeingSection net={net} />
 
         <SurfaceSection net={net} q={q} />
 

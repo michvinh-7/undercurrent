@@ -128,6 +128,11 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
         assert all(m["need_level"] in (34, 35) and m["have_level"] == 12 for m in b["matches"])
         assert [n["category"] for n in b["needs"] if not n["matched"]] == ["power"]
         assert all(p["signed"] and p["simulated"] for p in b["needs"] + b["haves"])
+    # sleep and mood: each level's averages from each person's latest check-in; the deep levels are worse off
+    wb = {r["level"]: r for r in c.get(f"{l12}/wellbeing").json()["levels"]}
+    assert (wb[34]["people"], wb[34]["sleep_avg_h"], wb[34]["mood_avg"]) == (3, 4.3, 1.7)
+    assert (wb[35]["sleep_avg_h"], wb[35]["mood_avg"]) == (3.5, 1.5)
+    assert (wb[12]["sleep_avg_h"], wb[12]["mood_avg"]) == (7.0, 4.5)
     sensors = [e for e in events if e.get("device_id")]
     assert sensors and all(e["source"] == "sensor" and e["author"] == e["device_id"] for e in sensors)
     assert c.get(f"{l34}/rejected").json()["total"] == 0

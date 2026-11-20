@@ -19,7 +19,11 @@ export function summary(e: HollowEvent): string {
   const p = e.payload;
   switch (e.type) {
     case "checkin":
-      return [p.status === "need_help" ? "Needs help" : "Checked in OK", str(p.name), str(p.note)].filter(Boolean).join(" · ");
+      return [
+        p.status === "need_help" ? "Needs help" : "Checked in OK", str(p.name), str(p.note),
+        typeof p.sleep_h === "number" ? `slept ${p.sleep_h} h` : null,
+        typeof p.mood === "number" ? `mood ${p.mood}/5` : null,
+      ].filter(Boolean).join(" · ");
     case "hazard":
       return [`${String(p.kind ?? "hazard").replace("_", " ")} (${p.severity ?? "?"})`, str(p.location), str(p.note)]
         .filter(Boolean)

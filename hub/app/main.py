@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .ai_routes import router as ai_router
 from .exchange import board as exchange_board
 from .forecast import CUTOFF_V, forecast_all
+from .wellbeing import wellbeing
 from .gate import Gate, Rejected
 from .link import Link
 from .log import EventLog
@@ -116,6 +117,14 @@ def have_need_board():
     """The Have / Need board: open needs and offers, suggested matches, counts per level
     (hub/app/exchange.py)."""
     return exchange_board(log.list(type="exchange"))
+
+
+@app.get("/wellbeing")
+def sleep_mood_roll_call(window_h: float = Query(default=24, gt=0, le=24 * 7, description="Hours that count as today")):
+    """Sleep and mood per level from daily check-ins (shown only when at least 2 people
+    answered), and the roll call: residents heard from this week but not in the window
+    (hub/app/wellbeing.py)."""
+    return wellbeing(log.list(), window_h)
 
 
 @app.get("/events/verify")
