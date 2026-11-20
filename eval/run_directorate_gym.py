@@ -515,6 +515,7 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--replays", type=int, default=50, help="fuzz episodes re-run from their seed to check resets")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--out", default=str(RESULTS), help="where the report goes (CI writes elsewhere)")
     args = ap.parse_args(argv)
 
     folder = Path(tempfile.mkdtemp(prefix="gym-"))
@@ -558,8 +559,8 @@ def main(argv=None) -> int:
     out["isolation"] = {"golden_unchanged": sha256_file(golden["path"]) == golden_sha}
     shutil.rmtree(folder, ignore_errors=True)
 
-    RESULTS.mkdir(exist_ok=True)
-    stem = RESULTS / f"directorate_gym_{out['date']}"
+    Path(args.out).mkdir(parents=True, exist_ok=True)
+    stem = Path(args.out) / f"directorate_gym_{out['date']}"
     stem.with_suffix(".json").write_text(json.dumps(out, indent=1))
     stem.with_suffix(".md").write_text(report_md(out))
     print(report_md(out))

@@ -6,11 +6,12 @@ Two hubs that sync: HUB_ID=hub-L34 HUB_DB=l34.db HUB_PEERS=http://localhost:8002
                     HUB_ID=hub-L12 HUB_DB=l12.db HUB_PEERS=http://localhost:8001 uvicorn app.main:app --port 8002
 """
 
+import ipaddress
 import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +35,8 @@ HUB_ID = os.getenv("HUB_ID", "hub-L38")
 HUB_DB = os.getenv("HUB_DB", "hub.db")
 HUB_PEERS = [p.strip() for p in os.getenv("HUB_PEERS", "").split(",") if p.strip()]
 SYNC_INTERVAL_S = float(os.getenv("SYNC_INTERVAL_S", "1") or 1)
+# Who may cut the link or change its bandwidth: only this machine, unless LINK_CONTROL=open.
+LINK_CONTROL_OPEN = os.getenv("LINK_CONTROL", "").strip().lower() == "open"
 
 
 @asynccontextmanager
@@ -171,9 +174,24 @@ def link_status():
     return link.status()
 
 
+def from_this_machine(request: Request) -> bool:
+    """True when the request came from the machine the hub runs on: a loopback address, or
+    the same address the connection reached (a browser on the laptop using its Wi-Fi IP)."""
+    client = request.client.host if request.client else ""
+    server = (request.scope.get("server") or ("",))[0]
+    try:
+        return ipaddress.ip_address(client).is_loopback or client == server
+    except ValueError:
+        return client == "testclient"  # FastAPI's in-process test client
+
+
 @app.post("/link")
-def set_link(settings: LinkSettings):
-    """For the dashboard's bandwidth slider and "cut the network" button."""
+def set_link(settings: LinkSettings, request: Request):
+    """For the dashboard's bandwidth slider and "cut the network" button. Only from the
+    hub's own machine: otherwise anyone on the Wi-Fi (the Directorate) could cut the link
+    through the hub's own API. LINK_CONTROL=open lifts that for a multi-machine setup."""
+    if not (LINK_CONTROL_OPEN or from_this_machine(request)):
+        raise HTTPException(403, "link control is only allowed from the hub's own machine")
     if settings.unlimited and settings.bandwidth_bps is not None:
         raise HTTPException(422, "send bandwidth_bps or unlimited, not both")
     # Through the syncer: events that finished crossing before the change get pushed, not dropped.

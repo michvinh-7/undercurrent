@@ -1,0 +1,56 @@
+# Every push and pull request: the hub's tests, a short Directorate gym (any breach fails the
+# run), and the web app's types and tests. No model and no internet services are needed:
+# triage falls back to keyword rules when Ollama isn't there, and the gym runs its fuzzer only.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hub:
+    name: Hub tests and Directorate gym
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: hub/requirements.txt
+      - name: Install
+        run: |
+          python -m venv hub/.venv
+          hub/.venv/bin/pip install -r hub/requirements.txt
+      - name: Hub tests
+        working-directory: hub
+        run: .venv/bin/python -m pytest -q
+      - name: Directorate gym (fuzzer, 200 episodes; fails on any breach)
+        run: hub/.venv/bin/python eval/run_directorate_gym.py --llm-episodes 0 --fuzz-episodes 200 --replays 10 --workers 2 --out "$RUNNER_TEMP/gym"
+      - name: Gym report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: directorate-gym
+          path: ${{ runner.temp }}/gym
+
+  web:
+    name: Web types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Types
+        run: npx tsc --noEmit
+      - name: Tests
+        run: node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs

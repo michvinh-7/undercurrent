@@ -1,5 +1,7 @@
 # Undercurrent
 
+[![CI](https://github.com/michvinh-7/undercurrent/actions/workflows/ci.yml/badge.svg)](https://github.com/michvinh-7/undercurrent/actions/workflows/ci.yml)
+
 **The Hollow's network the Directorate can't read, can't fake, and can't shut off.**
 
 The Hollow is an underground city of 40 levels. The Directorate controls the official network, can cut it at will, and publishes numbers that hide how bad things are. Undercurrent is the residents' own channel, and the tools they build on top of it:
@@ -174,6 +176,8 @@ cd hub
 
 **5. Tests and numbers**
 
+Every push runs the hub tests, a 200-episode Directorate gym that fails on any breach, and the web app's types and tests ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
 ```bash
 cd hub && .venv/bin/python -m pytest            # hub tests, including real-process sim and demo-script tests
 cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs
@@ -225,7 +229,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 | GET | `/roster` | Members, and whether signing is required |
 | POST | `/roster` | Add or remove a member. Must be signed by an operator |
 | GET | `/link` | The simulated outbound link: bandwidth, cut or not, queue size |
-| POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}` |
+| POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}`. Only from the hub's own machine (403 otherwise), so nobody on the Wi-Fi can cut the link through the API; `LINK_CONTROL=open` lifts that |
 | GET | `/sync/ids` | Every event id this hub holds, and its fingerprint |
 | POST | `/sync/events` | Events from a peer hub, each checked before it's stored |
 | GET | `/sync/status` | Peers, events in flight, gaps, rows restored, fingerprint, whether each peer agrees |
