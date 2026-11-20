@@ -9,6 +9,7 @@
 // Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
 import { AppBar } from "@/components/app-bar";
+import { PageIntro, Zone } from "@/components/page-intro";
 import { useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
 import { isEncrypted, isSensor, isSimulated, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
@@ -45,7 +46,17 @@ export default function Console() {
       className="mx-auto max-w-7xl px-4 py-6 sm:px-6"
       style={directorate ? { boxShadow: "inset 0 0 0 2px var(--directorate)" } : undefined}
     >
-      <Header net={net} directorate={directorate} setDirectorate={setDirectorate} />
+      <PageIntro
+        kicker={directorate ? "Console · Directorate view" : "Console"}
+        kickerColor={directorate ? "var(--directorate)" : undefined}
+        questions={[7, 9, 10]}
+        title={directorate ? "What the Directorate sees on the same feed." : "Every report, most urgent first, checked by both hubs."}
+        sub={directorate
+          ? "Public alerts are readable by anyone and signed, so they can't be faked. Cell messages are bytes without the key."
+          : "What the operator sees: signed alerts ranked by the hub's AI, and every attack the Directorate tries, refused or caught."}
+        actions={<HeaderControls net={net} directorate={directorate} setDirectorate={setDirectorate} />}
+        right={<StatStrip net={net} />}
+      />
 
       {net.mode === "demo" && (
         <p className="sim-hatch mt-4 rounded-lg border border-[var(--sim)] px-3 py-2 text-sm">
@@ -55,21 +66,22 @@ export default function Console() {
         </p>
       )}
 
-      <StatStrip net={net} />
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-        <section>
-          <div className="flex items-baseline justify-between">
-            <h2 className="caption">
-              {directorate ? "Intercepted traffic · Directorate view" : "Priority queue"} · {queue.length}
-            </h2>
-            {net.mode === "demo" && (
-              <button onClick={() => net.actions.demoSensorAlert(34)} className="caption underline hover:!text-[var(--foreground)]">
-                + demo sensor alert
-              </button>
-            )}
-          </div>
-          <ol className="mt-3 space-y-2">
+      <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <Zone
+          n={1}
+          title={directorate ? `Intercepted traffic · ${queue.length}` : `Who needs help, most urgent first · ${queue.length}`}
+          note={
+            <>
+              {directorate ? "every message on the link, as a tap sees it" : "the hub's AI reads free text; code does the scoring"}
+              {net.mode === "demo" && (
+                <button onClick={() => net.actions.demoSensorAlert(34)} className="ml-3 underline hover:text-foreground">
+                  + demo sensor alert
+                </button>
+              )}
+            </>
+          }
+        >
+          <ol className="space-y-2">
             {queue.map((e) => {
               const t = net.arrived.get(e.id);
               const isNew = t !== undefined && net.isFresh(e.id) && now - t < NEW_MS;
@@ -87,15 +99,25 @@ export default function Console() {
             })}
             {queue.length === 0 && <li className="text-[var(--muted)]">No reports yet.</li>}
           </ol>
-        </section>
+        </Zone>
 
         <aside className="space-y-6">
-          {[...net.hubs].sort((a) => (a === net.sendingHub ? -1 : 1)).map((h) => (
-            <LinkPanel key={h.role} hub={h} net={net} />
-          ))}
-          <ForgeryPanel net={net} now={now} />
-          <ChainPanel net={net} events={net.events} />
-          <MissingBoard events={net.events} now={now} />
+          <Zone n={2} title="Under attack" note="forged and replayed messages, refused">
+            <ForgeryPanel net={net} now={now} />
+          </Zone>
+          <Zone n={3} title="The link" note="cut it: alerts wait, then all arrive">
+            <div className="space-y-3">
+              {[...net.hubs].sort((a) => (a === net.sendingHub ? -1 : 1)).map((h) => (
+                <LinkPanel key={h.role} hub={h} net={net} />
+              ))}
+            </div>
+          </Zone>
+          <Zone n={4} title="The record" note="an edit breaks the chain at that row">
+            <ChainPanel net={net} events={net.events} />
+          </Zone>
+          <Zone n={5} title="People" note="missing persons, and who checked in">
+            <MissingBoard events={net.events} now={now} />
+          </Zone>
         </aside>
       </div>
     </main>
@@ -103,7 +125,7 @@ export default function Console() {
   );
 }
 
-function Header({
+function HeaderControls({
   net,
   directorate,
   setDirectorate,
@@ -112,18 +134,8 @@ function Header({
   directorate: boolean;
   setDirectorate: (v: boolean) => void;
 }) {
-  const primary = net.hubs.find((h) => h.role === "primary");
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="caption">
-          Undercurrent / Command{primary?.hubId ? ` / ${primary.hubId.replace("hub-", "Hub ")}` : ""}
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-          {directorate ? "What the Directorate sees" : "Rebel console"}
-        </h1>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
+    <>
         <ModeBadge mode={net.mode} />
         <button
           role="switch"
@@ -146,8 +158,7 @@ function Header({
           </span>
           Directorate view
         </button>
-      </div>
-    </header>
+    </>
   );
 }
 
@@ -180,7 +191,7 @@ function StatStrip({ net }: { net: Undercurrent }) {
   const link = net.sendingHub?.link;
   const chain = net.chain;
   return (
-    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Stat label="Verified reports" value={`${verified}/${alerts.length}`} sub="signed by a key on the roster" color="var(--ok)" />
       <Stat
         label={`Link · ${net.sendingHub?.hubId?.replace("hub-", "") ?? "hub"}`}

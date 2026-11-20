@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { timeAgo } from "@/lib/format";
 import { useUndercurrent } from "@/lib/useUndercurrent";
 import { AppBar } from "@/components/app-bar";
+import { PageIntroSlim } from "@/components/page-intro";
 import { adaptEvents, checkinStatus, isLungReport, isWaterReport, peopleIn, pinOf, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
 import {
   addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, levelInlet, safeRoute, streetGraph, streetMain, traceSource, upstream,
@@ -18,7 +19,7 @@ import { narrate, type SensorFacts, type Story } from "./narrate";
 import { activeSensorAlerts, buildingsNear, SENSOR_LOOK, type SensorAlert } from "./sensors";
 import { isPreset, testEvent, type TestPreset } from "./panels/TestAlerts";
 import type { HollowEvent } from "@/lib/types";
-import CityScene, { sourcePoint, type HubView, type Layers, type Selection, type View, type Zone } from "./scene/CityScene";
+import CityScene, { SEVERITY_COLOR, sourcePoint, type HubView, type Layers, type Selection, type View, type Zone } from "./scene/CityScene";
 import Briefs from "./panels/Briefs";
 import Feed, { type FeedFilter } from "./panels/Feed";
 import TestAlerts from "./panels/TestAlerts";
@@ -308,6 +309,19 @@ export default function CityApp() {
   return (
     <div className="theme-hollow flex h-[100dvh] w-full flex-col overflow-hidden">
       <AppBar net={net} />
+      <PageIntroSlim
+        kicker="3D map"
+        title="The city, live: every signed alert where it happened."
+        questions={[1, 3, 4, 5, 8, 9, 10, 11]}
+        legend={[
+          { label: "needs help", color: SEVERITY_COLOR.sos },
+          { label: "hazard", color: SEVERITY_COLOR.hazard },
+          { label: "caution", color: SEVERITY_COLOR.caution },
+          { label: "water pipe", color: "#3b82c4", mark: "square" },
+          { label: "safe route", color: "#2fbf8f", mark: "line" },
+          { label: "faded = not verified · sim = simulated", color: "transparent" },
+        ]}
+      />
       <TopBar
         net={net} world={world} active={level.n} sums={sums} view={view} setView={setView} follow={follow} setFollow={setFollow}
         onLevel={goLevel} onReset={() => { setFocus(null); select(null); setResetKey((k) => k + 1); }}

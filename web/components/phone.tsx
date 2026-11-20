@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftIcon, CheckIcon, CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon, SendIcon, ShieldCheckIcon, WavesIcon } from "lucide-react";
+import { useCarriedQuery } from "@/components/app-bar";
 import { Button } from "@/components/ui/button";
 import { addEvent, hubUrl } from "@/lib/hub";
 import { hubSigningInfo, loadIdentity, NotJoinedError, prepare } from "@/lib/sign";
@@ -107,10 +108,12 @@ function HubStatusChip() {
 
 /** The thin bar at the top of every phone page: wordmark and the hub chip. */
 export function PhoneHeader() {
+  const q = useCarriedQuery();
   return (
     <header className="border-b border-border bg-card">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-foreground">
+        {/* The logo leads back to the laptop side (the overview); "All reports" moves between phone pages. */}
+        <Link href={`/overview${q}`} className="flex items-center gap-2 text-foreground" aria-label="Undercurrent overview">
           <WavesIcon className="size-5 text-primary" aria-hidden="true" />
           <span className="font-mono text-xs font-medium tracking-[0.18em]">UNDERCURRENT</span>
         </Link>

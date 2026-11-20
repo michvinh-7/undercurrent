@@ -230,7 +230,7 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>How the hub decides what&apos;s urgent</Eyebrow>
+        <Eyebrow>How the hub decides what&apos;s urgent · questions 7 and 10</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">AI reads the panic, code does the math</h2>
         <p className="max-w-[70ch] text-foreground/75">
           On a slow link, the most urgent message has to go first. An AI model running on the hub reads each free-text report and pulls out
@@ -358,7 +358,7 @@ export function SurfaceSection({ net, q, compact = false }: { net: Undercurrent;
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Is the surface safe?</Eyebrow>
+        <Eyebrow>Is the surface safe? · question 13</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Their word against a signed reading</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at the top of the shaft measures the surface air and signs every reading with its own key. Hubs refuse anything else, so
@@ -516,7 +516,7 @@ export function ForecastSection({ net, compact = false }: { net: Undercurrent; c
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Warn before the power cuts out</Eyebrow>
+        <Eyebrow>Warn before the power cuts out · question 1</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The hub predicts the blackout, not just reports it</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at a power relay reports its voltage. When the supply is failing it sags before it drops out, so the hub fits a straight

@@ -9,6 +9,7 @@
 // only real cell messages (web/lib/cell.ts) show.
 
 import { AppBar } from "@/components/app-bar";
+import { PageIntro } from "@/components/page-intro";
 import { useEffect, useMemo, useState } from "react";
 import nacl from "tweetnacl";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
@@ -87,24 +88,21 @@ export default function Truth() {
     <>
     <AppBar net={net} />
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="caption !text-[var(--directorate)]">Undercurrent / Directorate perspective / relay intercept</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Everything they can see. And what they can&apos;t.</h1>
-          <p className="mt-2 max-w-2xl text-[var(--muted)]">
-            Left: the bytes a Directorate tap on the hub link captures. Right: what a member of the cell reads. Public
-            alerts are open on purpose, and signed so they can&apos;t be faked. Cell messages are ciphertext to everyone
-            without the cell key, including the hubs that carry them.
-          </p>
-        </div>
-      </header>
-
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Fact label="Captured" value={traffic.length} sub="messages on the link" />
-        <Fact label="Readable" value={pub} sub="public alerts, signed" color="var(--foreground)" />
-        <Fact label="Unreadable" value={encrypted} sub="cell messages, encrypted" color="var(--accent)" />
-        <Fact label="Forged & refused" value={net.forgeriesBlocked} sub="by the hubs' checks" color="var(--danger)" />
-      </div>
+      <PageIntro
+        kicker="Directorate view"
+        kickerColor="var(--directorate)"
+        questions={[7, 9, 13]}
+        title="What they can see, and what they can't."
+        sub="Left: the bytes a Directorate tap on the hub link captures. Right: what a cell member reads. Public alerts are open on purpose and signed, so they can't be faked. Cell messages are ciphertext to everyone without the key, the hubs included."
+        right={
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Fact label="Captured" value={traffic.length} sub="messages on the link" />
+            <Fact label="Readable" value={pub} sub="public alerts, signed" color="var(--foreground)" />
+            <Fact label="Unreadable" value={encrypted} sub="cell messages, encrypted" color="var(--accent)" />
+            <Fact label="Forged & refused" value={net.forgeriesBlocked} sub="by the hubs' checks" color="var(--danger)" />
+          </div>
+        }
+      />
 
       {net.mode === "demo" && (
         <p className="sim-hatch mt-4 rounded-lg border border-[var(--sim)] px-3 py-2 text-sm">
@@ -112,9 +110,17 @@ export default function Truth() {
         </p>
       )}
 
-      <div className="mt-6 hidden grid-cols-2 gap-4 lg:grid">
-        <p className="caption !text-[var(--directorate)]">Directorate · on the wire</p>
-        <p className="caption !text-[var(--ok)]">Member · on the phone</p>
+      <div className="mt-7 hidden grid-cols-2 gap-4 lg:grid">
+        <p className="flex items-baseline gap-2">
+          <span className="size-2 self-center rounded-full bg-[var(--directorate)]" aria-hidden="true" />
+          <span className="font-semibold">On the wire</span>
+          <span className="text-[13px] text-[var(--muted)]">what a Directorate tap captures</span>
+        </p>
+        <p className="flex items-baseline gap-2 pl-4">
+          <span className="size-2 self-center rounded-full bg-[var(--ok)]" aria-hidden="true" />
+          <span className="font-semibold">On a member&apos;s phone</span>
+          <span className="text-[13px] text-[var(--muted)]">what the cell reads</span>
+        </p>
       </div>
 
       <ol className="mt-2 space-y-3">
