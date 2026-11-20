@@ -5,7 +5,8 @@
 //   2. the link is cut, alerts queue        → Link card + "N waiting to send"
 //   3. a forged "all clear" is rejected     → Forgeries blocked counter
 //   4. an edited record                     → Chain card names the exact row
-//   5. the Directorate sniffs the channel   → Directorate view toggle (and /truth)
+//   5. the Directorate sniffs the channel   → Directorate view toggle (and /truth): their control room,
+//      where every command they fire is a real request, stamped with what the hubs actually did
 // Data: web/lib/useUndercurrent.ts. No hub answering → labeled demo data.
 
 import { AppBar } from "@/components/app-bar";
@@ -14,6 +15,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
 import { isEncrypted, isSensor, isSimulated, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
+import { DirectorateControl, TallyStrip, type Tally } from "./directorate-control";
 
 const NEW_MS = 5000;
 
@@ -48,6 +50,8 @@ export default function Console() {
   const net = useUndercurrent();
   const now = useNow();
   const [directorate, setDirectorate] = useState(false);
+  const [tally, setTally] = useState<Tally>({ issued: 0, tookEffect: 0 });
+  const onCommand = (tookEffect: boolean) => setTally((t) => ({ issued: t.issued + 1, tookEffect: t.tookEffect + (tookEffect ? 1 : 0) }));
 
   const queue = useMemo(() => net.events.filter((e) => e.type !== "roster").sort(byPressingThenTime), [net.events]);
   const pressing = queue.filter(isPressing).length;
@@ -61,15 +65,15 @@ export default function Console() {
       style={directorate ? { boxShadow: "inset 0 0 0 2px var(--directorate)" } : undefined}
     >
       <PageIntro
-        kicker={directorate ? "Console · Directorate view" : "Console"}
+        kicker={directorate ? "Directorate · Network control" : "Console"}
         kickerColor={directorate ? "var(--directorate)" : undefined}
         questions={[7, 9, 10]}
-        title={directorate ? "What the Directorate sees on the same feed." : "Every report, most urgent first, checked by both hubs."}
+        title={directorate ? "Their screen says every command went through." : "Every report, most urgent first, checked by both hubs."}
         sub={directorate
-          ? "Public alerts are readable by anyone and signed, so they can't be faked. Cell messages are bytes without the key."
+          ? "The Directorate's own control room, on the same feed. Under each command, stamped in green: what the residents' network actually did, from the hubs' real answer."
           : "What the operator sees: signed alerts ranked by the hub's AI, and every attack the Directorate tries, refused or caught."}
         actions={<HeaderControls net={net} directorate={directorate} setDirectorate={setDirectorate} />}
-        right={<StatStrip net={net} />}
+        right={directorate ? <TallyStrip tally={tally} net={net} /> : <StatStrip net={net} />}
       />
 
       {net.mode === "demo" && (
@@ -121,6 +125,13 @@ export default function Console() {
           </ol>
         </Zone>
 
+        {directorate ? (
+          <aside>
+            <Zone n={2} title="Commands" note="each one a real request to the hubs">
+              <DirectorateControl net={net} onCommand={onCommand} />
+            </Zone>
+          </aside>
+        ) : (
         <aside className="space-y-6">
           <Zone n={2} title="Under attack" note="forged and replayed messages, refused">
             <ForgeryPanel net={net} now={now} />
@@ -139,6 +150,7 @@ export default function Console() {
             <MissingBoard events={net.events} now={now} />
           </Zone>
         </aside>
+        )}
       </div>
     </main>
     </>
@@ -301,7 +313,8 @@ function QueueItem({
         ) : (
           <p className="mt-1 break-words">{summary(e)}</p>
         )}
-        {directorate && !enc && <p className="caption mt-1 !text-[var(--faint)]">Public · readable by anyone, provably from a member</p>}
+        {directorate && !enc && <p className="caption mt-1 !text-[var(--faint)]">🔒 Signed · readable, can&apos;t be faked</p>}
+        {directorate && enc && <p className="caption mt-1 !text-[var(--ok)]">Unreadable · no key on any hub</p>}
       </div>
       <span className="shrink-0 font-mono text-sm" title="Priority, 0 to 1">
         {e.priority === null ? <span className="text-[var(--muted)]">—</span> : e.priority.toFixed(2)}
