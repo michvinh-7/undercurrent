@@ -87,13 +87,15 @@ export const TRIAGE_EXAMPLES = [
   { label: "All fine", text: "checking in from 35, we're ok, water still clean at the clinic" },
 ];
 
-/** Triage on the held-out test split (n=149), from eval/results/RESULTS.md, 2026-11-17. */
+/** Triage on the held-out test split (n=149), from eval/results/RESULTS.md, 2026-11-17.
+ * The AI column is the model the hub runs offline; the cloud model is in the caption only. */
+export const TRIAGE_MODEL = "Llama 3.2 3B";
 export const TRIAGE_RESULTS = [
-  { label: "Urgency right", ai: "87.9%", aiCi: "82.6–92.6", rules: "53.7%" },
-  { label: "SOS caught (recall)", ai: "87.9%", aiCi: "75.7–97.3", rules: "27.3%" },
-  { label: "SOS ranked first in a batch of 10", ai: "84.1%", aiCi: "74.4–91.8", rules: "37.1%" },
-  { label: "Level pulled out exactly", ai: "98.0%", aiCi: "95.3–100", rules: "63.1%" },
-  { label: "SOS delay cut by the priority queue", ai: "75.9%", aiCi: "64.5–84.7", rules: "29.8%" },
+  { label: "Urgency right", ai: "75.8%", aiCi: "68.5–82.6", rules: "53.7%" },
+  { label: "SOS caught (recall)", ai: "87.9%", aiCi: "75.8–97.3", rules: "27.3%" },
+  { label: "SOS ranked first in a batch of 10", ai: "62.1%", aiCi: "52.2–71.4", rules: "37.1%" },
+  { label: "Level pulled out exactly", ai: "95.3%", aiCi: "91.9–98.7", rules: "63.1%" },
+  { label: "SOS delay cut by the priority queue", ai: "72.4%", aiCi: "63.6–80.3", rules: "29.8%" },
 ];
 
 /** Blackout forecast backtest, from eval/results/forecast_synthetic_2026-11-19.md (n=1000 synthetic sags). */

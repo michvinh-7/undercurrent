@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
-import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
+import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_MODEL, TRIAGE_RESULTS, type BeatId } from "./beats";
 import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
 import { timeAgo } from "@/lib/format";
 
@@ -307,7 +307,7 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="pb-2 font-normal"></th>
-                  <th className="pb-2 font-normal">AI</th>
+                  <th className="pb-2 font-normal">AI, offline</th>
                   <th className="pb-2 font-normal">Keywords</th>
                 </tr>
               </thead>
@@ -326,8 +326,8 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            AI column: Gemini 3.1 Flash Lite, 95% intervals below each number. The small model the hub runs offline (Llama 3.2 3B) scores
-            75.8% on urgency and 87.9% on SOS recall, and cuts SOS delay by 72.4%. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
+            AI column: {TRIAGE_MODEL}, the model the hub runs with no internet, 95% intervals below each number. A cloud model
+            (Gemini 3.1 Flash Lite, online mirror only) scores 87.9% on urgency. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
           </p>
         </Card>
         )}

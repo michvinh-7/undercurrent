@@ -71,7 +71,7 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 | Deleted rows put back by the other hub | **20 of 20**, chain intact | same script, two real hubs synced |
 | Alerts delivered after random link cuts | **200 of 200** after 26 cuts, 0 duplicates | `eval/run_sync_stress.py`, two real hubs, simulated cuts |
 | Water on the probe to the alert on the other hub | **0.81 s** median, 30 of 30 | `eval/run_probe_latency.py`, dry run with a simulated box; `--real` with the Canary box |
-| AI triage urgency accuracy | **88%** (Gemini) and **76%** (local Llama) vs **54%** for keyword rules, 149 held-out messages | `eval/run_triage_eval.py` |
+| AI triage urgency accuracy | **76%** offline (local Llama 3.2 3B, the model the hub runs) vs **54%** for keyword rules, 149 held-out messages. Cloud Gemini: 88%. Microsoft's Phi-4-mini, also offline: 77%, but worse at ranking SOS first (55% vs 62%), so the hub keeps Llama | `eval/run_triage_eval.py` |
 | SOS delay with the priority queue | **72–76% shorter** than first-come-first-served | same, simulated arrivals |
 | Blackout forecast, an hour before drop-out | **6 min** off vs 27 min for a two-reading guess; **0%** false alarms on steady power vs 35% | `eval/run_forecast_eval.py`, 1,000 synthetic sags |
 

@@ -111,8 +111,9 @@ To switch: `git fetch --prune && git checkout <your branch>`, then `git branch -
 | llama3.2:3b, local | 76% [69, 83] | 62% [52, 71] | 88% | 27% |
 | Keyword rules only | 54% | 37% | 27% | 27% |
 | Gemini, cloud (online mirror only) | 88% [83, 93] | 84% [74, 92] | 88% | 64% |
+| phi4-mini, local (tested 11/20, not adopted) | 77% [70, 84] | 55% [46, 64] | 91% | 9% |
 
-The priority queue cuts SOS delay by 72% against first-come-first-served on the slow link (simulated arrivals). Full table: [`eval/results/RESULTS.md`](eval/results/RESULTS.md).
+The priority queue cuts SOS delay by 72% against first-come-first-served on the slow link (simulated arrivals). Full table: [`eval/results/RESULTS.md`](eval/results/RESULTS.md). **The pitch and overview now quote 76% (the offline model the hub runs), not Gemini's 88%.**
 
 ---
 
