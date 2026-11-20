@@ -113,6 +113,14 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
     surface = [e for e in events if e.get("device_id") == "canary-surface"]
     assert len(surface) == 3 and all(e["level"] == 1 and e["hub_id"] == "hub-L12" and e["author_pub"] in members for e in surface)
     assert all(isinstance(e["payload"]["oxygen_pct"], int) for e in surface)
+    # the relay's voltage sags; the hub forecasts when it drops out, and the box's own
+    # warnings carry the same forecast as a countdown
+    fc = {f["device_id"]: f for f in c.get(f"{l12}/forecast").json()["boxes"]}
+    relay = fc["canary-12-relay"]
+    assert relay["status"] == "falling" and relay["simulated"] and relay["readings"] == 8
+    assert relay["slope_v_per_min"] < 0 and relay["eta_low_s"] <= relay["eta_s"] <= relay["eta_high_s"]
+    warnings = [e for e in events if e.get("device_id") == "canary-12-relay" and e["payload"]["kind"] == "blackout"]
+    assert len(warnings) == 2 and all(isinstance(e["payload"].get("expected_in_min"), int) for e in warnings)
     sensors = [e for e in events if e.get("device_id")]
     assert sensors and all(e["source"] == "sensor" and e["author"] == e["device_id"] for e in sensors)
     assert c.get(f"{l34}/rejected").json()["total"] == 0
@@ -125,7 +133,8 @@ def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
 
 @pytest.mark.parametrize("hubs", [False], indirect=True)
 def test_unsigned_fallback_when_keys_arent_on_the_roster(hubs):
-    world, _ = tiny_world(hubs["tmp"], WORLD["timeline"][:3])
+    deep = [s for s in WORLD["timeline"] if simulate.actors(WORLD)[s["by"]]["level"] >= 31][:3]  # all go to hub-L34
+    world, _ = tiny_world(hubs["tmp"], deep)
     argv = ["run", "--minutes", "0.05", "--dir", str(hubs["run"]), "--truth-dir", str(hubs["tmp"] / "t")]
     assert sim(*argv, world=world, keys=hubs["keys"]) == 0
     events = httpx.get(f"{hubs['urls'][0]}/events").json()

@@ -39,6 +39,7 @@ Hub URLs come from demo_hubs.py's state file (hub/demo/run/hubs.json); override 
 
 import argparse
 import json
+import math
 import sys
 import time
 import uuid
@@ -55,6 +56,7 @@ sys.path.insert(0, str(ROOT / "hub" / "scripts"))
 import demo_hubs  # noqa: E402
 import roster_tool  # noqa: E402
 from app import crypto  # noqa: E402
+from app.forecast import eta_for  # noqa: E402
 
 NOMINAL_S = 180  # the timeline's times are seconds at --minutes 3
 
@@ -217,12 +219,14 @@ def cmd_run(args) -> int:
         print(f"  t+{p['start_s'] * scale:5.0f}s  {p['says']}")
     start = time.monotonic()
     sent = {"stored": 0, "refused": 0, "unreachable": 0}
+    sent_volts: dict[str, list[tuple[float, float]]] = {}  # per box: (unix time, volts) it has sent
     log = []
     for s in steps:
         wait = start + s["t"] * scale - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         e = make_event(world, s)
+        add_countdown(e, sent_volts)
         hub_id = e["hub_id"]
         signed = sign_on[hub_id]
         body = crypto.sign(e, loaded[s["by"]]) if signed else {k: e[k] for k in ("type", "level", "author", "payload", "source", "device_id") if k in e}
@@ -240,6 +244,21 @@ def cmd_run(args) -> int:
     print(f"done: {sent['stored']} stored, {sent['refused']} refused, {sent['unreachable']} unreachable")
     write_truth(world, Path(args.truth_dir), log)
     return 0 if sent["refused"] == 0 and sent["unreachable"] == 0 else 1
+
+
+def add_countdown(e: dict, sent_volts: dict[str, list[tuple[float, float]]]) -> None:
+    """A box that reports volts remembers what it sent. A blackout warning from it carries
+    expected_in_min worked out by the same forecast the hub runs (hub/app/forecast.py) on
+    those readings, so the map's countdown and GET /forecast agree. Changes e in place."""
+    reading = e["payload"].get("reading")
+    if not e.get("device_id") or not isinstance(reading, dict) or reading.get("unit") != "V":
+        return
+    history = sent_volts.setdefault(e["device_id"], [])
+    history.append((time.time(), float(reading["value"])))
+    if e["payload"].get("kind") == "blackout":
+        status, eta, *_ = eta_for(history)
+        if status == "falling" and eta is not None:
+            e["payload"] = {**e["payload"], "expected_in_min": max(1, math.ceil(eta / 60))}
 
 
 def _gist(step: dict) -> str:

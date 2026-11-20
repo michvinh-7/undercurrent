@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from .ai_routes import router as ai_router
+from .forecast import CUTOFF_V, forecast_all
 from .gate import Gate, Rejected
 from .link import Link
 from .log import EventLog
@@ -100,6 +101,13 @@ def list_events(
     since: str | None = Query(default=None, description="ISO time; only events after it"),
 ):
     return log.list(type=type, level=level, since=since)
+
+
+@app.get("/forecast")
+def blackout_forecast(cutoff: float = Query(default=CUTOFF_V, ge=0, le=400, description="Volts where equipment drops out")):
+    """Per box that reports volts: a straight-line fit of its recent readings and, if the
+    supply is clearly falling, when it reaches the cutoff (hub/app/forecast.py)."""
+    return {"cutoff_v": cutoff, "boxes": [f.to_dict() for f in forecast_all(log.list(type="hazard"), cutoff)]}
 
 
 @app.get("/events/verify")

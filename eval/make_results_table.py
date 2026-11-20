@@ -156,6 +156,15 @@ def security_section() -> list[str]:
     return out
 
 
+def forecast_section() -> list[str]:
+    """The newest blackout-forecast backtest (eval/run_forecast_eval.py), as written. Synthetic data."""
+    found = sorted(RESULTS.glob("forecast_synthetic_*.md"))
+    if not found:
+        return []
+    body = found[-1].read_text().rstrip().splitlines()
+    return [body[0] + " (synthetic, say so in the video)", *body[1:], "", f"From `{found[-1].name}`.", ""]
+
+
 def main():
     runs = newest_runs()
     out = [
@@ -166,6 +175,7 @@ def main():
         "bound. Triage delivery times use the hubs' real link code (`hub/app/link.py`) with simulated arrival times.",
         "",
         *security_section(),
+        *forecast_section(),
     ]
     headings = {"test": "use these in the video", "dev": "tuning numbers, NOT for the video",
                 "synthetic": "synthetic scenario, say so in the video"}
