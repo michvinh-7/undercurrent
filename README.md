@@ -47,7 +47,7 @@ Anything that fails goes on a rejected list with its reason. That list is the co
 
 | Feature | What it does | Where |
 |---|---|---|
-| AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first | `hub/app/triage.py`, `POST /triage` |
+| AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first. What it may and may not do, and where it fails: [`MODEL_CARD.md`](MODEL_CARD.md) | `hub/app/triage.py`, `POST /triage` |
 | Blackout forecast | A least-squares line through a relay box's last 8 voltage readings predicts when the supply drops to 180 V, with a range; it only warns when the fall is clear of the noise | `hub/app/forecast.py`, `GET /forecast` |
 | Have / Need board | Signed offers and requests (space, food, water, medicine, power), matched to the nearest offer, medicine and water first, then the longest-waiting; only the poster can close a post | `hub/app/exchange.py`, `GET /exchange` |
 | Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events | `hub/app/livability.py`, `GET /livability` |
