@@ -95,11 +95,15 @@ def test_keys_are_kept_between_runs_and_roster_lists_them(tmp_path):
     assert {e.get("name") for e in entries} >= set(simulate.actors(w)) | {"phone-1"}
 
 
-def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs):
+def test_full_run_arrives_signed_and_verified_on_both_hubs(hubs, capsys):
     world = ROOT / "sim" / "world.json"
     truth = hubs["tmp"] / "truth"
     argv = ["run", "--minutes", "0.05", "--dir", str(hubs["run"]), "--truth-dir", str(truth)]
-    assert sim(*argv, world=world, keys=hubs["keys"]) == 0
+    code = sim(*argv, world=world, keys=hubs["keys"])
+    out = capsys.readouterr().out
+    # On failure, name the events that were refused (✗) or didn't reach a hub (…), so CI's
+    # annotation says why without the full log.
+    assert code == 0, "\n".join(l for l in out.splitlines() if " ✗ " in l or " … " in l or l.startswith("done:"))
     n = len(WORLD["timeline"])
     c = httpx.Client(timeout=5)
     l34, l12 = hubs["urls"]
