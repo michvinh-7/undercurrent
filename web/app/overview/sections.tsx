@@ -94,6 +94,11 @@ export function useLiveToasts(net: Undercurrent) {
   const seen = useRef<{ forgeries: number; cut: boolean; intact: boolean | null; box: string | null } | null>(null);
   useEffect(() => {
     if (net.mode !== "live") return;
+    // Wait until every hub has answered a poll at least once (or been given up on). Before
+    // that, the counts are still filling in (0, then the real total), and announcing that
+    // jump would pop "Forgery refused" for old refusals every time the page opens.
+    const settled = net.hubs.length > 0 && net.hubs.every((h) => h.hubId !== null || h.misses >= 2);
+    if (!settled) return;
     const box = net.events.filter((e) => e.device_id === REAL_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     const now = { forgeries: net.forgeriesBlocked, cut: !!net.sendingHub?.link?.cut, intact: net.chain ? net.chain.chain_intact : null, box: box?.id ?? null };
     const before = seen.current;
