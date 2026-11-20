@@ -7,7 +7,7 @@
 The Hollow is an underground city of 40 levels. The Directorate controls the official network, can cut it at will, and publishes numbers that hide how bad things are. Undercurrent is the residents' own channel, and the tools they build on top of it:
 
 - **Canary boxes** on each level sense trouble (water on the floor, the supply voltage sagging, heat, the air going bad) and sound the alarm. Each box signs its own alerts.
-- **Residents' phones** join in person by QR code, then sign every report: check-ins, hazards, symptoms, missing persons, Have / Need posts.
+- **Residents' phones** join in person by QR code, then sign every report: check-ins, hazards, symptoms, missing persons, Have / Need posts. A report that can't reach the hub waits on the phone and sends itself, signed, the moment the hub is back (at most once).
 - **Hubs** keep each level connected with no internet. They check every message before storing it, chain every record, and sync with each other, catching up after the link is cut.
 - **Public alerts** are signed, so anyone can read them and check they're real. **Cell messages** are encrypted on the phone, so only members can read them; hubs carry them without being able to.
 - **On top of the network:** AI triage that puts the SOS first on a slow link, a blackout forecast from the box's voltage readings, a Have / Need board that shares what's left fairly, daily sleep and mood check-ins, and a signed reading of the surface air.
@@ -181,7 +181,7 @@ Every push runs the hub tests, a 200-episode Directorate gym that fails on any b
 
 ```bash
 cd hub && .venv/bin/python -m pytest            # hub tests, including real-process sim and demo-script tests
-cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs
+cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs lib/outbox.test.mjs app/hollow/city/city.test.mjs
 hub/.venv/bin/python eval/run_attacks.py         # numbers 1 and 2
 hub/.venv/bin/python eval/run_sync_stress.py     # number 3 (add --real with two laptops)
 hub/.venv/bin/python eval/run_probe_latency.py   # number 4 (add --real with the Canary box)

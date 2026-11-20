@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRightLeftIcon, ChevronRightIcon, LockKeyholeIcon, QrCodeIcon, StethoscopeIcon, TriangleAlertIcon, UserCheckIcon, UserSearchIcon } from "lucide-react";
 import { DesktopRedirect } from "@/components/desktop-redirect";
 import { PhoneHeader, RememberHub } from "@/components/phone";
+import { OutboxBanner } from "@/components/outbox";
 
 // The hub's home page on a resident's phone: pick what to report.
 const REPORTS = [
@@ -41,6 +42,7 @@ export default function Home() {
       <DesktopRedirect />
       <PhoneHeader />
       <main className="mx-auto flex max-w-md flex-col gap-8 px-4 pb-16 pt-7">
+        <OutboxBanner />
         <div>
           <p className="caption">Works without internet · Signed on this phone</p>
           <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight">What do you need to report?</h1>

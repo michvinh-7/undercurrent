@@ -12,13 +12,14 @@ import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon, LockKeyholeIcon, Pl
 import { Label, LevelSelect, Notice, PhoneShell, TextArea, useStored } from "@/components/phone";
 import { Button } from "@/components/ui/button";
 import { QR } from "@/components/qr";
-import { addEvent, hubUrl, listEvents } from "@/lib/hub";
+import { hubUrl, listEvents } from "@/lib/hub";
+import { sendOrQueue } from "@/lib/outbox";
 import { CELL_EVENT_TYPE, decrypt, encrypt, inviteLink, isCellPayload, keyFromHash, keyTag, loadCellKey, newCellKey, saveCellKey } from "@/lib/cell";
 import { timeAgo } from "@/lib/format";
-import { NotJoinedError, prepare } from "@/lib/sign";
+import { NotJoinedError } from "@/lib/sign";
 import type { HollowEvent } from "@/lib/types";
 
-type Status = { state: "idle" } | { state: "sending" } | { state: "sent"; signed: boolean } | { state: "error"; message: string };
+type Status = { state: "idle" } | { state: "sending" } | { state: "sent"; signed: boolean } | { state: "queued" } | { state: "error"; message: string };
 
 const LOCAL = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
@@ -110,9 +111,8 @@ export default function CellPage() {
     if (!key || !text.trim() || level === null || !author) return;
     setStatus({ state: "sending" });
     try {
-      const { event, signed } = await prepare({ type: CELL_EVENT_TYPE, level, author, payload: { ...encrypt(text.trim(), key) } }, hubUrl());
-      await addEvent(event);
-      setStatus({ state: "sent", signed });
+      const r = await sendOrQueue({ type: CELL_EVENT_TYPE, level, author, payload: { ...encrypt(text.trim(), key) } });
+      setStatus(r.state === "sent" ? { state: "sent", signed: r.signed } : { state: "queued" });
       setText("");
       refresh();
     } catch (err) {
@@ -182,6 +182,7 @@ export default function CellPage() {
           </Button>
           <div aria-live="polite">
             {status.state === "sent" && <Notice tone="ok" icon={<CircleCheckIcon />}>Sent encrypted{status.signed ? " and signed" : ""}.</Notice>}
+            {status.state === "queued" && <Notice tone="warn" icon={<CircleAlertIcon />}>No connection to the hub. Sealed and saved on this phone: it sends by itself when the hub is back.</Notice>}
             {status.state === "error" && <Notice tone="danger" icon={<CircleAlertIcon />}>{status.message}</Notice>}
           </div>
         </form>

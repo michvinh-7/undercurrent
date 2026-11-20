@@ -7,13 +7,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftIcon, CheckIcon, CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon, SendIcon, ShieldCheckIcon, WavesIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, CircleAlertIcon, CircleCheckIcon, CloudOffIcon, LoaderCircleIcon, SendIcon, ShieldCheckIcon, WavesIcon } from "lucide-react";
 import { useCarriedQuery } from "@/components/app-bar";
 import { Button } from "@/components/ui/button";
-import { addEvent, hubUrl } from "@/lib/hub";
-import { hubSigningInfo, loadIdentity, NotJoinedError, prepare } from "@/lib/sign";
+import { hubUrl } from "@/lib/hub";
+import { hubSigningInfo, loadIdentity, NotJoinedError } from "@/lib/sign";
 import type { EventType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { sendOrQueue } from "@/lib/outbox";
+import { OutboxBanner } from "@/components/outbox";
 
 /**
  * localStorage-backed state. Falls back to memory if storage is blocked (private mode).
@@ -156,6 +158,7 @@ export function PhoneShell({
           </div>
         </div>
         {hint && <p className="mt-2 text-foreground/70">{hint}</p>}
+        <div className="mt-4"><OutboxBanner /></div>
         <div className="mt-6">{children}</div>
       </main>
     </div>
@@ -226,6 +229,7 @@ type Sent =
   | { state: "idle" }
   | { state: "sending" }
   | { state: "sent"; hub: string; signed: boolean }
+  | { state: "queued" }
   | { state: "error"; message: string; join?: boolean };
 
 /** What to tell the resident when a report didn't go through. */
@@ -264,10 +268,10 @@ export function ReportForm({
     if (!ready) return;
     setSent({ state: "sending" });
     try {
-      // Signed with this phone's key once it's on the roster (lib/sign.ts).
-      const { event, signed } = await prepare({ type, level: level!, author, payload: payload! }, hubUrl());
-      const saved = await addEvent(event);
-      setSent({ state: "sent", hub: saved.hub_id, signed });
+      // Signed with this phone's key once it's on the roster (lib/sign.ts). No hub: it waits
+      // in the outbox and sends itself when the hub is back (lib/outbox.ts).
+      const r = await sendOrQueue({ type, level: level!, author, payload: payload! });
+      setSent(r.state === "sent" ? { state: "sent", hub: r.hub, signed: r.signed } : { state: "queued" });
       onSent?.();
     } catch (err) {
       setSent(sendError(err));
@@ -296,6 +300,11 @@ export function ReportForm({
         {sent.state === "sent" && (
           <Notice tone="ok" icon={<CircleCheckIcon />}>
             Sent{sent.signed ? " and signed by this phone" : ""}. Saved on {sent.hub}. You can send another.
+          </Notice>
+        )}
+        {sent.state === "queued" && (
+          <Notice tone="warn" icon={<CloudOffIcon />}>
+            No connection to the hub right now. Saved on this phone: it sends by itself, signed, the moment the hub is back. You can close this page.
           </Notice>
         )}
         {sent.state === "error" && (
