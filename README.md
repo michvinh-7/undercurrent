@@ -72,6 +72,7 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 | Forged and replayed messages accepted | **0 of 300**; all 40 real member alerts accepted | `eval/run_attacks.py`, real hub, generated attacks |
 | Edited database records caught at the exact row | **160 of 160**, deleting the newest row included | same script, direct edits to the hub's database |
 | Deleted rows put back by the other hub | **20 of 20**, chain intact | same script, two real hubs synced |
+| Adaptive attackers, isolated episodes | **0 breaches** in 40,000 fuzzer attempts (2,000 episodes) and 20 episodes of a local LLM playing the Directorate; every database edit flagged or put back by sync; reset **0.9 ms**, identical to the starting hub 2,020 of 2,020 times. It found and we fixed a crash: a row edited to level 999999 took the hub's pages down | `eval/run_directorate_gym.py` |
 | Alerts delivered after random link cuts | **200 of 200** after 26 cuts, 0 duplicates | `eval/run_sync_stress.py`, two real hubs, simulated cuts |
 | Water on the probe to the alert on the other hub | **0.81 s** median, 30 of 30 | `eval/run_probe_latency.py`, dry run with a simulated box; `--real` with the Canary box |
 | AI triage urgency accuracy | **76%** offline (local Llama 3.2 3B, the model the hub runs) vs **54%** for keyword rules, 149 held-out messages. Cloud Gemini: 88%. Microsoft's Phi-4-mini, also offline: 77%, but worse at ranking SOS first (55% vs 62%), so the hub keeps Llama | `eval/run_triage_eval.py` |
@@ -82,6 +83,7 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 - **Metadata is visible.** Hubs can see who sent a cell message, when, and from which level. Hiding that, the way Tor does, is out of scope.
 - **A stolen phone can sign** until an operator removes its key (one roster event, synced to every hub).
 - **A hub's own priority score isn't protected** by the hash, on purpose: the hub sets it on arrival.
+- **One hub alone can't see some deletions.** With the laptop, deleting the newest row together with the hub's record of writing it, or deleting rows of the *other* hub's chain, looks to that hub like rows that haven't arrived yet. The other hub still holds them, and the next sync round puts them back (found and measured by the Directorate gym).
 - **Cutting the power to a hub** stops it; nothing is lost, but nothing moves until it's back.
 
 ---

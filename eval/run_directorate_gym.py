@@ -436,14 +436,17 @@ def describe(ep: Episode) -> str:
 
 
 def ask(model: str, prompt: str, seed: int, client: httpx.Client) -> dict | None:
-    r = client.post(f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
-                    json={"model": model, "prompt": prompt, "format": "json", "stream": False,
-                          "options": {"temperature": 0.8, "seed": seed}}, timeout=120)
-    r.raise_for_status()
-    try:
-        return json.loads(r.json()["response"])
-    except (json.JSONDecodeError, KeyError):
-        return None
+    """The model's reply as JSON, or None (a wasted move) if the model errs twice."""
+    for attempt in range(2):
+        try:
+            r = client.post(f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
+                            json={"model": model, "prompt": prompt, "format": "json", "stream": False,
+                                  "options": {"temperature": 0.8, "seed": seed + attempt}}, timeout=120)
+            r.raise_for_status()
+            return json.loads(r.json()["response"])
+        except (httpx.HTTPError, json.JSONDecodeError, KeyError):
+            continue
+    return None
 
 
 def llm_episode(golden: dict, folder: Path, seed: int, steps: int, model: str, client: httpx.Client) -> dict:
@@ -565,6 +568,9 @@ def main(argv=None) -> int:
     return 1 if breached or not out["isolation"]["golden_unchanged"] else 0
 
 
+NOTE = ('Per-attempt "edited, NOT flagged" lines are edits that set a field to the value it already had, or deletions of the other hub\'s rows (put back by sync); the episode rows above are the score.')
+
+
 def report_md(o: dict) -> str:
     f, l = o["fuzzer"], o.get("llm")
     rows = [("Episodes", "episodes"), ("Attempts", "attempts"), ("Episodes with a breach", "episodes_breached"),
@@ -592,7 +598,7 @@ def report_md(o: dict) -> str:
     if l:
         lines.append(f"LLM attacker: {l['steps_per_episode']} moves per episode, seeing each refusal reason; "
                      f"{l['invalid_moves']} moves were malformed or invalid.")
-    lines += ["", "Refusals by action (fuzzer):", ""]
+    lines += ["", "Outcomes by action (fuzzer). " + NOTE, ""]
     for kind, r in sorted(f["by_action"].items()):
         lines.append(f"- `{kind}`: " + ", ".join(f"{n} {k}" for k, n in sorted(r.items(), key=lambda kv: -kv[1])))
     return "\n".join(lines) + "\n"
