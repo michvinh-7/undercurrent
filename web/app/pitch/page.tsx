@@ -16,8 +16,9 @@ import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import {
-  Dot, ExchangeSection, ForecastSection, HowItWorks, LivabilityStrip, TONE, TriageSection, WellbeingSection, useLiveToasts, useProofs,
+  Dot, ExchangeSection, ForecastSection, HowItWorks, TONE, TriageSection, WellbeingSection, useLiveToasts, useProofs,
 } from "../overview/sections";
+import { LivabilityReplayStrip } from "../overview/livability-replay";
 import { BOX_PARTS, PROOF, QUESTIONS, SLIDES, STACK, TEAM, TEAM_PLACEHOLDER, THREATS, TOTAL_SECONDS } from "./slides";
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -135,7 +136,7 @@ function SharesSlide({ net }: { net: Undercurrent }) {
         <ExchangeSection net={net} compact />
         <WellbeingSection net={net} compact />
       </div>
-      <LivabilityStrip net={net} />
+      <LivabilityReplayStrip />
       {o2 !== null && (
         <p className="font-mono text-sm text-muted-foreground">
           And the surface: {o2}% oxygen, signed by the box at the top of the shaft{isSimulated(surface) ? " (simulated)" : ""}. The Directorate says it kills in minutes.
@@ -194,6 +195,55 @@ function Body({ id, net }: { id: (typeof SLIDES)[number]["id"]; net: Undercurren
 }
 
 // ------------------------------------------------------------------ the stage
+
+/** The width every slide is laid out at: the 1080p recording. */
+const DESIGN_W = 1920;
+
+/**
+ * Lays the slide out at 1920 px wide (or the screen's width, if wider) and scales it down to
+ * fit the space between the top bar and the controls, centred. A slide made for 1080p then
+ * shows whole on a 1440x900 laptop or in a 720p capture, and nothing changes at 1080p (the
+ * scale never goes above 1). It refits when the notes open or live data changes the height.
+ * Screens under 1024 px wide (phones) scroll instead, as before.
+ */
+function FitStage({ children }: { children: React.ReactNode }) {
+  const outer = useRef<HTMLElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<{ s: number; left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const o = outer.current, i = inner.current;
+    if (!o || !i) return;
+    const measure = () => {
+      if (window.innerWidth < 1024) {
+        i.style.width = "";
+        setFit(null);
+        return;
+      }
+      const aw = o.clientWidth, ah = o.clientHeight;
+      const w = Math.max(aw, DESIGN_W);
+      if (i.style.width !== `${w}px`) i.style.width = `${w}px`;
+      const h = i.offsetHeight; // layout size, not affected by the transform
+      const s = Math.min(1, aw / w, ah / h);
+      setFit({ s, left: (aw - w * s) / 2, top: Math.max(0, (ah - h * s) / 2) });
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(o);
+    ro.observe(i);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <main ref={outer} className={`relative flex min-h-0 flex-1 flex-col ${fit ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div ref={inner} data-scale={fit ? fit.s.toFixed(3) : undefined}
+        className={fit ? "absolute flex origin-top-left flex-col gap-6 px-20 py-8" : "my-auto flex flex-col gap-6 px-6 py-8 sm:px-12 lg:px-20"}
+        style={fit ? { left: fit.left, top: fit.top, transform: `scale(${fit.s})` } : undefined}>
+        {children}
+      </div>
+    </main>
+  );
+}
 
 export default function Pitch() {
   const net = useUndercurrent();
@@ -278,9 +328,7 @@ export default function Pitch() {
         </header>
 
         {/* the slide */}
-        <main key={s.id} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8 sm:px-12 lg:px-20">
-          {/* my-auto centres a short slide; a tall one still scrolls from its top */}
-          <div className="my-auto flex flex-col gap-6">
+        <FitStage key={s.id}>
           <div className="flex max-w-5xl flex-col gap-3">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-primary">{s.kicker}</p>
             <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight lg:text-6xl">{s.title}</h1>
@@ -293,8 +341,7 @@ export default function Pitch() {
             <span className="font-mono text-xs uppercase tracking-[0.16em] text-primary">Takeaway</span>
             {s.takeaway}
           </p>
-          </div>
-        </main>
+        </FitStage>
 
         {/* speaker notes */}
         {notes && (

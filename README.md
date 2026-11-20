@@ -1,5 +1,7 @@
 # Undercurrent
 
+[![CI](https://github.com/michvinh-7/undercurrent/actions/workflows/ci.yml/badge.svg)](https://github.com/michvinh-7/undercurrent/actions/workflows/ci.yml)
+
 **The Hollow's network the Directorate can't read, can't fake, and can't shut off.**
 
 The Hollow is an underground city of 40 levels. The Directorate controls the official network, can cut it at will, and publishes numbers that hide how bad things are. Undercurrent is the residents' own channel, and the tools they build on top of it:
@@ -45,10 +47,10 @@ Anything that fails goes on a rejected list with its reason. That list is the co
 
 | Feature | What it does | Where |
 |---|---|---|
-| AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first | `hub/app/triage.py`, `POST /triage` |
+| AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first. What it may and may not do, and where it fails: [`MODEL_CARD.md`](MODEL_CARD.md) | `hub/app/triage.py`, `POST /triage` |
 | Blackout forecast | A least-squares line through a relay box's last 8 voltage readings predicts when the supply drops to 180 V, with a range; it only warns when the fall is clear of the noise | `hub/app/forecast.py`, `GET /forecast` |
 | Have / Need board | Signed offers and requests (space, food, water, medicine, power), matched to the nearest offer, medicine and water first, then the longest-waiting; only the poster can close a post | `hub/app/exchange.py`, `GET /exchange` |
-| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events | `hub/app/livability.py`, `GET /livability` |
+| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events. On `/overview`, "The index over time" plays a simulated night (6 hours, 4 levels) scored every 5 minutes by the same code, with play, pause, step, scrub and speed | `hub/app/livability.py`, `GET /livability`, `hub/scripts/livability_replay.py` |
 | Sleep, mood and roll call | Optional answers on the daily check-in, averaged per level only once 2+ people answer; plus who hasn't been heard from today | `hub/app/wellbeing.py`, `GET /wellbeing` |
 | Cell messages | XSalsa20-Poly1305 (tweetnacl secretbox) under a key shared in person by QR | `web/lib/cell.ts`, `/cell` |
 | Surface check | A box at the top of the shaft signs CO₂ and oxygen, next to the Directorate's "the air kills in minutes" | `/overview`, map Briefs #13 |
@@ -174,6 +176,8 @@ cd hub
 
 **5. Tests and numbers**
 
+Every push runs the hub tests, a 200-episode Directorate gym that fails on any breach, and the web app's types and tests ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
 ```bash
 cd hub && .venv/bin/python -m pytest            # hub tests, including real-process sim and demo-script tests
 cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs
@@ -225,7 +229,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 | GET | `/roster` | Members, and whether signing is required |
 | POST | `/roster` | Add or remove a member. Must be signed by an operator |
 | GET | `/link` | The simulated outbound link: bandwidth, cut or not, queue size |
-| POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}` |
+| POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}`. Only from the hub's own machine (403 otherwise), so nobody on the Wi-Fi can cut the link through the API; `LINK_CONTROL=open` lifts that |
 | GET | `/sync/ids` | Every event id this hub holds, and its fingerprint |
 | POST | `/sync/events` | Events from a peer hub, each checked before it's stored |
 | GET | `/sync/status` | Peers, events in flight, gaps, rows restored, fingerprint, whether each peer agrees |

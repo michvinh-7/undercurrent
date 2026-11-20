@@ -21,6 +21,7 @@ import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/
 import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_MODEL, TRIAGE_RESULTS, type BeatId } from "./beats";
 import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
 import { timeAgo } from "@/lib/format";
+import { LivabilityReplay } from "./livability-replay";
 
 export type Tone = "ok" | "warn" | "danger" | "muted";
 export const TONE: Record<Tone, string> = { ok: "var(--ok)", warn: "var(--warn)", danger: "var(--danger)", muted: "var(--muted)" };
@@ -875,6 +876,7 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
           </p>
         )}
       </Card>
+      {!compact && <LivabilityReplay />}
     </section>
   );
 }
