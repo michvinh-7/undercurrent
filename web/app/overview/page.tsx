@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, ArrowRightLeftIcon as SwapIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, MoonIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, ArrowRightLeftIcon as SwapIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, MoonIcon, MountainIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -761,6 +761,75 @@ function WellbeingSection({ net }: { net: Undercurrent }) {
   );
 }
 
+/** Questions 14 and 15: going back up. Design notes, labelled as not built, showing which live pieces they'd stand on. */
+function SurfaceReturnSection({ net }: { net: Undercurrent }) {
+  const people = net.events.filter((e) => e.source !== "sensor" && e.type !== "roster");
+  const residents = new Set(people.map((e) => e.author_pub ?? e.author)).size;
+  const levels = new Set(people.map((e) => e.level)).size;
+  const surface = net.events.filter((e) => e.device_id === SURFACE_BOX).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  const o2 = surface && typeof (surface.payload as { oxygen_pct?: unknown }).oxygen_pct === "number" ? `${(surface.payload as { oxygen_pct: number }).oxygen_pct}% oxygen` : null;
+  const spaceOffers = net.events.filter((e) => e.type === "exchange" && (e.payload as { side?: unknown; category?: unknown }).side === "have" && (e.payload as { category?: unknown }).category === "space").length;
+
+  const cards = [
+    {
+      q: "14", title: "Which works: suits, domes or outposts?",
+      steps: [
+        "Put a Canary box inside every trial suit, dome and outpost. It signs oxygen, CO₂ and heat, so no side can fake how a trial went.",
+        "Compare them on the record: hours each stayed in the safe range, and how often it alarmed.",
+        "Run the blackout forecast on their air: a dome whose oxygen is sliding gets flagged before it's unsafe.",
+        "The first volunteers come from the roster, picked by their cell. Their daily check-ins show who is fit to go.",
+      ],
+      uses: ["signed boxes", "the forecast", "the roster", "check-ins"],
+    },
+    {
+      q: "15", title: "Plan the move for hundreds of millions",
+      steps: [
+        "The signed census says who and where: everyone heard from, per level, that nobody can inflate or erase.",
+        "Go or no-go comes from signed surface readings, published to every hub at once.",
+        "Each outpost posts its beds on the Have / Need board as space, and the same fair matching decides who goes first.",
+        "The roll call checks nobody is left behind on a level that's emptying.",
+      ],
+      uses: ["census", "surface box", "Have / Need board", "roll call"],
+    },
+  ];
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>Going back up · questions 14 and 15</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The same network carries the move to the surface</h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          We haven&apos;t built these two. They are designs, and each step uses a piece that already runs today. The live inputs they would
+          start from are below.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {cards.map((c) => (
+          <Card key={c.q} className="gap-3 p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground">Question {c.q}</span>
+              <Badge variant="outline" className="border-border-strong text-muted-foreground">Design · not built</Badge>
+            </div>
+            <span className="text-lg font-semibold">{c.title}</span>
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-foreground/85">
+              {c.steps.map((st) => <li key={st}>{st}</li>)}
+            </ol>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {c.uses.map((u) => <Badge key={u} variant="secondary">{u}</Badge>)}
+            </div>
+          </Card>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-dashed border-border-strong px-4 py-3 text-sm">
+        <MountainIcon className="size-4 text-primary" aria-hidden="true" />
+        <span>Starting from, live: <strong className="font-semibold">{residents}</strong> residents heard from on {levels} level{levels === 1 ? "" : "s"}</span>
+        <span>surface: {o2 ? <strong className="font-semibold">{o2}, signed</strong> : "no reading yet"}</span>
+        <span>{spaceOffers} space offer{spaceOffers === 1 ? "" : "s"} on the board</span>
+      </div>
+    </section>
+  );
+}
+
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
@@ -926,6 +995,8 @@ export default function Overview() {
         <WellbeingSection net={net} />
 
         <SurfaceSection net={net} q={q} />
+
+        <SurfaceReturnSection net={net} />
 
         {/* Results */}
         <section className="flex flex-col gap-5">

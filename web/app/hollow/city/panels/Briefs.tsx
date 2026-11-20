@@ -1,4 +1,4 @@
-// The "Briefs" tab: all 14 hackathon questions, each with what the network shows about it right
+// The "Briefs" tab: all 15 hackathon questions, each with what the network shows about it right
 // now and a button that takes you to that view. Statuses are computed from live data, never
 // written in by hand:
 //   live     the data is here and the map shows it
@@ -155,6 +155,18 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
     ? { n: 11, q: "Track what no sunlight does to people", status: "live", line: `Daily check-ins: ${sleepByLevel.map((x) => `L${x.n} sleeps ${x.avg.toFixed(1)} h`).join(" · ")} (levels with 2+ answers)`, action: { label: "Who checked in", run: () => go.openFeed("people") } }
     : { n: 11, q: "Track what no sunlight does to people", status: "ready", line: "The daily check-in asks hours slept and mood; each level's average shows once 2 or more people answer." };
 
+  // 14 and 15 · going back up: design notes, built on the pieces above, with the live inputs they'd use
+  const residents = new Set(events.filter((e) => e.origin === "report" && e.event.type !== "roster").map((e) => e.event.author_pub ?? e.event.author));
+  const residentLevels = new Set(events.filter((e) => e.origin === "report" && e.level !== null).map((e) => e.level));
+  const b14: Brief = {
+    n: 14, q: "Choose suits, domes or outposts for going up", status: "design",
+    line: "Design: a Canary box in each trial suit, dome and outpost signs its oxygen, CO₂ and heat; compare how long each stays safe, and the blackout-style forecast flags one heading toward unsafe. First volunteers come from the roster, picked by the cell, not the Directorate. Not built.",
+  };
+  const b15: Brief = {
+    n: 15, q: "Plan the move back up", status: "design",
+    line: `Design: the signed census says who and where (${residents.size} residents heard from on ${residentLevels.size} level${residentLevels.size === 1 ? "" : "s"} so far); signed surface readings decide go or no-go in public; outpost beds go on the Have / Need board as space, so the same fair matching decides who goes first, and the roll call checks nobody is left. Not built.`,
+  };
+
   // 6 and 12 · the Have / Need board (type "exchange", hub/app/exchange.py): posts of one kind
   const board = (n: number, q: string, kinds: string[], what: string): Brief => {
     const posts = events.filter((e) => e.event.type === "exchange" && kinds.includes(String((e.event.payload as { category?: unknown }).category)));
@@ -170,7 +182,8 @@ export function briefs({ events, levels, water, forgeriesBlocked }: BriefInput, 
     b11,
     board(12, "Grow and share food locally", ["food"], "food or seeds"),
     b13,
-    { n: 14, q: "Choose suits, domes or outposts for going up", status: "design", line: "The same signed boxes inside each trial suit, dome and outpost would compare them on real readings. Not built." },
+    b14,
+    b15,
   ];
 }
 
@@ -180,7 +193,7 @@ export default function Briefs({ input, actions }: { input: BriefInput; actions:
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3.5 shadow-sm">
       <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="text-sm font-semibold">The 14 questions</h2>
+        <h2 className="text-sm font-semibold">The 15 questions</h2>
         <span className="ml-auto text-xs text-[var(--muted)]">{live} showing live data</span>
       </div>
       <ol className="space-y-1">
