@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Fri 11/20 (early morning, after /pitch went to 3 minutes) by Michael. `main` has everything up to the redesign; the 3-minute pitch is on `michael/sync`.
+**Last updated:** Fri 11/20 (early morning) by Michael. Everything is merged to `main`, including the 3-minute `/pitch`. **Restart the demo hubs** (`demo_hubs.py down` then `up`) if they were started before Thursday night: older hubs don't have `/forecast`, `/exchange` or `/wellbeing`, and the overview now says so instead of "Loading…".
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.

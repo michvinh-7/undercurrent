@@ -475,23 +475,53 @@ export function ForecastChart({ points, f }: { points: { t: number; v: number }[
   );
 }
 
-/** Question 1: warn before the power cuts out. The hub's forecast from a relay box's voltage readings. */
-export function ForecastSection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
+/**
+ * Poll one of the primary hub's endpoints. `problem` says why there's no data instead of
+ * leaving "Loading…" up forever: "old" when the hub answers 404 (it runs code from before
+ * that endpoint existed, so restart it), "down" when it doesn't answer at all.
+ */
+export function useHubPoll<T>(net: Undercurrent, path: string, everyMs: number) {
   const primary = net.hubs.find((h) => h.role === "primary");
-  const [boxes, setBoxes] = useState<BoxForecast[] | null>(null);
+  const [data, setData] = useState<T | null>(null);
+  const [problem, setProblem] = useState<"old" | "down" | null>(null);
   useEffect(() => {
     if (net.mode !== "live" || !primary) return;
     let stop = false;
     async function poll() {
       try {
-        const res = await fetch(`${primary!.url}/forecast`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-        if (res.ok && !stop) setBoxes(((await res.json()) as { boxes: BoxForecast[] }).boxes);
-      } catch {}
+        const res = await fetch(`${primary!.url}${path}`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
+        if (stop) return;
+        if (res.ok) {
+          setData((await res.json()) as T);
+          setProblem(null);
+        } else setProblem(res.status === 404 ? "old" : "down");
+      } catch {
+        if (!stop) setProblem("down");
+      }
     }
     poll();
-    const t = setInterval(poll, 4000);
+    const t = setInterval(poll, everyMs);
     return () => { stop = true; clearInterval(t); };
-  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [net.mode, primary?.url, path, everyMs]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, problem };
+}
+
+export function HubProblem({ problem, path }: { problem: "old" | "down"; path: string }) {
+  return problem === "old" ? (
+    <span className="text-[var(--warn)]">
+      This hub is running older code without <code className="font-mono text-sm">{path}</code>. Restart it on the latest code:{" "}
+      <code className="font-mono text-sm">demo_hubs.py down</code> then <code className="font-mono text-sm">up</code> (keeps the data).
+    </span>
+  ) : (
+    <span className="text-[var(--warn)]">The hub isn&apos;t answering <code className="font-mono text-sm">{path}</code> right now. Retrying…</span>
+  );
+}
+
+/** Question 1: warn before the power cuts out. The hub's forecast from a relay box's voltage readings. */
+export function ForecastSection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const fc = useHubPoll<{ boxes: BoxForecast[] }>(net, "/forecast", 4000);
+  const boxes = fc.data?.boxes ?? null;
 
   const f = boxes?.find((b) => b.status === "falling") ?? boxes?.[0] ?? null;
   const points = f
@@ -550,7 +580,7 @@ export function ForecastSection({ net, compact = false }: { net: Undercurrent; c
           ) : (
             <p className="text-muted-foreground">
               {net.mode === "live"
-                ? <>No box is reporting voltage yet. The simulation&apos;s L12 relay starts within seconds of <code className="font-mono text-sm">sim/simulate.py run</code>.</>
+                ? fc.problem ? <HubProblem problem={fc.problem} path="/forecast" /> : !boxes ? "Loading the forecast…" : <>No box is reporting voltage yet. The simulation&apos;s L12 relay starts within seconds of <code className="font-mono text-sm">sim/simulate.py run</code>.</>
                 : "Connect to a hub to see the live forecast."}
             </p>
           )}
@@ -598,20 +628,8 @@ const CATEGORY_TONE: Record<string, string> = { medicine: "var(--danger)", water
 /** Questions 2, 6, 10 and 12: the Have / Need board, live from the primary hub (GET /exchange). */
 export function ExchangeSection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
   const primary = net.hubs.find((h) => h.role === "primary");
-  const [b, setB] = useState<BoardView | null>(null);
-  useEffect(() => {
-    if (net.mode !== "live" || !primary) return;
-    let stop = false;
-    async function poll() {
-      try {
-        const res = await fetch(`${primary!.url}/exchange`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-        if (res.ok && !stop) setB((await res.json()) as BoardView);
-      } catch {}
-    }
-    poll();
-    const t = setInterval(poll, 4000);
-    return () => { stop = true; clearInterval(t); };
-  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  const board = useHubPoll<BoardView>(net, "/exchange", 4000);
+  const b = board.data;
 
   const unmet = b ? b.needs.filter((n) => !n.matched) : [];
   const simulated = b ? [...b.needs, ...b.haves].some((p) => p.simulated) : false;
@@ -631,7 +649,7 @@ export function ExchangeSection({ net, compact = false }: { net: Undercurrent; c
       <Card className="gap-4 p-6">
         {!b ? (
           <p className="text-muted-foreground">
-            {net.mode === "live" ? "Loading the board…" : "Connect to a hub to see the live board."}
+            {net.mode !== "live" ? "Connect to a hub to see the live board." : board.problem ? <HubProblem problem={board.problem} path="/exchange" /> : "Loading the board…"}
           </p>
         ) : b.needs.length + b.haves.length === 0 ? (
           <p className="text-muted-foreground">
@@ -690,20 +708,8 @@ export function Bar({ value, max, color, label }: { value: number; max: number; 
 /** Question 11 (sleep and mood underground) and question 8 (the roll call), live from GET /wellbeing. */
 export function WellbeingSection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
   const primary = net.hubs.find((h) => h.role === "primary");
-  const [w, setW] = useState<WellbeingView | null>(null);
-  useEffect(() => {
-    if (net.mode !== "live" || !primary) return;
-    let stop = false;
-    async function poll() {
-      try {
-        const res = await fetch(`${primary!.url}/wellbeing`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-        if (res.ok && !stop) setW((await res.json()) as WellbeingView);
-      } catch {}
-    }
-    poll();
-    const t = setInterval(poll, 5000);
-    return () => { stop = true; clearInterval(t); };
-  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wb = useHubPoll<WellbeingView>(net, "/wellbeing", 5000);
+  const w = wb.data;
 
   const shown = w?.levels.filter((l) => !l.hidden) ?? [];
   const deep = shown.filter((l) => l.level >= 31 && l.sleep_avg_h !== undefined);
@@ -728,7 +734,7 @@ export function WellbeingSection({ net, compact = false }: { net: Undercurrent; 
       )}
       <Card className="gap-4 p-6">
         {!w ? (
-          <p className="text-muted-foreground">{net.mode === "live" ? "Loading…" : "Connect to a hub to see sleep and mood."}</p>
+          <p className="text-muted-foreground">{net.mode !== "live" ? "Connect to a hub to see sleep and mood." : wb.problem ? <HubProblem problem={wb.problem} path="/wellbeing" /> : "Loading…"}</p>
         ) : w.levels.length === 0 ? (
           <p className="text-muted-foreground">No sleep or mood answers today yet. Check in from a phone, or run the simulation.</p>
         ) : (
