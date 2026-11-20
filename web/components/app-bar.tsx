@@ -133,7 +133,8 @@ export function AppBar({ net, className }: { net: Undercurrent; className?: stri
   const q = useCarriedQuery();
   const chips = useStatusChips(net);
   const phoneHub = net.sendingHub?.url;
-  const phones = phoneHub && net.mode === "live" ? `/?hub=${encodeURIComponent(phoneHub)}` : "/";
+  // ?phone=1: stay on the phone page on a wide screen (see components/desktop-redirect.tsx)
+  const phones = phoneHub && net.mode === "live" ? `/?hub=${encodeURIComponent(phoneHub)}&phone=1` : "/?phone=1";
 
   const links = (
     <>
