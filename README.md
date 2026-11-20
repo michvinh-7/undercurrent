@@ -48,18 +48,19 @@ Anything that fails goes on a rejected list with its reason. That list is the co
 | AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first | `hub/app/triage.py`, `POST /triage` |
 | Blackout forecast | A least-squares line through a relay box's last 8 voltage readings predicts when the supply drops to 180 V, with a range; it only warns when the fall is clear of the noise | `hub/app/forecast.py`, `GET /forecast` |
 | Have / Need board | Signed offers and requests (space, food, water, medicine, power), matched to the nearest offer, medicine and water first, then the longest-waiting; only the poster can close a post | `hub/app/exchange.py`, `GET /exchange` |
+| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events | `hub/app/livability.py`, `GET /livability` |
 | Sleep, mood and roll call | Optional answers on the daily check-in, averaged per level only once 2+ people answer; plus who hasn't been heard from today | `hub/app/wellbeing.py`, `GET /wellbeing` |
 | Cell messages | XSalsa20-Poly1305 (tweetnacl secretbox) under a key shared in person by QR | `web/lib/cell.ts`, `/cell` |
 | Surface check | A box at the top of the shaft signs CO₂ and oxygen, next to the Directorate's "the air kills in minutes" | `/overview`, map Briefs #13 |
 
 ## The 15 questions
 
-The brief asks 15 questions. Undercurrent answers 11 with working features, 2 partly, and has designs for the last 2, all on the same signed network.
+The brief asks 15 questions. Undercurrent answers 12 with working features, 1 partly, and has designs for the last 2, all on the same signed network.
 
 | | Questions |
 |---|---|
-| **Built and live** | 1 warn before blackouts · 2 share fairly · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 13 is the surface safe |
-| **Partly** | 3 keep levels livable (heat readings, no cooling response) · 12 grow food (shared on the board, nothing helps grow it) |
+| **Built and live** | 1 warn before blackouts · 2 share fairly · 3 keep levels livable (the Livability Index) · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 13 is the surface safe |
+| **Partly** | 12 grow food (shared on the board, nothing helps grow it) |
 | **Designed, not built** | 14 suits, domes or outposts · 15 plan the move up (both on `/overview`) |
 
 ## What we measured
@@ -231,6 +232,7 @@ Every report is one **event** in an append-only log. The full definition is in `
 | GET | `/forecast` | Per voltage-reporting box: trend, status and when it reaches the cutoff (`?cutoff=180`) |
 | GET | `/exchange` | The Have / Need board: open needs and offers, matches, counts per level |
 | GET | `/wellbeing` | Sleep and mood per level (2+ answers only) and the roll call (`?window_h=24`) |
+| GET | `/livability` | The Livability Index: a 0-100 score per level, each dimension with its reason and the signed events behind it (`?window_h=6`) |
 
 ## How we work
 

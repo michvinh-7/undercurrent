@@ -786,6 +786,99 @@ export function WellbeingSection({ net, compact = false }: { net: Undercurrent; 
   );
 }
 
+interface LivDim { score: number; why: string; events: string[]; from: string[] }
+interface LivLevel { level: number; score: number; band: "livable" | "strained" | "unsafe"; capped: boolean; limited_by: string; limited_why: string; coverage: number; of: number; dimensions: Record<string, LivDim> }
+interface LivView { window_h: number; weights: Record<string, number>; levels: LivLevel[]; ignored_unsigned: number }
+
+const LIV_DIMS: { key: string; label: string }[] = [
+  { key: "flooding", label: "Flooding" }, { key: "water", label: "Water" }, { key: "air", label: "Air" }, { key: "heat", label: "Heat" },
+  { key: "power", label: "Power" }, { key: "health", label: "Health" }, { key: "needs", label: "Needs" }, { key: "people", label: "People" },
+];
+const BAND_COLOR = { livable: "var(--ok)", strained: "var(--warn)", unsafe: "var(--danger)" } as const;
+const scoreColor = (n: number) => (n >= 80 ? BAND_COLOR.livable : n >= 50 ? BAND_COLOR.strained : BAND_COLOR.unsafe);
+const levelName = (n: number) => (n === 1 ? "Surface" : `L${n}`);
+
+/** Question 3: keep every level livable. One score per level from GET /livability, each number traced to signed events. */
+export function LivabilitySection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
+  const poll = useHubPoll<LivView>(net, "/livability", 5000);
+  const v = poll.data;
+  const worst = v?.levels[0];
+
+  return (
+    <section className="flex flex-col gap-5">
+      {!compact && (
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>Keep every level livable · question 3</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {worst && worst.band !== "livable" ? `${levelName(worst.level)} is ${worst.band}: ${worst.limited_why}` : "The Livability Index, level by level"}
+        </h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          One score from 0 to 100 per level, built only from signed events: the boxes&apos; probes, air, heat and voltage readings, the
+          blackout forecast, illness reports, unmet Have / Need requests, and sleep and mood. Plain rules, no model. A dimension with no data
+          says so instead of counting as fine, and one unsafe dimension makes the whole level unsafe. Every number links back to the events behind it.
+        </p>
+      </div>
+      )}
+      <Card className="gap-4 p-6">
+        {!v ? (
+          <p className="text-muted-foreground">{net.mode !== "live" ? "Connect to a hub to see the Livability Index." : poll.problem ? <HubProblem problem={poll.problem} path="/livability" /> : "Loading…"}</p>
+        ) : v.levels.length === 0 ? (
+          <p className="text-muted-foreground">No signed readings or reports in the last {v.window_h} h yet. Run the simulation, or report from a phone.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {v.levels.map((l) => (
+              <li key={l.level} className="py-3 first:pt-0 last:pb-0">
+                <details className="group">
+                  <summary className="grid cursor-pointer list-none grid-cols-[4.5rem_3.5rem_1fr] items-center gap-x-4 gap-y-2 sm:grid-cols-[4.5rem_3.5rem_1fr_auto]">
+                    <span className="font-mono text-sm">
+                      {levelName(l.level)}
+                      <span className="block text-xs text-muted-foreground">{l.coverage} of {l.of} measured</span>
+                    </span>
+                    <span className="font-mono text-2xl font-semibold tabular-nums" style={{ color: BAND_COLOR[l.band] }}>{l.score}</span>
+                    <span className="min-w-0 text-sm">
+                      <span className="font-medium" style={{ color: BAND_COLOR[l.band] }}>{l.band}</span>
+                      <span className="text-muted-foreground"> · held down by {l.limited_by}: {l.limited_why}{l.capped ? " (one unsafe dimension caps the level)" : ""}</span>
+                    </span>
+                    <span className="col-span-3 flex flex-wrap gap-1 sm:col-span-1 sm:justify-end">
+                      {LIV_DIMS.map((d) => {
+                        const x = l.dimensions[d.key];
+                        return (
+                          <span key={d.key} title={x ? `${d.label}: ${x.score} · ${x.why}` : `${d.label}: no data`}
+                            className="inline-flex h-7 min-w-11 flex-col items-center justify-center rounded border border-border px-1 text-[10px] leading-none">
+                            <span className="text-muted-foreground">{d.label}</span>
+                            <span className="font-mono font-semibold tabular-nums" style={{ color: x ? scoreColor(x.score) : "var(--muted)" }}>{x ? x.score : "–"}</span>
+                          </span>
+                        );
+                      })}
+                    </span>
+                  </summary>
+                  <ul className="mt-3 flex flex-col gap-1 pl-[5.5rem] text-sm text-muted-foreground">
+                    {LIV_DIMS.filter((d) => l.dimensions[d.key]).map((d) => {
+                      const x = l.dimensions[d.key];
+                      return (
+                        <li key={d.key}>
+                          <span className="font-mono tabular-nums" style={{ color: scoreColor(x.score) }}>{x.score}</span> {d.label}: {x.why}
+                          <span className="text-xs"> · from {x.from.join(", ")}{x.events.length ? ` · ${x.events.length} signed event${x.events.length === 1 ? "" : "s"} (${x.events.map((i) => i.slice(0, 8)).join(", ")})` : ""}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
+        {v && (
+          <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+            Last {v.window_h} h of signed events. Click a level for each number&apos;s source. 80+ livable, 50 to 79 strained, under 50 unsafe.
+            {v.ignored_unsigned > 0 ? ` ${v.ignored_unsigned} unsigned events left out.` : ""} Rules in <code className="font-mono">hub/app/livability.py</code>.
+          </p>
+        )}
+      </Card>
+    </section>
+  );
+}
+
 /** Questions 14 and 15: going back up. Design notes, labelled as not built, showing which live pieces they'd stand on. */
 export function SurfaceReturnSection({ net }: { net: Undercurrent }) {
   const people = net.events.filter((e) => e.source !== "sensor" && e.type !== "roster");
