@@ -148,10 +148,10 @@ function SharesSlide({ net }: { net: Undercurrent }) {
 function ProofSlide() {
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
         {PROOF.map((r) => (
           <Card key={r.label} className="gap-1 p-4">
-            <span className="font-mono text-2xl font-medium tabular-nums sm:text-3xl">{r.value}</span>
+            <span className="font-mono text-2xl font-medium whitespace-nowrap tabular-nums sm:text-3xl lg:text-2xl 2xl:text-3xl">{r.value}</span>
             <span className="text-sm text-foreground/80">{r.label}</span>
           </Card>
         ))}
