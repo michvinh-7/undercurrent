@@ -39,6 +39,8 @@ Every hub runs the same checks on every event, whether it comes from a phone, a 
 
 Anything that fails goes on a rejected list with its reason. That list is the console's "forgeries blocked" counter.
 
+**Don't trust the hub: check it.** `hub/scripts/verify.py` is an independent audit that imports none of the hub's code: about 300 lines of standard library plus PyNaCl. Give it a live hub, a hub's database file or an export, plus the roster you got in person. It recomputes every hash and signature, replays the roster to check that each signer was a member when it signed, finds forks and deleted rows, and cross-checks two hubs event by event. It can sign its report with the auditor's own key, so the verdict can be passed on and checked too.
+
 **What runs on top:**
 
 | Feature | What it does | Where |
@@ -163,6 +165,8 @@ cd hub
 .venv/bin/python scripts/directorate.py edit      # change a stored record → the chain check names the row
 .venv/bin/python scripts/directorate.py delete    # delete the newest record → flagged, then put back
 .venv/bin/python scripts/directorate.py status    # both hubs: counter, fingerprint, do they agree
+.venv/bin/python scripts/verify.py --hub http://127.0.0.1:8001 --hub http://127.0.0.1:8002 --roster demo/roster.json
+                                                   # independent audit: PASS, or the exact row that fails
 ```
 
 **5. Tests and numbers**
