@@ -879,6 +879,35 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
   );
 }
 
+/** The index as one row of level tiles, for a slide: score, band and what holds each level down. */
+export function LivabilityStrip({ net }: { net: Undercurrent }) {
+  const poll = useHubPoll<LivView>(net, "/livability", 5000);
+  const v = poll.data;
+  if (!v || v.levels.length === 0) {
+    return (
+      <Card className="p-4 text-sm text-muted-foreground">
+        Livability Index: {net.mode !== "live" ? "connect to a hub." : poll.problem ? <HubProblem problem={poll.problem} path="/livability" /> : v ? "no signed readings yet." : "Loading…"}
+      </Card>
+    );
+  }
+  return (
+    <Card className="gap-2 p-4">
+      <span className="caption">Livability Index · one score per level, from signed readings only</span>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {v.levels.slice(0, 4).map((l) => (
+          <div key={l.level} className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2" style={{ borderLeft: `4px solid ${BAND_COLOR[l.band]}` }}>
+            <span className="font-mono text-2xl font-semibold tabular-nums" style={{ color: BAND_COLOR[l.band] }}>{l.score}</span>
+            <span className="min-w-0 text-sm leading-tight">
+              <span className="font-mono">{levelName(l.level)}</span> <span style={{ color: BAND_COLOR[l.band] }}>{l.band}</span>
+              <span className="block truncate text-muted-foreground" title={l.limited_why}>{l.band === "livable" ? `${l.coverage} of ${l.of} measured` : l.limited_why}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 /** Questions 14 and 15: going back up. Design notes, labelled as not built, showing which live pieces they'd stand on. */
 export function SurfaceReturnSection({ net }: { net: Undercurrent }) {
   const people = net.events.filter((e) => e.source !== "sensor" && e.type !== "roster");

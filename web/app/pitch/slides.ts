@@ -70,10 +70,10 @@ export const SLIDES: Slide[] = [
   {
     id: "shares", seconds: 25, kicker: "It shares",
     title: "It shares what's left and sees who's struggling.",
-    sub: "Needs meet offers across levels, medicine first. Daily check-ins show the deep levels sleeping hours less.",
-    purpose: "Bring it back to people: fairness and wellbeing.",
+    sub: "Needs meet offers across levels, medicine first. Check-ins track sleep. One score per level says which is failing, and why.",
+    purpose: "Bring it back to people: fairness, wellbeing, and which level needs help first.",
     takeaway: "It makes life underground fairer.",
-    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. The same check-ins track sleep and mood: the deep levels sleep three hours less. And a box at the top of the shaft says the surface air is breathable.",
+    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. Check-ins show the deep levels sleep three hours less. And it all adds up to one score per level: level 34 is unsafe, and it says why, the air.",
   },
   {
     id: "reach", seconds: 15, kicker: "The brief",
