@@ -21,6 +21,7 @@ const PAGES = [
   { href: "/dashboard", label: "Console" },
   { href: "/hollow", label: "Map" },
   { href: "/truth", label: "Directorate view" },
+  { href: "/pitch", label: "Pitch" },
 ] as const;
 
 type Tone = "ok" | "warn" | "danger" | "accent" | "muted" | "sim";
