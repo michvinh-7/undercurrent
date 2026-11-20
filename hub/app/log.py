@@ -15,6 +15,7 @@ list is how it knows its own chain's tip even if the newest row is deleted, and 
 it can take a deleted row back from a peer: only a row whose hash it wrote.
 """
 
+import functools
 import hashlib
 import json
 import sqlite3
@@ -104,10 +105,22 @@ def chain_prefix(events: list[Event]) -> list[Event]:
     return out
 
 
+def _locked(method):
+    """Run an EventLog method holding its lock (see __init__)."""
+    @functools.wraps(method)
+    def run(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return run
+
+
 class EventLog:
     def __init__(self, path: str, hub_id: str):
         self.hub_id = hub_id
-        self._lock = threading.Lock()
+        # One connection, shared by the request threads and the sync thread: every use of it
+        # takes this lock. (Unlocked reads racing a write made SQLite fail a commit, and the
+        # hub then served events it never saved.) Re-entrant: locked methods call each other.
+        self._lock = threading.RLock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
@@ -125,6 +138,7 @@ class EventLog:
             )
         self._db.commit()
 
+    @_locked
     def _last_hash(self, hub_id: str) -> str:
         """The tip of `hub_id`'s chain. For this hub: the last hash it wrote, even if that
         row has since been deleted (so the deletion shows in verify) or a restored row was
@@ -148,11 +162,12 @@ class EventLog:
             )
             if own:
                 self._db.execute("INSERT OR IGNORE INTO own_hashes (hash, event_id) VALUES (?, ?)", (event.hash, event.id))
-        except sqlite3.IntegrityError:
-            self._db.rollback()
+            self._db.commit()
+        except BaseException:
+            self._db.rollback()  # never leave a transaction open: what isn't committed is lost on exit
             raise
-        self._db.commit()
 
+    @_locked
     def wrote(self, event_hash: str) -> bool:
         """Did this hub write an event with this hash itself?"""
         return self._db.execute("SELECT 1 FROM own_hashes WHERE hash = ?", (event_hash,)).fetchone() is not None
@@ -178,10 +193,12 @@ class EventLog:
             self._insert(event)
             return event
 
+    @_locked
     def get(self, event_id: str) -> Event | None:
         row = self._db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
         return self._readable(row) if row else None
 
+    @_locked
     def ids(self) -> list[str]:
         return [r[0] for r in self._db.execute("SELECT id FROM events ORDER BY seq")]
 
@@ -201,12 +218,14 @@ class EventLog:
             self._db.commit()
             return True
 
+    @_locked
     def rejected(self, limit: int = 100) -> tuple[int, list[dict]]:
         """(total count, newest `limit` rejections)."""
         total = self._db.execute("SELECT COUNT(*) FROM rejected").fetchone()[0]
         rows = self._db.execute("SELECT * FROM rejected ORDER BY seq DESC LIMIT ?", (limit,)).fetchall()
         return total, [{**dict(r), "event": json.loads(r["event"])} for r in rows]
 
+    @_locked
     def has(self, event_id: str) -> bool:
         return self._db.execute("SELECT 1 FROM events WHERE id = ?", (event_id,)).fetchone() is not None
 
@@ -238,6 +257,7 @@ class EventLog:
             rows = self._db.execute(query + " ORDER BY seq", params).fetchall()
         return [(row["seq"], e) for row in rows if (e := self._readable(row)) is not None]
 
+    @_locked
     def fingerprint(self) -> str:
         """One short hash of every event this hub holds, in any order: two hubs that hold
         exactly the same events show the same fingerprint, whatever order they got them in."""
@@ -258,6 +278,7 @@ class EventLog:
                            "first": (prefix[0].hash if prefix else GENESIS)[:SHORT]}
         return out
 
+    @_locked
     def count(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
 
@@ -266,6 +287,7 @@ class EventLog:
         report = self.verify_report()
         return report["chain_intact"], report["first_bad_event"]
 
+    @_locked
     def verify_report(self) -> dict:
         """Check every event and every origin hub's chain.
 
