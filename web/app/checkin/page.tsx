@@ -69,16 +69,16 @@ export default function CheckinPage() {
           <p className="mt-1 text-xs text-muted-foreground">Only shown as an average for your level, and only once 2 or more people answer.</p>
         </div>
         <div>
-          <Label optional>Food at home</Label>
+          <Label optional>Days of food at home</Label>
           <Choice
             value={food}
             onChange={(v) => setFood(food === v ? null : v)}
             columns={4}
             options={[
-              { value: "0", label: "< 1 day" },
-              { value: "2", label: "1–3 days" },
-              { value: "5", label: "3–7 days" },
-              { value: "7", label: "A week +" },
+              { value: "0", label: "< 1" },
+              { value: "2", label: "1–3" },
+              { value: "5", label: "3–7" },
+              { value: "7", label: "7+" },
             ]}
           />
           <p className="mt-2 text-xs text-muted-foreground">Feeds your level&apos;s food score, only once 2 or more people answer.</p>
