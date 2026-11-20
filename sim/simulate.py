@@ -97,7 +97,7 @@ def check_world(world: dict) -> None:
         where = f"timeline[{i}]"
         if step["by"] not in who:
             raise SystemExit(f"{where}: unknown sender {step['by']!r}")
-        if step["type"] not in ("checkin", "hazard", "case", "missing_person"):
+        if step["type"] not in ("checkin", "hazard", "case", "missing_person", "exchange"):
             raise SystemExit(f"{where}: type {step['type']!r} isn't one a phone or box sends")
         if step["t"] < last:
             raise SystemExit(f"{where}: times must not go backwards")

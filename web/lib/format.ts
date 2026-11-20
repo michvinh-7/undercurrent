@@ -35,6 +35,13 @@ export function summary(e: HollowEvent): string {
         .join(" · ");
     case "roster":
       return `${p.action === "remove" ? "Removed" : "Added"} ${p.role === "operator" ? "operator" : "member"} ${String(p.pub ?? "?").slice(0, 8)}…`;
+    case "exchange":
+      if (str(p.closes)) return "Marked a Have / Need post as done";
+      return [
+        `${p.side === "have" ? "Has" : "Needs"} ${String(p.category ?? "something")}: ${str(p.item) ?? "unnamed"}`,
+        typeof p.quantity === "number" ? `× ${p.quantity}` : null,
+        str(p.location),
+      ].filter(Boolean).join(" · ");
   }
 }
 
@@ -44,4 +51,5 @@ export const TYPE_LABEL: Record<HollowEvent["type"], string> = {
   case: "symptoms",
   missing_person: "missing",
   roster: "roster",
+  exchange: "have / need",
 };

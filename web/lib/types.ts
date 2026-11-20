@@ -1,6 +1,6 @@
 // Mirrors shared/schemas/event.schema.json. Change both together.
 
-export type EventType = "checkin" | "hazard" | "case" | "missing_person" | "roster";
+export type EventType = "checkin" | "hazard" | "case" | "missing_person" | "roster" | "exchange";
 export type EventSource = "resident" | "sensor";
 
 export interface HollowEvent {

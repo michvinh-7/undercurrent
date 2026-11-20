@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from .ai_routes import router as ai_router
+from .exchange import board as exchange_board
 from .forecast import CUTOFF_V, forecast_all
 from .gate import Gate, Rejected
 from .link import Link
@@ -108,6 +109,13 @@ def blackout_forecast(cutoff: float = Query(default=CUTOFF_V, ge=0, le=400, desc
     """Per box that reports volts: a straight-line fit of its recent readings and, if the
     supply is clearly falling, when it reaches the cutoff (hub/app/forecast.py)."""
     return {"cutoff_v": cutoff, "boxes": [f.to_dict() for f in forecast_all(log.list(type="hazard"), cutoff)]}
+
+
+@app.get("/exchange")
+def have_need_board():
+    """The Have / Need board: open needs and offers, suggested matches, counts per level
+    (hub/app/exchange.py)."""
+    return exchange_board(log.list(type="exchange"))
 
 
 @app.get("/events/verify")
