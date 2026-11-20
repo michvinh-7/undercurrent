@@ -1,6 +1,6 @@
 # Team status
 
-**Last updated:** Thu 11/19 (night, after the Have / Need board) by Michael. The forecast is on `main` (PR #38); the board is on `michael/sync`.
+**Last updated:** Thu 11/19 (night) by Michael. Everything is on `main` through PR #39, including the blackout forecast and the Have / Need board.
 **Based on:** what's in the repo (`main` plus pushed branches). If you've done work that isn't pushed, it isn't counted here. Push it, or edit your section.
 
 The plan is now the rework: the Canary box plus a signed, encrypted channel ([`REWORK_PLAN.md`](REWORK_PLAN.md)). Tasks below come from the reworked team contract, one section per person. `[x]` means done and merged into `main`. Anything partly done stays unchecked, with a note saying what's left.
