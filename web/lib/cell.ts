@@ -60,8 +60,11 @@ export function keyTag(key: Uint8Array): string {
 
 // ---------------------------------------------------------------- the invite link
 
-export function inviteLink(key: Uint8Array, origin: string): string {
-  return `${origin}/cell#k=${encodeURIComponent(b64(key))}`;
+/** The invite: the cell page plus the key in the #fragment (never sent to any server).
+ *  `hub`, when given, rides along as ?hub= so the new phone posts to the right hub. */
+export function inviteLink(key: Uint8Array, origin: string, hub?: string): string {
+  const query = hub ? `?hub=${encodeURIComponent(hub)}` : "";
+  return `${origin}/cell${query}#k=${encodeURIComponent(b64(key))}`;
 }
 
 /** The key from a location.hash like "#k=...", or null. */
