@@ -9,7 +9,9 @@ GET/POST /link. sync.py will drain it with `poll()` once hub-to-hub sync exists.
 - restore(): sending resumes from now.
 - bandwidth_bps=None means unlimited (instant).
 
-Fairness (no level waits too long) is Person 2's Upgrade 2: hub/app/scheduler.py.
+Fairness: with `fair_max_wait_s` set (the hub sets 60 s, LINK_FAIR_MAX_WAIT_S), the next
+event is picked by hub/app/scheduler.py: SOS first always, then any level whose oldest
+message has waited that long, then highest priority. Without it, plain highest priority.
 """
 
 import time
@@ -18,6 +20,7 @@ from dataclasses import dataclass, field
 from itertools import count
 
 from .models import Event
+from .scheduler import pick
 
 
 def event_size(event: Event) -> int:
@@ -42,6 +45,7 @@ class Link:
     bandwidth_bps: float | None = None
     clock: Callable[[], float] = time.monotonic
     is_cut: bool = False
+    fair_max_wait_s: float | None = None  # None: plain highest priority
     _queue: list[_Queued] = field(default_factory=list)
     _sending: tuple[_Queued, float] | None = None  # (item, finishes_at)
     _free_at: float = 0.0
@@ -88,7 +92,10 @@ class Link:
             return None
         start = max(self._free_at, min(q.enqueued_at for q in self._queue))
         ready = [q for q in self._queue if q.enqueued_at <= start]
-        best = max(ready, key=lambda q: (q.priority, -q.order))
+        if self.fair_max_wait_s is not None:
+            best = pick(ready, start, self.fair_max_wait_s)  # no level starves
+        else:
+            best = max(ready, key=lambda q: (q.priority, -q.order))
         self._queue.remove(best)
         self._free_at = start
         return best

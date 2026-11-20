@@ -86,3 +86,24 @@ def test_slider_change_applies_from_now(clock):
 def test_bad_bandwidth_rejected(clock):
     with pytest.raises(ValueError):
         Link(clock=clock).set_bandwidth(0)
+
+
+
+def test_fair_link_serves_a_starved_deep_level_but_sos_still_goes_first(clock):
+    """With fair_max_wait_s (on in every hub), a level whose message has waited past the
+    limit goes next, ahead of higher-priority messages from busier levels. SOS still first."""
+    def at(name, priority, level):
+        return ev(name, priority).model_copy(update={"level": level})
+
+    orders = {}
+    for name, link in {"plain": Link(bandwidth_bps=1, clock=clock),
+                       "fair": Link(bandwidth_bps=1, clock=clock, fair_max_wait_s=60)}.items():
+        clock.t = 0.0
+        for e in (at("sos", 0.95, 12), at("upper-a", 0.65, 3), at("deep", 0.25, 38), at("upper-b", 0.65, 3)):
+            link.enqueue(e)  # each takes ~200 s to cross at 1 byte/s
+        clock.t = 10_000
+        orders[name] = [e.id for e in link.poll()]
+    assert orders["plain"] == ["sos", "upper-a", "upper-b", "deep"]  # the deep level always loses
+    # Past 60 s, each level's oldest message gets a turn, longest-waiting first: L3's first, then
+    # the deep level's, before L3's second.
+    assert orders["fair"] == ["sos", "upper-a", "deep", "upper-b"]

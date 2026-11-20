@@ -74,13 +74,13 @@ Brackets are 95% bootstrap intervals.
 
 ## Fairness
 
-Ranking by priority alone can starve a quiet level whose reports keep losing to busier ones. A fair scheduler (`hub/app/scheduler.py`) puts a ceiling on how long any level waits. With Llama's priorities, it cut the longest wait of any level from 998 s to 929 s, and SOS still crossed in 159 s instead of 470 s first-come-first-served (simulated arrivals). It's measured but not yet switched on in the hub's link, which sends highest priority first. The deep levels are the ones the Directorate starves, so it's the next step.
+Ranking by priority alone can starve a quiet level whose reports keep losing to busier ones. A fair scheduler (`hub/app/scheduler.py`) puts a ceiling on how long any level waits. With Llama's priorities, it cut the longest wait of any level from 998 s to 929 s, and SOS still crossed in 159 s instead of 470 s first-come-first-served (simulated arrivals). It's on in every hub's link (`LINK_FAIR_MAX_WAIT_S`, 60 s by default): SOS always goes first; after that, once a level's oldest message has waited 60 s, it takes the next turn (longest-waiting level first) instead of waiting behind busier levels' higher-priority messages. The deep levels are the ones the Directorate starves.
 
 ## Privacy and control
 
 - **Nothing leaves the hub.** The model runs on the laptop; no report goes to a cloud service unless `CLOUD_PROVIDER=gemini` is set for the eval or a mirror.
 - **People stay in charge.** The model only orders reports; people read them and decide what to do. Nothing is dispatched automatically. The overview's Try it card shows which path read a message (model, cloud or keyword rules).
-- **Turning it off is one setting:** `TRIAGE_ON_INGEST=0`. Reports then keep the order they arrived in.
+- **Turning it off is one setting:** `TRIAGE_ON_INGEST=0`. Reports then keep the order they arrived in. `LINK_FAIR_MAX_WAIT_S=0` turns off the fair scheduler (plain highest priority first).
 
 ## Other AI in the repo
 

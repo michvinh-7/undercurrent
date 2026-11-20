@@ -59,7 +59,9 @@ log = EventLog(HUB_DB, HUB_ID)
 gate = Gate(log, Roster.from_env(), HUB_ID)  # signature, roster and replay checks (hub/app/gate.py)
 app.include_router(ai_router)  # POST /triage, POST /organize
 _bps = float(os.getenv("LINK_BANDWIDTH_BPS", "0") or 0)
-link = Link(bandwidth_bps=_bps or None)  # outbound link to peer hubs, drained by sync
+_fair = float(os.getenv("LINK_FAIR_MAX_WAIT_S", "60") or 0)
+# outbound link to peer hubs, drained by sync; SOS first, and no level waits more than 60 s
+link = Link(bandwidth_bps=_bps or None, fair_max_wait_s=_fair or None)
 syncer = Syncer(log, gate, link, HUB_PEERS, HttpTransport())
 app.include_router(make_router(syncer))  # GET /sync/ids, POST /sync/events, GET /sync/status
 

@@ -76,6 +76,7 @@ Every number comes from a real run of the code in this repo. Anything simulated 
 | Deleted rows put back by the other hub | **20 of 20**, chain intact | same script, two real hubs synced |
 | Adaptive attackers, isolated episodes | **0 breaches** in 40,000 fuzzer attempts (2,000 episodes) and 20 episodes of a local LLM playing the Directorate; every database edit flagged or put back by sync; reset **0.9 ms**, identical to the starting hub 2,020 of 2,020 times. It found and we fixed a crash: a row edited to level 999999 took the hub's pages down | `eval/run_directorate_gym.py` |
 | Alerts delivered after random link cuts | **200 of 200** after 26 cuts, 0 duplicates | `eval/run_sync_stress.py`, two real hubs, simulated cuts |
+| 40 hubs, one per level, linked only to their neighbours; the deep half cut off for 30 rounds while both halves post | **0 of 1,120 alerts lost** on any hub, 0 duplicated, every chain intact; all 40 agree **20 rounds** after reconnecting. A quiet round costs **6.6 KB** across the mesh (was 3.34 MB); the question one hub asks a neighbour stays **3.2 KB** at 100,000 events (was 3.81 MB) | `eval/run_mesh.py`, real hub code in one process, simulated network, one hop per round |
 | Water on the probe to the alert on the other hub | **0.81 s** median, 30 of 30 | `eval/run_probe_latency.py`, dry run with a simulated box; `--real` with the Canary box |
 | AI triage urgency accuracy | **76%** offline (local Llama 3.2 3B, the model the hub runs) vs **54%** for keyword rules, 149 held-out messages. Cloud Gemini: 88%. Microsoft's Phi-4-mini, also offline: 77%, but worse at ranking SOS first (55% vs 62%), so the hub keeps Llama | `eval/run_triage_eval.py` |
 | SOS delay with the priority queue | **72–76% shorter** than first-come-first-served | same, simulated arrivals |
@@ -230,7 +231,8 @@ Every report is one **event** in an append-only log. The full definition is in `
 | POST | `/roster` | Add or remove a member. Must be signed by an operator |
 | GET | `/link` | The simulated outbound link: bandwidth, cut or not, queue size |
 | POST | `/link` | `{"bandwidth_bps": 200}`, `{"unlimited": true}`, `{"cut": true}` / `{"cut": false}`. Only from the hub's own machine (403 otherwise), so nobody on the Wi-Fi can cut the link through the API; `LINK_CONTROL=open` lifts that |
-| GET | `/sync/ids` | Every event id this hub holds, and its fingerprint |
+| GET | `/sync/summary` | What this hub holds, per origin hub: how many events with no gap, and the last one's hash. A few bytes per hub, however many events. `?unless=<fingerprint>` answers just "same" when nothing differs |
+| GET | `/sync/ids` | Every event id this hub holds, and its fingerprint (for hubs on older code) |
 | POST | `/sync/events` | Events from a peer hub, each checked before it's stored |
 | GET | `/sync/status` | Peers, events in flight, gaps, rows restored, fingerprint, whether each peer agrees |
 | POST | `/triage` | Messy text in, a structured record with a priority out, and which model read it |

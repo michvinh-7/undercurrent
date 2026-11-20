@@ -12,7 +12,7 @@ from app.link import Link
 from app.log import EventLog
 from app.models import EventIn
 from app.roster import Roster
-from app.sync import Syncer, make_router
+from app.sync import NotSupported, Syncer, make_router, missing
 
 
 @pytest.fixture(autouse=True)
@@ -20,12 +20,29 @@ def no_model(monkeypatch):
     monkeypatch.setenv("TRIAGE_ON_INGEST", "0")
 
 
+@pytest.fixture(autouse=True, params=["summary", "ids"])
+def sync_mode(request, monkeypatch):
+    """Every sync test runs twice: peers asked for a summary, and peers on older code (ids)."""
+    monkeypatch.setattr(Memory, "ids_only", request.param == "ids")
+    return request.param
+
+
 class Memory:
-    """In-memory transport: peers are Syncers in the same process. `down` = unreachable."""
+    """In-memory transport: peers are Syncers in the same process. `down` = unreachable.
+    Asked for a summary like a current hub; with ids_only, answers like a hub on older code."""
+
+    ids_only = False
 
     def __init__(self):
         self.hubs: dict[str, Syncer] = {}
         self.down: set[str] = set()
+
+    def summary(self, peer, mine=None):
+        if self.ids_only:
+            raise NotSupported(peer)
+        log = self._hub(peer).log
+        fp = log.fingerprint()
+        return (None if mine == fp else log.summary()), fp
 
     def _hub(self, peer):
         if peer in self.down:
@@ -333,7 +350,7 @@ def test_wiped_hub_refuses_its_old_events_once_not_every_tick(tmp_path):
     a.log._db.close()
     (tmp_path / "hub-L34.db").unlink()
     a = make_hub(tmp_path, net, "hub-L34", "hub-L12")
-    b.peer_ids.clear()
+    b.peer_view.clear()
     settle(a, b, rounds=10)
     assert not {e.id for e in old} & ids(a)  # A can't prove it wrote them: not taken back
     assert rejected_total(a) == 3  # each counted once, not once per tick
@@ -439,6 +456,70 @@ def test_peer_on_older_code_without_a_fingerprint_is_unknown(pair):
     post(a)
     old_ids = net.ids
     net.ids = lambda peer: old_ids(peer)[0]  # ids only, no fingerprint: what an old hub sends
+    net.ids_only = True  # and no summary either
     settle(a, b)
     assert a.status()["agrees_with"] == {"hub-L12": None}
     assert a.last_error == {} and ids(a) == ids(b)  # and sync with it still works
+
+
+# ---------------------------------------------------------------- the summary: bytes per hub, not per event
+
+def test_summary_is_per_origin_and_stops_at_a_gap(pair):
+    a, b, _ = pair
+    a1, a2, a3 = post(a), post(a), post(a)
+    b.receive([a1, a3])  # a2 still in transit
+    s = b.log.summary()
+    assert s["hub-L34"] == {"n": 1, "head": a1.hash[:16], "first": a1.hash[:16]}
+    assert [e.id for e in missing(a.log.list(), ("summary", s))] == [a2.id, a3.id]  # a3 offered again: B says duplicate
+    b.receive([a2])
+    assert b.log.summary()["hub-L34"] == {"n": 3, "head": a3.hash[:16], "first": a1.hash[:16]}
+    assert missing(a.log.list(), ("summary", b.log.summary())) == []
+
+
+def test_a_peer_whose_chain_differs_is_offered_the_whole_chain(pair):
+    a, b, _ = pair
+    evs = [post(a) for _ in range(3)]
+    fake = {"hub-L34": {"n": 2, "head": "f" * 64, "first": "f" * 64}}  # different events
+    assert {e.id for e in missing(a.log.list(), ("summary", fake))} == {e.id for e in evs}
+
+
+def test_the_question_stays_small_as_the_log_grows(pair, sync_mode):
+    import json
+    a, b, _ = pair
+    for _ in range(200):
+        post(a)
+    settle(a, b)
+    summary = len(json.dumps(b.log.summary()))
+    ids = len(json.dumps(b.log.ids()))
+    assert summary < 100 and ids > 7000  # one origin: ~70 bytes, vs 200 ids at ~39 bytes each
+
+
+def test_a_hub_on_older_code_is_asked_for_ids(pair, sync_mode):
+    a, b, net = pair
+    post(a)
+    settle(a, b)
+    assert ("hub-L12" in a.ids_only) == (sync_mode == "ids")
+    assert a.peer_view["hub-L12"][0] == sync_mode
+
+
+def test_a_chain_restarted_by_a_wiped_hub_is_offered_once_not_every_round(pair):
+    a, b, _ = pair
+    old = [post(a) for _ in range(3)]
+    view = ("summary", {"hub-L34": {"n": 3, "head": old[-1].hash[:16], "first": old[0].hash[:16]}})
+    a.log._db.execute("DELETE FROM events")
+    a.log._db.commit()
+    fresh = post(a)  # a new chain from the start: B's summary is longer, but it's not this chain
+    assert [e.id for e in missing(a.log.list(), view)] == [fresh.id]
+    assert missing(a.log.list(), view, delivered={fresh.id}) == []
+
+
+def test_a_peer_holding_the_same_events_just_says_so(pair, sync_mode):
+    a, b, net = pair
+    post(a)
+    settle(a, b)
+    a.tick()
+    assert a.peer_view["hub-L12"] == (("ids", ids(b)) if sync_mode == "ids" else ("summary", b.log.summary()))
+    post(a)
+    a.tick()  # now they differ: a full summary, and the new event goes
+    settle(a, b)
+    assert ids(a) == ids(b)

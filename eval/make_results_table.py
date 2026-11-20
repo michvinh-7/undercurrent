@@ -173,6 +173,14 @@ def gym_section() -> list[str]:
     return [*found[-1].read_text().rstrip().splitlines(), "", f"From `{found[-1].name}`.", ""]
 
 
+def mesh_section() -> list[str]:
+    """The newest 40-hub mesh run (eval/run_mesh.py), as written."""
+    found = sorted(RESULTS.glob("mesh_*.md"))
+    if not found:
+        return []
+    return [*found[-1].read_text().rstrip().splitlines(), "", f"From `{found[-1].name}`.", ""]
+
+
 def main():
     runs = newest_runs()
     out = [
@@ -184,6 +192,7 @@ def main():
         "",
         *security_section(),
         *gym_section(),
+        *mesh_section(),
         *forecast_section(),
     ]
     headings = {"test": "use these in the video", "dev": "tuning numbers, NOT for the video",

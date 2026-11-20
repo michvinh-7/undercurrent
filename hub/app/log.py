@@ -26,6 +26,7 @@ from . import crypto
 from .models import SIGNED_FIELDS, Event, EventIn
 
 GENESIS = "0" * 64
+SHORT = 16  # hex digits of a hash in a sync summary: enough to tell chains apart; the gate checks the full hash
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -83,6 +84,24 @@ def compute_hash(fields: dict, prev_hash: str) -> str:
     content = {k: fields[k] for k in (*SIGNED_FIELDS, "sig") if fields.get(k) is not None}
     blob = json.dumps(content, sort_keys=True, separators=(",", ":")) + prev_hash
     return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def by_origin(events: list[Event]) -> dict[str, list[Event]]:
+    out: dict[str, list[Event]] = {}
+    for e in events:
+        out.setdefault(e.hub_id, []).append(e)
+    return out
+
+
+def chain_prefix(events: list[Event]) -> list[Event]:
+    """One origin's events in chain order, from its first event up to the first gap
+    (an event not held yet, or deleted). Each event's prev_hash names the one before it."""
+    after = {e.prev_hash: e for e in events}
+    out, cur = [], GENESIS
+    while (e := after.get(cur)) is not None and len(out) < len(events):
+        out.append(e)
+        cur = e.hash
+    return out
 
 
 class EventLog:
@@ -225,6 +244,19 @@ class EventLog:
         hashes = sorted(r[0] for r in self._db.execute("SELECT hash FROM events"))
         blob = f"{len(hashes)}:" + ",".join(hashes)
         return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+    def summary(self, events: list[Event] | None = None) -> dict[str, dict]:
+        """What this hub holds, in a few bytes per origin hub instead of one id per event:
+        for each origin, how many events of its chain this hub holds with no gap from the
+        start (`n`), the hash of the last of them (`head`) and of the first (`first`, which tells a
+        chain restarted by a wiped hub from the old one). A peer sends only what comes
+        after (sync.py). The size grows with the number of hubs, not the number of events."""
+        out = {}
+        for origin, evs in by_origin(events if events is not None else self.list()).items():
+            prefix = chain_prefix(evs)
+            out[origin] = {"n": len(prefix), "head": (prefix[-1].hash if prefix else GENESIS)[:SHORT],
+                           "first": (prefix[0].hash if prefix else GENESIS)[:SHORT]}
+        return out
 
     def count(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0]
