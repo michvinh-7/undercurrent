@@ -10,7 +10,7 @@
 
 import { AppBar } from "@/components/app-bar";
 import { PageIntro, Zone } from "@/components/page-intro";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { summary, timeAgo, TYPE_LABEL } from "@/lib/format";
 import { isEncrypted, isSensor, isSimulated, isSOS, useUndercurrent, type HubState, type Undercurrent } from "@/lib/useUndercurrent";
 import type { HollowEvent } from "@/lib/types";
@@ -26,17 +26,31 @@ function useNow(ms = 1000) {
   return now;
 }
 
-// Unscored events (AI triage off, e.g. on the box) sort by rule: SOS, then sensor alarms. Only the order
+// Unscored events (AI triage off, e.g. on the box) rank by rule: SOS, then hazards (box or resident) by their severity. Only the order
 // uses this; the priority column still shows "—" for them.
-const rank = (e: HollowEvent) => e.priority ?? (isSOS(e) ? 0.95 : isSensor(e) ? 0.9 : 0.3);
-const byPriority = (a: HollowEvent, b: HollowEvent) => rank(b) - rank(a) || b.created_at.localeCompare(a.created_at);
+const SENSOR_RANK: Record<string, number> = { high: 0.9, medium: 0.7, low: 0.25 };
+const rank = (e: HollowEvent) => {
+  if (e.priority !== null && e.priority !== undefined) return e.priority;
+  if (isSOS(e)) return 0.95;
+  // A hazard, from a box or a resident, is as pressing as its own severity says:
+  // "air normal (low)" isn't urgent, "lights flickering (medium)" is.
+  if (isSensor(e) || e.type === "hazard") return SENSOR_RANK[String((e.payload as { severity?: unknown }).severity)] ?? 0.3;
+  return 0.3;
+};
+/** Pressing: SOS and urgent (triage scores 0.65 and up), and sensor alarms. Listed first. */
+const PRESSING = 0.65;
+const isPressing = (e: HollowEvent) => rank(e) >= PRESSING;
+/** Pressing reports first, then everything else; newest first within each. */
+const byPressingThenTime = (a: HollowEvent, b: HollowEvent) =>
+  Number(isPressing(b)) - Number(isPressing(a)) || b.created_at.localeCompare(a.created_at);
 
 export default function Console() {
   const net = useUndercurrent();
   const now = useNow();
   const [directorate, setDirectorate] = useState(false);
 
-  const queue = useMemo(() => net.events.filter((e) => e.type !== "roster").sort(byPriority), [net.events]);
+  const queue = useMemo(() => net.events.filter((e) => e.type !== "roster").sort(byPressingThenTime), [net.events]);
+  const pressing = queue.filter(isPressing).length;
   const primary = net.hubs.find((h) => h.role === "primary");
 
   return (
@@ -69,7 +83,7 @@ export default function Console() {
       <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <Zone
           n={1}
-          title={directorate ? `Intercepted traffic · ${queue.length}` : `Who needs help, most urgent first · ${queue.length}`}
+          title={directorate ? `Intercepted traffic · ${queue.length}` : `Who needs help: urgent first, newest first · ${queue.length}`}
           note={
             <>
               {directorate ? "every message on the link, as a tap sees it" : "the hub's AI reads free text; code does the scoring"}
@@ -82,10 +96,15 @@ export default function Console() {
           }
         >
           <ol className="space-y-2">
-            {queue.map((e) => {
+            {queue.map((e, i) => {
               const t = net.arrived.get(e.id);
               const isNew = t !== undefined && net.isFresh(e.id) && now - t < NEW_MS;
+              const heading = !directorate && (i === 0 || i === pressing) && queue.length > 0
+                ? (i === 0 && pressing > 0 ? `Urgent · ${pressing}` : `Everything else · ${queue.length - pressing}`)
+                : null;
               return (
+                <Fragment key={e.id}>
+                {heading && <li className="caption pt-1 first:pt-0">{heading}</li>}
                 <QueueItem
                   key={e.id}
                   e={e}
@@ -95,6 +114,7 @@ export default function Console() {
                   tampered={net.chain?.first_bad_event === e.id}
                   directorate={directorate}
                 />
+                </Fragment>
               );
             })}
             {queue.length === 0 && <li className="text-[var(--muted)]">No reports yet.</li>}
