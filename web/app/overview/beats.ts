@@ -95,3 +95,11 @@ export const TRIAGE_RESULTS = [
   { label: "Level pulled out exactly", ai: "98.0%", aiCi: "95.3–100", rules: "63.1%" },
   { label: "SOS delay cut by the priority queue", ai: "75.9%", aiCi: "64.5–84.7", rules: "29.8%" },
 ];
+
+/** Blackout forecast backtest, from eval/results/forecast_synthetic_2026-11-19.md (n=1000 synthetic sags). */
+export const FORECAST_RESULTS = [
+  { label: "Error in the predicted drop-out time, an hour ahead", forecast: "6 min", baseline: "27 min" },
+  { label: "Error 15 minutes ahead", forecast: "1 min", baseline: "2 min" },
+  { label: "Sags warned before the power drops", forecast: "99.6%", baseline: "–" },
+  { label: "False alarms on steady power", forecast: "0%", baseline: "35%" },
+];

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
-  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
+  ArrowLeftRightIcon, ArrowRightIcon, BrainCircuitIcon, CloudSunIcon, MegaphoneIcon, ZapIcon, CheckIcon, CopyIcon, DropletIcon, LoaderCircleIcon, ServerIcon, SmartphoneIcon,
 } from "lucide-react";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
-import { BEATS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
+import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_RESULTS, type BeatId } from "./beats";
 import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
 import { timeAgo } from "@/lib/format";
 
@@ -406,6 +406,174 @@ function SurfaceSection({ net, q }: { net: Undercurrent; q: string }) {
   );
 }
 
+/** One box's forecast, as GET /forecast returns it (hub/app/forecast.py). */
+interface BoxForecast {
+  device_id: string;
+  level: number;
+  hub_id: string;
+  readings: number;
+  latest_v: number;
+  latest_at: string;
+  slope_v_per_min: number;
+  status: "falling" | "steady" | "below cutoff" | "too few readings";
+  eta_s: number | null;
+  eta_low_s: number | null;
+  eta_high_s: number | null;
+  cutoff_v: number;
+  simulated: boolean;
+}
+
+const mins = (s: number) => (s < 90 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`);
+
+/** Readings as dots, the fitted trend projected forward to the cutoff, the cutoff as a line. */
+function ForecastChart({ points, f }: { points: { t: number; v: number }[]; f: BoxForecast }) {
+  const W = 560, H = 180, padL = 44, padR = 16, padT = 14, padB = 26;
+  const last = Date.parse(f.latest_at);
+  const end = f.status === "falling" && f.eta_s !== null ? last + (f.eta_high_s ?? f.eta_s) * 1000 : last;
+  const t0 = Math.min(...points.map((p) => p.t), last), t1 = Math.max(end, last + 1);
+  const vs = points.map((p) => p.v);
+  const vMax = Math.max(...vs, f.latest_v) + 4, vMin = Math.min(f.cutoff_v - 6, ...vs);
+  const X = (t: number) => padL + ((t - t0) / (t1 - t0)) * (W - padL - padR);
+  const Y = (v: number) => padT + ((vMax - v) / (vMax - vMin)) * (H - padT - padB);
+  const slope = f.slope_v_per_min / 60000; // volts per ms
+  const fitAt = (t: number) => f.latest_v + slope * (t - last);
+  const cross = f.status === "falling" && f.eta_s !== null ? last + f.eta_s * 1000 : null;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Voltage readings from ${f.device_id} and the forecast trend to ${f.cutoff_v} volts`}>
+      {[vMax - 4, f.cutoff_v + (vMax - 4 - f.cutoff_v) / 2, f.cutoff_v].map((v) => (
+        <g key={v}>
+          <line x1={padL} x2={W - padR} y1={Y(v)} y2={Y(v)} stroke="var(--border)" />
+          <text x={padL - 6} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="var(--muted)">{Math.round(v)} V</text>
+        </g>
+      ))}
+      <line x1={padL} x2={W - padR} y1={Y(f.cutoff_v)} y2={Y(f.cutoff_v)} stroke="var(--danger)" strokeDasharray="4 4" />
+      <text x={W - padR} y={Y(f.cutoff_v) - 6} textAnchor="end" fontSize="11" fill="var(--danger)">equipment drops out</text>
+      {f.status === "falling" && cross !== null && (
+        <>
+          <line x1={X(t0)} y1={Y(fitAt(t0))} x2={X(cross)} y2={Y(f.cutoff_v)} stroke="var(--warn)" strokeWidth="1.5" strokeDasharray="6 4" />
+          {f.eta_low_s !== null && f.eta_high_s !== null && (
+            <rect x={X(last + f.eta_low_s * 1000)} y={Y(f.cutoff_v) - 5} width={Math.max(2, X(last + f.eta_high_s * 1000) - X(last + f.eta_low_s * 1000))} height="10" rx="5" fill="var(--warn)" fillOpacity="0.25" />
+          )}
+          <circle cx={X(cross)} cy={Y(f.cutoff_v)} r="5" fill="var(--warn)" />
+        </>
+      )}
+      {points.map((p) => <circle key={p.t} cx={X(p.t)} cy={Y(p.v)} r="3.5" fill="var(--water)" />)}
+      <text x={padL} y={H - 6} fontSize="11" fill="var(--muted)">readings</text>
+      {cross !== null && <text x={X(cross)} y={H - 6} textAnchor="middle" fontSize="11" fill="var(--warn)">forecast drop-out</text>}
+    </svg>
+  );
+}
+
+/** Question 1: warn before the power cuts out. The hub's forecast from a relay box's voltage readings. */
+function ForecastSection({ net }: { net: Undercurrent }) {
+  const primary = net.hubs.find((h) => h.role === "primary");
+  const [boxes, setBoxes] = useState<BoxForecast[] | null>(null);
+  useEffect(() => {
+    if (net.mode !== "live" || !primary) return;
+    let stop = false;
+    async function poll() {
+      try {
+        const res = await fetch(`${primary!.url}/forecast`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
+        if (res.ok && !stop) setBoxes(((await res.json()) as { boxes: BoxForecast[] }).boxes);
+      } catch {}
+    }
+    poll();
+    const t = setInterval(poll, 4000);
+    return () => { stop = true; clearInterval(t); };
+  }, [net.mode, primary?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const f = boxes?.find((b) => b.status === "falling") ?? boxes?.[0] ?? null;
+  const points = f
+    ? net.events
+        .filter((e) => e.device_id === f.device_id && (e.payload as { reading?: { unit?: string } }).reading?.unit === "V")
+        .map((e) => ({ t: Date.parse(e.created_at), v: Number((e.payload as { reading: { value: number } }).reading.value) }))
+        .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v))
+        .sort((a, b) => a.t - b.t)
+    : [];
+  const tone = !f ? "var(--muted)" : f.status === "falling" ? "var(--warn)" : f.status === "below cutoff" ? "var(--danger)" : "var(--ok)";
+  const headline = !f
+    ? null
+    : f.status === "falling" && f.eta_s !== null
+      ? `L${f.level} power drops out in about ${mins(f.eta_s)}`
+      : f.status === "below cutoff"
+        ? `L${f.level} supply is below ${f.cutoff_v} V now`
+        : f.status === "steady"
+          ? `L${f.level} supply steady at ${Math.round(f.latest_v)} V`
+          : `L${f.level}: waiting for more readings`;
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>Warn before the power cuts out</Eyebrow>
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The hub predicts the blackout, not just reports it</h2>
+        <p className="max-w-[70ch] text-foreground/75">
+          A box at a power relay reports its voltage. When the supply is failing it sags before it drops out, so the hub fits a straight
+          line through the last 8 signed readings and works out when it reaches the 180 V point where equipment stops. It only warns when
+          the fall is clear of the noise, and gives a range, not one confident number.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-start gap-4">
+        <Card className="min-w-0 flex-[999_1_480px] gap-3 p-6" style={{ borderColor: f ? tone : "var(--border)" }}>
+          <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: tone }}>
+            <ZapIcon className="size-4" aria-hidden="true" /> Live forecast
+          </span>
+          {f ? (
+            <>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1" aria-live="polite">
+                <span className="text-2xl font-semibold">{headline}</span>
+                {f.status === "falling" && f.eta_low_s !== null && f.eta_high_s !== null && (
+                  <span className="font-mono text-sm text-muted-foreground">range {mins(f.eta_low_s)} to {mins(f.eta_high_s)}</span>
+                )}
+              </div>
+              {points.length >= 2 && <ForecastChart points={points} f={f} />}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline">{f.device_id}</Badge>
+                {f.simulated && <Badge variant="outline" className="border-[var(--sim)] text-[var(--sim)]">Simulated</Badge>}
+                <span className="font-mono text-xs text-muted-foreground">
+                  {Math.round(f.latest_v)} V now · {f.slope_v_per_min.toFixed(1)} V/min · {f.readings} readings · {f.hub_id}
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              {net.mode === "live"
+                ? <>No box is reporting voltage yet. The simulation&apos;s L12 relay starts within seconds of <code className="font-mono text-sm">sim/simulate.py run</code>.</>
+                : "Connect to a hub to see the live forecast."}
+            </p>
+          )}
+        </Card>
+        <Card className="min-w-0 flex-[1_1_340px] gap-3 p-6">
+          <span className="font-semibold">Backtested on 1,000 voltage sags</span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th className="pb-2 font-normal"></th>
+                  <th className="pb-2 font-normal">Forecast</th>
+                  <th className="pb-2 font-normal">Last 2 readings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {FORECAST_RESULTS.map((r) => (
+                  <tr key={r.label} className="border-t border-border">
+                    <td className="py-2 pr-3">{r.label}</td>
+                    <td className="py-2 pr-3 font-mono tabular-nums">{r.forecast}</td>
+                    <td className="py-2 font-mono tabular-nums text-muted-foreground">{r.baseline}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Synthetic supplies with a known drop-out time, a reading every 5 minutes, plus 1,000 steady ones for false alarms. Medians;
+            95% intervals in <code className="font-mono">eval/results/RESULTS.md</code>.
+          </p>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
 export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
@@ -563,6 +731,8 @@ export default function Overview() {
         </section>
 
         <TriageSection net={net} />
+
+        <ForecastSection net={net} />
 
         <SurfaceSection net={net} q={q} />
 
