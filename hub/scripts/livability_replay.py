@@ -83,13 +83,15 @@ def build() -> Night:
     end = HOURS * 60
 
     # Last evening's check-ins (inside the 6-hour window from the start) and this morning's.
-    for level, people, sleep, mood in ((34, 3, 6, 3), (35, 2, 7, 4), (12, 3, 7, 4)):
+    # (level, people, hours slept, mood, days of food at home)
+    for level, people, sleep, mood, food in ((34, 3, 6, 3, 5), (35, 2, 7, 4, 5), (12, 3, 7, 4, 7)):
         for i in range(people):
-            n.add(-50 + 5 * i, level, "checkin", {"status": "ok", "sleep_h": sleep, "mood": mood}, f"resident-{level}-{i}")
-    for level, people, sleep, mood in ((34, 3, 5, 2), (35, 2, 5, 3), (12, 3, 7, 4)):
+            n.add(-50 + 5 * i, level, "checkin", {"status": "ok", "sleep_h": sleep, "mood": mood, "food_days": food}, f"resident-{level}-{i}")
+    for level, people, sleep, mood, food in ((34, 3, 5, 2, 5), (35, 2, 5, 3, 2), (12, 3, 7, 4, 7)):
         for i in range(people):
-            n.add(330 + 4 * i, level, "checkin", {"status": "ok", "sleep_h": sleep, "mood": mood}, f"resident-{level}-{i}")
+            n.add(330 + 4 * i, level, "checkin", {"status": "ok", "sleep_h": sleep, "mood": mood, "food_days": food}, f"resident-{level}-{i}")
     n.moment(330, 34, "Morning check-ins: 34 and 35 slept 5 hours, mood low")
+    n.moment(334, 35, "35's check-ins: the flood spoiled stores, 2 days of food left")
 
     for m in range(-10, end + 1, 10):  # from 01:50, so the first frame already has every box
         # Level 34: the fan stalls at 02:40, CO2 climbs; repaired at 06:00.
@@ -139,6 +141,8 @@ def build() -> Night:
     n.add(250, 35, "hazard", {"kind": "flooding", "severity": "low", "note": "mostly drained"}, "resident-35-1")
     n.add(210, 35, "hazard", {"kind": "bad_water", "severity": "medium", "note": "sewage smell from the drains"}, "resident-35-1")
     n.add(220, 35, "exchange", {"side": "need", "category": "water", "item": "drinking water", "quantity": 10}, "resident-35-0")
+    n.add(260, 35, "exchange", {"side": "need", "category": "food", "item": "dry food for 4 days, family of 5", "quantity": 1}, "resident-35-1")
+    n.moment(260, 35, "A family on 35 asks for food: unmet")
     n.moment(120, 35, "Resident: water past the ankles (high)")
     n.moment(210, 35, "Sewage backs up after the flood")
     n.events.sort(key=lambda e: e.created_at)

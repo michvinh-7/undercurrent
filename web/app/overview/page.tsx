@@ -26,7 +26,7 @@ const PROVEN_AT: Record<number, { label: string; href: string }> = {
   1: { label: "Forecast", href: "#forecast" }, 2: { label: "Have / Need", href: "#exchange" }, 3: { label: "Livability", href: "#livability" },
   4: { label: "3D map", href: "/hollow" }, 5: { label: "Beat 1", href: "#beats" }, 6: { label: "Have / Need", href: "#exchange" },
   7: { label: "How it works", href: "#how" }, 8: { label: "People", href: "#wellbeing" }, 9: { label: "Console", href: "/dashboard" },
-  10: { label: "Have / Need", href: "#exchange" }, 11: { label: "People", href: "#wellbeing" }, 12: { label: "Have / Need", href: "#exchange" },
+  10: { label: "Have / Need", href: "#exchange" }, 11: { label: "People", href: "#wellbeing" }, 12: { label: "Food score", href: "#livability" },
   13: { label: "Surface", href: "#surface" }, 14: { label: "Next", href: "#next" }, 15: { label: "Next", href: "#next" },
 };
 const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(--muted)" } as const;
@@ -74,7 +74,7 @@ function ProofStrip() {
 
 /** Why this should win, in the four things judges grade. */
 const WHY = [
-  { head: "It answers the brief", body: "One signed channel answers 12 of the 15 questions live, 1 partly, and designs the last 2. Question 7 (organise without the Directorate) and 13 (is the surface safe?) are central, not bolted on." },
+  { head: "It answers the brief", body: "One signed channel answers 13 of the 15 questions live and designs the last 2. Question 7 (organise without the Directorate) and 13 (is the surface safe?) are central, not bolted on." },
   { head: "It is hard engineering", body: "Ed25519 signing at the source, an in-person roster, replay defence, per-hub hash chains repaired from the peer, sync that survives cuts, end-to-end cells, and a verifier that shares no code with the hub." },
   { head: "It is measured", body: "0 of 300 forgeries accepted, 160 of 160 edits caught at the row, 0 of 1,120 alerts lost across 40 hubs. Our own adaptive attackers made 40,156 attempts against our hubs with 0 breaches. Every number reruns from eval/." },
   { head: "It is honest about limits", body: "Boxes and city data are simulated and labelled. Hubs can see who sent a cell message and when. A physical cut stops movement until it is restored. The offline AI misjudges urgency about 1 time in 4, so code and signatures carry the safety." },
@@ -90,7 +90,7 @@ function QuestionIndex({ q }: { q: string }) {
         <span className="text-[13px] text-muted-foreground">click one to jump to it</span>
         <span className="ml-auto flex flex-wrap gap-x-4 font-mono text-xs">
           <span><span style={{ color: STATUS_COLOR.live }}>■</span> {count("live")} live</span>
-          <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>
+          {count("partial") > 0 && <span><span style={{ color: STATUS_COLOR.partial }}>■</span> {count("partial")} partly</span>}
           <span><span style={{ color: STATUS_COLOR.design }}>■</span> {count("design")} designed</span>
         </span>
       </div>
@@ -350,7 +350,7 @@ export default function Overview() {
         <section id="questions" className="scroll-mt-16">
           <details className="rounded-xl border border-border bg-card">
             <summary className="cursor-pointer select-none px-5 py-4 text-lg font-semibold">
-              The brief&apos;s 15 questions: {QUESTIONS.filter((x) => x.status === "live").length} live, {QUESTIONS.filter((x) => x.status === "partial").length} partly, {QUESTIONS.filter((x) => x.status === "design").length} designed
+              The brief&apos;s 15 questions: {QUESTIONS.filter((x) => x.status === "live").length} live{QUESTIONS.some((x) => x.status === "partial") ? `, ${QUESTIONS.filter((x) => x.status === "partial").length} partly` : ""}, {QUESTIONS.filter((x) => x.status === "design").length} designed
             </summary>
             <div className="px-5 pb-5"><QuestionIndex q={q} /></div>
           </details>

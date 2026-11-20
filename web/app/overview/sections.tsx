@@ -793,7 +793,8 @@ interface LivView { window_h: number; weights: Record<string, number>; levels: L
 
 const LIV_DIMS: { key: string; label: string }[] = [
   { key: "flooding", label: "Flooding" }, { key: "water", label: "Water" }, { key: "air", label: "Air" }, { key: "heat", label: "Heat" },
-  { key: "power", label: "Power" }, { key: "health", label: "Health" }, { key: "needs", label: "Needs" }, { key: "people", label: "People" },
+  { key: "power", label: "Power" }, { key: "health", label: "Health" }, { key: "food", label: "Food" }, { key: "needs", label: "Needs" },
+  { key: "people", label: "People" },
 ];
 const BAND_COLOR = { livable: "var(--ok)", strained: "var(--warn)", unsafe: "var(--danger)" } as const;
 const scoreColor = (n: number) => (n >= 80 ? BAND_COLOR.livable : n >= 50 ? BAND_COLOR.strained : BAND_COLOR.unsafe);
@@ -815,7 +816,7 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
         </h2>
         <p className="max-w-[70ch] text-foreground/75">
           One score from 0 to 100 per level, built only from signed events: the boxes&apos; probes, air, heat and voltage readings, the
-          blackout forecast, illness reports, unmet Have / Need requests, and sleep and mood. Plain rules, no model. A dimension with no data
+          blackout forecast, illness reports, days of food at home, unmet Have / Need requests, and sleep and mood. Plain rules, no model. A dimension with no data
           says so instead of counting as fine, and one unsafe dimension makes the whole level unsafe. Every number links back to the events behind it.
         </p>
       </div>

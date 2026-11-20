@@ -11,6 +11,8 @@ export default function CheckinPage() {
   // Optional, for question 11 (what living underground does to people): whole numbers only.
   const [sleep, setSleep] = useState<string | null>(null);
   const [mood, setMood] = useState<string | null>(null);
+  // Optional, for question 12 (food): days of food at home, as a whole number.
+  const [food, setFood] = useState<string | null>(null);
 
   const payload = status && {
     status,
@@ -18,11 +20,12 @@ export default function CheckinPage() {
     ...(note.trim() && { note: note.trim() }),
     ...(sleep !== null && { sleep_h: Number(sleep) }),
     ...(mood !== null && { mood: Number(mood) }),
+    ...(food !== null && { food_days: Number(food) }),
   };
 
   return (
     <PhoneShell title="Check in" icon={<UserCheckIcon />} hint="Let people know where you are and how you're doing.">
-      <ReportForm type="checkin" payload={payload} onSent={() => { setStatus(null); setNote(""); setSleep(null); setMood(null); }}>
+      <ReportForm type="checkin" payload={payload} onSent={() => { setStatus(null); setNote(""); setSleep(null); setMood(null); setFood(null); }}>
         <div>
           <Label>How are you?</Label>
           <Choice
@@ -64,6 +67,21 @@ export default function CheckinPage() {
           />
           <p className="mt-2 flex justify-between text-xs text-muted-foreground"><span>1 = awful</span><span>5 = great</span></p>
           <p className="mt-1 text-xs text-muted-foreground">Only shown as an average for your level, and only once 2 or more people answer.</p>
+        </div>
+        <div>
+          <Label optional>Days of food at home</Label>
+          <Choice
+            value={food}
+            onChange={(v) => setFood(food === v ? null : v)}
+            columns={4}
+            options={[
+              { value: "0", label: "< 1" },
+              { value: "2", label: "1–3" },
+              { value: "5", label: "3–7" },
+              { value: "7", label: "7+" },
+            ]}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">Feeds your level&apos;s food score, only once 2 or more people answer.</p>
         </div>
         <label className="block">
           <Label optional>Name, so family can find you</Label>

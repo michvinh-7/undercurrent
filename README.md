@@ -7,7 +7,7 @@
 The Hollow is an underground city of 40 levels. The Directorate controls the official network, can cut it at will, and publishes numbers that hide how bad things are. Undercurrent is the residents' own channel, and the tools they build on top of it:
 
 - **Canary boxes** on each level sense trouble (water on the floor, the supply voltage sagging, heat, the air going bad) and sound the alarm. Each box signs its own alerts.
-- **Residents' phones** join in person by QR code, then sign every report: check-ins, hazards, symptoms, missing persons, Have / Need posts.
+- **Residents' phones** join in person by QR code, then sign every report: check-ins, hazards, symptoms, missing persons, Have / Need posts. A report that can't reach the hub waits on the phone and sends itself, signed, the moment the hub is back (at most once).
 - **Hubs** keep each level connected with no internet. They check every message before storing it, chain every record, and sync with each other, catching up after the link is cut.
 - **Public alerts** are signed, so anyone can read them and check they're real. **Cell messages** are encrypted on the phone, so only members can read them; hubs carry them without being able to.
 - **On top of the network:** AI triage that puts the SOS first on a slow link, a blackout forecast from the box's voltage readings, a Have / Need board that shares what's left fairly, daily sleep and mood check-ins, and a signed reading of the surface air.
@@ -50,19 +50,18 @@ Anything that fails goes on a rejected list with its reason. That list is the co
 | AI triage | A small model on the hub (Llama 3.2 3B via Ollama, offline) reads messy text and pulls out the facts; code turns them into a priority and checks every number against the message, so the SOS crosses a slow link first. What it may and may not do, and where it fails: [`MODEL_CARD.md`](MODEL_CARD.md) | `hub/app/triage.py`, `POST /triage` |
 | Blackout forecast | A least-squares line through a relay box's last 8 voltage readings predicts when the supply drops to 180 V, with a range; it only warns when the fall is clear of the noise | `hub/app/forecast.py`, `GET /forecast` |
 | Have / Need board | Signed offers and requests (space, food, water, medicine, power), matched to the nearest offer, medicine and water first, then the longest-waiting; only the poster can close a post | `hub/app/exchange.py`, `GET /exchange` |
-| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events. On `/overview`, "The index over time" plays a simulated night (6 hours, 4 levels) scored every 5 minutes by the same code, with play, pause, step, scrub and speed | `hub/app/livability.py`, `GET /livability`, `hub/scripts/livability_replay.py` |
+| Livability Index | One 0-100 score per level from signed readings, reports, the blackout forecast, days of food at home (question 12), unmet needs and check-ins; plain rules, "no data" never counts as fine, one unsafe dimension makes the level unsafe, and every number links to its events. On `/overview`, "The index over time" plays a simulated night (6 hours, 4 levels) scored every 5 minutes by the same code, with play, pause, step, scrub and speed | `hub/app/livability.py`, `GET /livability`, `hub/scripts/livability_replay.py` |
 | Sleep, mood and roll call | Optional answers on the daily check-in, averaged per level only once 2+ people answer; plus who hasn't been heard from today | `hub/app/wellbeing.py`, `GET /wellbeing` |
 | Cell messages | XSalsa20-Poly1305 (tweetnacl secretbox) under a key shared in person by QR | `web/lib/cell.ts`, `/cell` |
 | Surface check | A box at the top of the shaft signs CO₂ and oxygen, next to the Directorate's "the air kills in minutes" | `/overview`, map Briefs #13 |
 
 ## The 15 questions
 
-The brief asks 15 questions. Undercurrent answers 12 with working features, 1 partly, and has designs for the last 2, all on the same signed network.
+The brief asks 15 questions. Undercurrent answers 13 with working features and has designs for the last 2, all on the same signed network.
 
 | | Questions |
 |---|---|
-| **Built and live** | 1 warn before blackouts · 2 share fairly · 3 keep levels livable (the Livability Index) · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 13 is the surface safe |
-| **Partly** | 12 grow food (shared on the board, nothing helps grow it) |
+| **Built and live** | 1 warn before blackouts · 2 share fairly · 3 keep levels livable (the Livability Index) · 4 catch bad water · 5 safe tunnels · 6 share space · 7 organize without their network · 8 reconnect families · 9 the real outbreak · 10 care that reaches people · 11 life without sunlight · 12 food (days of food at home per level, in the Livability Index; food and seeds shared across levels on the board; growing itself isn't tracked) · 13 is the surface safe |
 | **Designed, not built** | 14 suits, domes or outposts · 15 plan the move up (both on `/overview`) |
 
 ## What we measured
@@ -181,7 +180,7 @@ Every push runs the hub tests, a 200-episode Directorate gym that fails on any b
 
 ```bash
 cd hub && .venv/bin/python -m pytest            # hub tests, including real-process sim and demo-script tests
-cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs
+cd web && node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs lib/outbox.test.mjs app/hollow/city/city.test.mjs
 hub/.venv/bin/python eval/run_attacks.py         # numbers 1 and 2
 hub/.venv/bin/python eval/run_sync_stress.py     # number 3 (add --real with two laptops)
 hub/.venv/bin/python eval/run_probe_latency.py   # number 4 (add --real with the Canary box)

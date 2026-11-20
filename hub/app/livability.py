@@ -11,7 +11,9 @@ Eight dimensions, each scored 0 (unlivable) to 100 (fine) by a plain rule:
     power          0.75    relay volts + the blackout forecast      100 at >= 220 V, 0 at 180 V; at most 40 when the
                            or blackout reports                      forecast says it drops out within the hour
     health         1.0     case reports in the window               100 - 8 per person affected
-    needs          0.5     unmet Have / Need requests (exchange.py) 100 - 15 per unmet need
+    needs          0.5     unmet Have / Need requests (exchange.py) 100 - 15 per unmet need (food needs: see food)
+    food           0.75    days of food at home, from check-ins     median of each person's latest answer: 7+ days -> 100,
+                           (2+ people), and unmet food requests     0 -> 0; each unmet food request takes 25 off
     people         0.5     sleep and mood (wellbeing.py)            sleep 4 h -> 0, 8 h -> 100; mood 1 -> 0, 5 -> 100
                                                                     (only where 2+ people answered, as on /wellbeing)
 
@@ -30,13 +32,16 @@ inferred by a model and nothing changes the log.
 """
 
 from datetime import datetime, timezone
+from statistics import median
 
 from .exchange import board
 from .forecast import forecast_all
 from .wellbeing import wellbeing
 
 WEIGHTS = {"flooding": 1.0, "water": 1.0, "air": 1.0, "heat": 0.75, "power": 0.75,
-           "health": 1.0, "needs": 0.5, "people": 0.5}
+           "health": 1.0, "food": 0.75, "needs": 0.5, "people": 0.5}
+FOOD_FULL_DAYS = 7  # a week of food at home scores 100
+MIN_PEOPLE_FOOD = 2  # as on /wellbeing: one household's answer isn't shown on its own
 SEVERITY = {"low": 80, "medium": 50, "high": 20}
 UNSAFE_DIMENSION = 25
 UNSAFE_CAP = 49
@@ -127,11 +132,22 @@ def livability(events, window_h: float = 6, now: float | None = None) -> dict:
 
     levels = sorted({*newest, *health} | {f.level for f in falling.values()})
     ex = board(signed, now)  # an old request that's still unmet still counts
-    unmet = {}
+    unmet, unmet_food = {}, {}
     for n in ex["needs"]:
         if not n["matched"]:
-            unmet.setdefault(n["level"], []).append(n["id"])
-    levels = sorted(set(levels) | set(unmet))
+            (unmet_food if n.get("category") == "food" else unmet).setdefault(n["level"], []).append(n["id"])
+    # Days of food at home (question 12): each person's latest check-in answer in the window.
+    food_answer: dict[str, tuple[float, object, int]] = {}
+    for e in recent:
+        d = (e.payload or {}).get("food_days")
+        if e.type == "checkin" and isinstance(d, int) and not isinstance(d, bool) and 0 <= d <= 365:
+            who, t = e.author_pub or f"handle:{e.author}", _t(e)
+            if who not in food_answer or t > food_answer[who][0]:
+                food_answer[who] = (t, e, d)
+    food_days: dict[int, list[tuple[int, str]]] = {}
+    for _, e, d in food_answer.values():
+        food_days.setdefault(e.level, []).append((d, e.id))
+    levels = sorted(set(levels) | set(unmet) | set(unmet_food) | {lv for lv, a in food_days.items() if len(a) >= MIN_PEOPLE_FOOD})
     wb = {row["level"]: row for row in wellbeing(recent, window_h, now)["levels"] if "hidden" not in row}
     levels = sorted(set(levels) | set(wb))
 
@@ -153,6 +169,19 @@ def livability(events, window_h: float = 6, now: float | None = None) -> dict:
             people = sum(int(c.payload.get("people_affected") or 1) for c in cases)
             dims["health"] = {"score": _clamp(100 - 8 * people), "why": f"{_n(people, 'person', 'people')} sick in {_n(len(cases), 'report', 'reports')}",
                               "events": sorted(c.id for c in cases), "from": ["report"]}
+        answers, hungry = food_days.get(level, []), unmet_food.get(level, [])
+        if len(answers) >= MIN_PEOPLE_FOOD or hungry:
+            parts, score, ids = [], 100.0, list(hungry)
+            if len(answers) >= MIN_PEOPLE_FOOD:
+                med = median(d for d, _ in answers)
+                score = 100 * min(med, FOOD_FULL_DAYS) / FOOD_FULL_DAYS
+                parts.append(f"{med:g} days of food at home, median of {len(answers)} people")
+                ids += [i for _, i in answers]
+            if hungry:
+                score -= 25 * len(hungry)
+                parts.append(_n(len(hungry), "unmet food request", "unmet food requests"))
+            dims["food"] = {"score": _clamp(score), "why": "; ".join(parts), "events": sorted(ids),
+                            "from": sorted({"checkins"} if len(answers) >= MIN_PEOPLE_FOOD else set()) + (["exchange"] if hungry else [])}
         if ids := unmet.get(level):
             dims["needs"] = {"score": _clamp(100 - 15 * len(ids)), "why": _n(len(ids), "unmet request", "unmet requests"),
                              "events": sorted(ids), "from": ["exchange"]}

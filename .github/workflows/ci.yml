@@ -55,4 +55,4 @@ jobs:
       - name: Types
         run: npx tsc --noEmit
       - name: Tests
-        run: node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs app/hollow/city/city.test.mjs
+        run: node --import ./lib/node-ts-resolve.mjs --test lib/lib.test.mjs lib/outbox.test.mjs app/hollow/city/city.test.mjs
