@@ -23,9 +23,11 @@ jobs:
         run: |
           python -m venv hub/.venv
           hub/.venv/bin/pip install -r hub/requirements.txt
+          # each failing test becomes an annotation on the run, readable without logging in
+          hub/.venv/bin/pip install pytest-github-actions-annotate-failures
       - name: Hub tests
         working-directory: hub
-        run: .venv/bin/python -m pytest -q
+        run: .venv/bin/python -m pytest -q -rf --durations=10
       - name: Directorate gym (fuzzer, 200 episodes; fails on any breach)
         run: hub/.venv/bin/python eval/run_directorate_gym.py --llm-episodes 0 --fuzz-episodes 200 --replays 10 --workers 2 --out "$RUNNER_TEMP/gym"
       - name: Gym report
