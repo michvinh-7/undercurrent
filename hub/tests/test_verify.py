@@ -170,3 +170,14 @@ def test_save_then_audit_the_export_and_sign_the_report(hub, tmp_path, capsys):
     report.write_text(json.dumps(doctored))
     assert verify.main(["--check-report", str(report)]) == 1
     assert "INVALID" in capsys.readouterr().out
+
+
+def test_a_row_edited_into_nonsense_is_flagged_not_a_crash(hub):
+    """Found by the Directorate gym: a level of 999999 or a broken payload used to make the
+    hub's own chain check (and every page that lists events) raise instead of answering."""
+    events = hub["log"].list()
+    sql(hub, "UPDATE events SET level = 999999 WHERE id = ?", events[1].id)
+    sql(hub, "UPDATE events SET payload = 'not json' WHERE id = ?", events[3].id)
+    assert hub["log"].verify() == (False, events[1].id)
+    assert len(hub["log"].list()) == len(events) - 2  # the rest still list
+    assert {p["event"] for p in run(hub)["problems"] if p["check"] == "hash"} >= {events[1].id, events[3].id}

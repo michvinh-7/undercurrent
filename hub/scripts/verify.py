@@ -100,7 +100,10 @@ def from_db(path: str) -> dict:
     for row in db.execute("SELECT * FROM events ORDER BY seq"):
         e = dict(row)
         e.pop("seq", None)
-        e["payload"] = json.loads(e["payload"])
+        try:
+            e["payload"] = json.loads(e["payload"])
+        except (TypeError, ValueError):
+            pass  # edited into something that isn't JSON: kept as is, so its hash fails below
         events.append(e)
     written = [dict(r) for r in db.execute("SELECT hash, event_id FROM own_hashes ORDER BY n")]
     by_hash = {e["hash"]: e for e in events}
