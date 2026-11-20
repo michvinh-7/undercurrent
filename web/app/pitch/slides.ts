@@ -73,7 +73,8 @@ export const SLIDES: Slide[] = [
     sub: "Needs meet offers across levels, medicine first. Check-ins track sleep. One score per level says which is failing, and why.",
     purpose: "Bring it back to people: fairness, wellbeing, and which level needs help first.",
     takeaway: "It makes life underground fairer.",
-    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. Check-ins show the deep levels sleep three hours less. And it all adds up to one score per level: level 34 is unsafe, and it says why, the air.",
+    say: "Residents post what they can spare and what they need, and the hub matches them across levels, medicine and water first. Check-ins show the deep levels sleep three hours less. And it all adds up to one score per level. Here's one night, simulated: level 34 turns unsafe, and it says why, the air.",
+    doNote: "The night below plays by itself, 10 simulated minutes a second: L34 turns unsafe about 12 s in. Pause (the button by the clock) to hold it there.",
   },
   {
     id: "reach", seconds: 15, kicker: "The brief",

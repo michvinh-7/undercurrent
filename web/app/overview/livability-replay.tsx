@@ -105,11 +105,11 @@ function LevelChart({ level, t, onSeek }: { level: number; t: number; onSeek: (t
   );
 }
 
-/** The index over a simulated night, with play, pause, step, scrub and speed. */
-export function LivabilityReplay() {
+/** Play, pause, step, seek and speed over the simulated night. `autoplay` starts it on mount. */
+function usePlayback(defaultSpeedIx: number, autoplay = false) {
   const [t, setT] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speedIx, setSpeedIx] = useState(DEFAULT_SPEED);
+  const [playing, setPlaying] = useState(autoplay);
+  const [speedIx, setSpeedIx] = useState(defaultSpeedIx);
   const speed = SPEEDS[speedIx];
   const last = useRef<number | null>(null);
 
@@ -129,8 +129,16 @@ export function LivabilityReplay() {
   useEffect(() => { if (playing && t >= END) setPlaying(false); }, [playing, t]);
 
   const seek = (m: number) => setT(Math.max(0, Math.min(END, m)));
-  const step = (d: number) => { setPlaying(false); seek((Math.round(t / DATA.step_min) + d) * DATA.step_min); };
-  const toggle = () => { if (t >= END) setT(0); setPlaying((p) => !p); };
+  return {
+    t, setT, playing, setPlaying, speed, speedIx, setSpeedIx, seek,
+    step: (d: number) => { setPlaying(false); seek((Math.round(t / DATA.step_min) + d) * DATA.step_min); },
+    toggle: () => { if (t >= END) setT(0); setPlaying((p) => !p); },
+  };
+}
+
+/** The index over a simulated night, with play, pause, step, scrub and speed. */
+export function LivabilityReplay() {
+  const { t, setT, playing, setPlaying, speed, speedIx, setSpeedIx, seek, step, toggle } = usePlayback(DEFAULT_SPEED);
   const frame = frameAt(t);
   const happened = useMemo(() => DATA.moments.filter((m) => m.t <= t).slice(-4).reverse(), [t]);
 
@@ -194,6 +202,67 @@ export function LivabilityReplay() {
           (<code className="font-mono">hub/app/livability.py</code>), each time seeing only what had been signed by then. The same code scores the live
           index above. Click a chart or a ▼ marker to jump there; made by <code className="font-mono">hub/scripts/livability_replay.py</code>.
         </p>
+      </div>
+    </Card>
+  );
+}
+
+/** A small line of one level's score up to the playhead, with the bands behind it. */
+function Spark({ level, t }: { level: number; t: number }) {
+  const W = 160, H = 34;
+  const X = (m: number) => (m / END) * W;
+  const Y = (v: number) => 2 + ((100 - v) / 100) * (H - 4);
+  const key = String(level);
+  const pts = DATA.frames.filter((f) => f.t <= t && f.levels[key]);
+  const d = pts.map((f, i) => `${i ? "L" : "M"}${X(f.t).toFixed(1)},${Y(f.levels[key].score).toFixed(1)}`).join("");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-8 w-full" aria-hidden>
+      <rect x="0" y={Y(50)} width={W} height={Y(0) - Y(50)} fill="var(--danger)" fillOpacity="0.08" />
+      <rect x="0" y={Y(80)} width={W} height={Y(50) - Y(80)} fill="var(--warn)" fillOpacity="0.07" />
+      <rect x="0" y={Y(100)} width={W} height={Y(80) - Y(100)} fill="var(--ok)" fillOpacity="0.07" />
+      {d && <path d={d} fill="none" stroke="var(--foreground)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
+      <line x1={X(t)} x2={X(t)} y1="0" y2={H} stroke="var(--accent)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/**
+ * The replay as one row of level tiles, for a slide: it starts playing on its own, at
+ * 10 simulated minutes a second, so L34 turns unsafe about 12 s in.
+ */
+export function LivabilityReplayStrip({ autoplay = true }: { autoplay?: boolean }) {
+  const { t, playing, speed, speedIx, setSpeedIx, toggle } = usePlayback(2, autoplay);
+  const frame = frameAt(t);
+  return (
+    <Card className="gap-2 p-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="caption">Livability Index · one night, scored by the hub&apos;s own rules</span>
+        <Badge variant="outline" style={{ borderColor: "var(--sim)", color: "var(--sim)" }}>Simulated</Badge>
+        <span className="ml-auto flex items-center gap-1">
+          <span className="mr-1 font-mono text-sm tabular-nums">{clock(t)}</span>
+          <Button size="icon" variant="ghost" className="size-7" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>{playing ? <PauseIcon /> : <PlayIcon />}</Button>
+          <Button size="icon" variant="ghost" className="size-7" onClick={() => setSpeedIx((i) => Math.max(0, i - 1))} disabled={speedIx === 0} aria-label="Slower"><ChevronsLeftIcon /></Button>
+          <span className="w-16 text-center font-mono text-xs whitespace-nowrap tabular-nums text-muted-foreground">{speed} min/s</span>
+          <Button size="icon" variant="ghost" className="size-7" onClick={() => setSpeedIx((i) => Math.min(SPEEDS.length - 1, i + 1))} disabled={speedIx === SPEEDS.length - 1} aria-label="Faster"><ChevronsRightIcon /></Button>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {DATA.levels.map((level) => {
+          const l = frame.levels[String(level)];
+          const color = l ? BAND_COLOR[l.band] : "var(--border)";
+          return (
+            <div key={level} className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2" style={{ borderLeft: `4px solid ${color}` }}>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="font-mono text-2xl font-semibold tabular-nums" style={{ color }}>{l ? l.score : "–"}</span>
+                <span className="min-w-0 text-sm leading-tight">
+                  <span className="font-mono">{levelName(level)}</span> {l && <span style={{ color }}>{l.band}</span>}
+                  <span className="block truncate text-muted-foreground" title={l ? `${l.by}: ${l.why}` : undefined}>{l ? (l.band === "livable" ? "fine" : `${l.by}: ${l.why}`) : "no data"}</span>
+                </span>
+              </div>
+              <div className="w-16 shrink-0 xl:w-24"><Spark level={level} t={t} /></div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

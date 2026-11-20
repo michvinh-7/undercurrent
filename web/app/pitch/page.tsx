@@ -16,8 +16,9 @@ import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import {
-  Dot, ExchangeSection, ForecastSection, HowItWorks, LivabilityStrip, TONE, TriageSection, WellbeingSection, useLiveToasts, useProofs,
+  Dot, ExchangeSection, ForecastSection, HowItWorks, TONE, TriageSection, WellbeingSection, useLiveToasts, useProofs,
 } from "../overview/sections";
+import { LivabilityReplayStrip } from "../overview/livability-replay";
 import { BOX_PARTS, PROOF, QUESTIONS, SLIDES, STACK, TEAM, TEAM_PLACEHOLDER, THREATS, TOTAL_SECONDS } from "./slides";
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -135,7 +136,7 @@ function SharesSlide({ net }: { net: Undercurrent }) {
         <ExchangeSection net={net} compact />
         <WellbeingSection net={net} compact />
       </div>
-      <LivabilityStrip net={net} />
+      <LivabilityReplayStrip />
       {o2 !== null && (
         <p className="font-mono text-sm text-muted-foreground">
           And the surface: {o2}% oxygen, signed by the box at the top of the shaft{isSimulated(surface) ? " (simulated)" : ""}. The Directorate says it kills in minutes.
