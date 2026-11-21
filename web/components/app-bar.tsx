@@ -20,7 +20,7 @@ const PAGES = [
   { href: "/overview", label: "Overview" },
   { href: "/dashboard", label: "Console" },
   { href: "/hollow", label: "Map" },
-  { href: "/pitch", label: "Pitch" },
+  // The pitch (/pitch) is kept in the repo for recording, but not linked from the site.
 ] as const;
 
 type Tone = "ok" | "warn" | "danger" | "accent" | "muted" | "sim";
