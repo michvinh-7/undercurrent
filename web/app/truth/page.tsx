@@ -106,7 +106,11 @@ export default function Truth() {
 
       {net.mode === "demo" && (
         <p className="sim-hatch mt-4 rounded-lg border border-[var(--sim)] px-3 py-2 text-sm">
-          <span className="caption mr-2 !text-[var(--sim)]">Demo data</span>No hub answered. Showing example traffic.
+{net.recorded ? (
+            <><span className="caption mr-2 !text-[var(--sim)]">Recorded run</span>No hub here. This is the traffic of a real run of our hubs, played back with times shifted to now.</>
+          ) : (
+            <><span className="caption mr-2 !text-[var(--sim)]">Demo data</span>No hub answered. Showing example traffic.</>
+          )}
         </p>
       )}
 

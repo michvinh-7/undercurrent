@@ -17,6 +17,15 @@ import type { HollowEvent } from "./types";
 
 export type Mode = "connecting" | "live" | "demo";
 
+/** A recorded run of the hubs (web/public/recorded/run.json, made by hub/scripts/record_run.py). */
+interface RecordedRun {
+  recorded_at: string;
+  hubs: Record<string, { link: LinkStatus; rejected: { total: number; rejected: RejectedEvent[] }; verify: VerifyReport }>;
+  roster: RosterStatus;
+  events: HollowEvent[];
+  endpoints: Record<string, unknown>;
+}
+
 export interface VerifyReport {
   chain_intact: boolean;
   first_bad_event: string | null;
@@ -166,37 +175,65 @@ export function useUndercurrent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, hubs.length]);
 
-  // Demo data: built once when demo mode starts, then changed only by demo actions.
+  // No hub: play back a real run of the hubs, recorded by hub/scripts/record_run.py into
+  // web/public/recorded/run.json (events, refusals, roster, link and chain, and what the hub's
+  // endpoints answered). Times are shifted so its newest event is "just now", so time windows
+  // (the map's last day, "5 min ago") work whenever it's opened. If the file can't load, the
+  // small built-in sample stands in. Changed after that only by demo actions.
   const [demo, setDemo] = useState<{
     events: HollowEvent[];
     rejected: { total: number; rejected: RejectedEvent[] };
     link: LinkStatus;
     verify: VerifyReport;
+    roster: RosterStatus;
+    peer: { rejected: { total: number; rejected: RejectedEvent[] }; verify: VerifyReport; link: LinkStatus };
+    recordedAt: string | null;
+    endpoints: Record<string, unknown>;
   } | null>(null);
   useEffect(() => {
     if (mode !== "demo" || demo) return;
-    const now = Date.now();
-    setDemo({
-      events: demoEvents(now),
-      rejected: demoRejected(now),
-      link: demoLink,
-      verify: { chain_intact: true, first_bad_event: null, gaps: {} },
-    });
+    let alive = true;
+    const sample = () => {
+      const now = Date.now();
+      const verify = { chain_intact: true, first_bad_event: null, gaps: {} };
+      setDemo({
+        events: demoEvents(now), rejected: demoRejected(now), link: demoLink, verify, roster: demoRoster,
+        peer: { rejected: { total: 0, rejected: [] }, verify, link: demoLink }, recordedAt: null, endpoints: {},
+      });
+    };
+    fetch("/recorded/run.json", { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<RecordedRun>) : Promise.reject(new Error(String(r.status)))))
+      .then((run) => {
+        if (!alive) return;
+        const newest = Math.max(...run.events.map((e) => Date.parse(e.created_at)));
+        const shift = Date.now() - 20_000 - newest;
+        const at = (iso: string) => new Date(Date.parse(iso) + shift).toISOString();
+        const moved = (r: { total: number; rejected: RejectedEvent[] }) => ({ total: r.total, rejected: r.rejected.map((x) => ({ ...x, received_at: at(x.received_at) })) });
+        const l12 = run.hubs["hub-L12"], l34 = run.hubs["hub-L34"];
+        setDemo({
+          events: run.events.map((e) => ({ ...e, created_at: at(e.created_at) })),
+          rejected: moved(l12.rejected), link: l34.link, verify: l12.verify, roster: run.roster,
+          peer: { rejected: moved(l34.rejected), verify: l34.verify, link: l12.link },
+          recordedAt: run.recorded_at, endpoints: run.endpoints,
+        });
+      })
+      .catch(() => alive && sample());
+    return () => { alive = false; };
   }, [mode, demo]);
 
   const live = mode !== "demo";
   const eventList = useMemo(() => (live ? [...events.values()] : demo?.events ?? []), [live, events, demo]);
-  const rosterNow = live ? roster : demoRoster;
+  const rosterNow = live ? roster : demo?.roster ?? demoRoster;
   const members = useMemo(() => new Set(rosterNow?.members.map((m) => m.pub) ?? []), [rosterNow]);
 
   const hubStates: HubState[] = useMemo(() => {
     if (live) return hubs;
     if (!demo) return [];
     return [
-      { role: "primary", url: hubUrls().primary, hubId: "hub-L12", online: true, misses: 0, link: demoLink, rejectedTotal: demo.rejected.total,
+      { role: "primary", url: hubUrls().primary, hubId: "hub-L12", online: true, misses: 0, link: demo.peer.link, rejectedTotal: demo.rejected.total,
         rejected: demo.rejected.rejected, verify: demo.verify },
-      { role: "peer", url: hubUrls().peer ?? "demo", hubId: "hub-L34", online: true, misses: 0, link: demo.link, rejectedTotal: 0, rejected: [],
-        verify: demo.verify },
+      { role: "peer", url: hubUrls().peer ?? "demo", hubId: "hub-L34", online: true, misses: 0, link: demo.link, rejectedTotal: demo.peer.rejected.total,
+        rejected: demo.peer.rejected.rejected, verify: demo.peer.verify },
     ];
   }, [live, hubs, demo]);
 
@@ -343,8 +380,12 @@ export function useUndercurrent() {
   /** True for events that arrived after the initial backlog: new alerts, and ones released by a restored link. */
   const isFresh = useCallback((id: string) => openedAt > 0 && (arrived.get(id) ?? 0) - openedAt > 1500, [arrived, openedAt]);
 
+  /** When no hub answers and the recorded run loaded: when it was recorded, and what the hub's endpoints said. */
+  const recorded = !live && demo?.recordedAt ? { at: demo.recordedAt, endpoints: demo.endpoints } : null;
+
   return {
     mode,
+    recorded,
     live,
     isFresh,
     events: eventList,

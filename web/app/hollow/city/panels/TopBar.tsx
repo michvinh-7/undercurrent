@@ -18,7 +18,7 @@ export default function TopBar(p: {
       <div className="flex shrink-0 items-baseline gap-2">
         <span className="text-[15px] font-semibold tracking-tight">The Hollow</span>
         <span className={`hidden rounded-full px-2 py-0.5 text-[11px] sm:inline ${p.net.mode === "live" ? "bg-[color-mix(in_oklab,var(--ok)_14%,transparent)] text-[var(--ok)]" : "bg-[var(--panel-2)] text-[var(--muted)]"}`}>
-          {p.net.mode === "live" ? "● Live" : p.net.mode === "demo" ? "Demo data" : "Connecting…"}
+          {p.net.mode === "live" ? "● Live" : p.net.mode === "demo" ? (p.net.recorded ? "Recorded run" : "Demo data") : "Connecting…"}
         </span>
       </div>
 

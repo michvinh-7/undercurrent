@@ -196,7 +196,7 @@ function useLabels(p: CitySceneProps): Label[] {
               <span style={{ color }}>●</span> {pinTitle(e)}
               {list.length > 1 && <span className="text-[var(--faint)]"> · +{list.length - 1} more</span>}
               <span className="block text-[10px] text-[var(--muted)]">
-                {pin.named ? `${pin.named} · ` : ""}{e.test ? "test alert" : e.demo ? "demo data" : e.verified ? "✓ verified" : "not verified"}
+                {pin.named ? `${pin.named} · ` : ""}{e.test ? "test alert" : e.demo ? "not live" : e.verified ? "✓ verified" : "not verified"}
               </span>
             </span>
           ),

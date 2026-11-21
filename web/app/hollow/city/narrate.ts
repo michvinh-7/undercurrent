@@ -97,7 +97,7 @@ function peel(r: NarrateInput): NarrateInput | null {
 }
 
 function narrateOne(s: NarrateInput): Story {
-  const demoNote = s.demo ? " Demo data: no hub connected." : "";
+  const demoNote = s.demo ? " Not live: no hub connected." : "";
 
   if (s.forgery)
     return {
@@ -145,7 +145,7 @@ function narrateOne(s: NarrateInput): Story {
       tone: "alert",
       title: `${f.spread ? "If it keeps rising: f" : "F"}looding at ${f.where}.`,
       lines,
-      source: `${f.spread ? "Simulated spread · " : ""}Canary box reading ${f.ago}${f.demo ? " · demo data" : f.verified ? " · verified by the hub" : " · not verified"} · blocked streets are assumed`,
+      source: `${f.spread ? "Simulated spread · " : ""}Canary box reading ${f.ago}${f.demo ? " · not live" : f.verified ? " · verified by the hub" : " · not verified"} · blocked streets are assumed`,
     };
   }
 
@@ -206,12 +206,12 @@ function narrateOne(s: NarrateInput): Story {
       ...(s.waterReports ? [`${plural(s.waterReports, "bad-water report")} so far: not enough to point to a source.`] : []),
       "Click your building to see the way to the nearest care.",
     ],
-    source: s.demo ? "Demo data: no hub connected" : "Live from the hubs",
+    source: s.demo ? "Not live: no hub connected" : "Live from the hubs",
   };
 }
 
 function sensorStory(s: NarrateInput, f: SensorFacts): Story {
-  const source = `Canary box reading ${f.ago}${f.test ? " · test alert made on this page, not from a hub" : f.demo ? " · demo data" : f.verified ? " · verified by the hub" : " · not verified"}`;
+  const source = `Canary box reading ${f.ago}${f.test ? " · test alert made on this page, not from a hub" : f.demo ? " · not live" : f.verified ? " · verified by the hub" : " · not verified"}`;
   const reading = f.reading ? ` (${f.reading})` : "";
   if (f.kind === "blackout") {
     const soon = f.expectedIn !== null;
