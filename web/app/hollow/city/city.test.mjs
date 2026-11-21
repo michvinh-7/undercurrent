@@ -112,6 +112,14 @@ test("adapter: an SOS with only a level is level-only, never given coordinates",
   assert.equal(m.verified, false);
 });
 
+test("adapter: a check-in whose note names a building lands on it; a note naming nothing stays level-only", () => {
+  const named = adaptEvent(ev({ id: "c1", type: "checkin", payload: { status: "ok", note: "safe at the Shelter with the kids" } }), world, opts);
+  assert.equal(named.place.kind, "named");
+  assert.equal(named.place.name, "Shelter");
+  const vague = adaptEvent(ev({ id: "c2", type: "checkin", payload: { status: "ok", note: "all good here" } }), world, opts);
+  assert.deepEqual(vague.place, { kind: "level" });
+});
+
 test("adapter: a device on the wrong level, or an unknown device, is not pinned", () => {
   assert.equal(adaptEvent(ev({ level: 12, device_id: "canary-34" }), world, opts).place.kind, "level");
   assert.equal(adaptEvent(ev({ device_id: "canary-99" }), world, opts).place.kind, "level");

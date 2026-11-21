@@ -40,7 +40,7 @@ export const SEVERITY_LABEL: Record<Severity, string> = { sos: "Needs help", haz
 
 export type Place =
   | { kind: "exact"; x: number; z: number; y: number; deviceId: string }
-  /** The report's own location text names a street or building on that level. */
+  /** The report's own words (its location, else its note) name a street or building on that level. */
   | { kind: "named"; name: string; street?: string; building?: string; x: number; z: number; y: number }
   | { kind: "level" }
   | { kind: "unknown"; reason: string };
@@ -106,7 +106,10 @@ export function adaptEvent(raw: unknown, world: CityWorld, opts: AdaptOptions): 
     const s = e.device_id ? world.sensors.find((m) => m.deviceId === e.device_id) : undefined;
     place = s && s.level === level
       ? { kind: "exact", x: s.x, z: s.z, y: s.y, deviceId: s.deviceId }
-      : matchPlace(payloadOf(e).location, world, level) ?? { kind: "level" };
+      // The report's location field first; else its free text (a check-in's note, a typed message),
+      // so "safe at the L34 Shelter" lands on the Shelter. Still only a street or building it names.
+      : matchPlace(payloadOf(e).location, world, level) ?? matchPlace(payloadOf(e).note, world, level)
+        ?? matchPlace(payloadOf(e).raw_text, world, level) ?? { kind: "level" };
   }
   const t = Date.parse(e.created_at);
   let verified = false;
