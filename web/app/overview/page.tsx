@@ -219,13 +219,11 @@ export default function Overview() {
               Every alert is signed at the source and checked by every hub, with no internet. Forgeries are refused and cutting the link loses nothing. The sensor boxes are simulated in this demo.
             </p>
             <div className="reveal flex flex-wrap gap-2.5 pt-1" style={{ "--d": "240ms" } as React.CSSProperties}>
-              <Button asChild size="lg" className="shine relative overflow-hidden shadow-[0_8px_30px_-10px_var(--accent)] transition-shadow hover:shadow-[0_10px_40px_-8px_var(--accent)]">
-                <Link href={`/pitch${q}`}>
-                  Watch the 3-minute pitch <ArrowRightIcon />
-                </Link>
+              <Button size="lg" onClick={() => setTour(true)} className="shine relative overflow-hidden shadow-[0_8px_30px_-10px_var(--accent)] transition-shadow hover:shadow-[0_10px_40px_-8px_var(--accent)]">
+                How does this answer the brief? <ArrowRightIcon />
               </Button>
-              <Button size="lg" variant="outline" onClick={() => setTour(true)}>
-                How does this answer the brief?
+              <Button size="lg" variant="outline" onClick={() => { setDeep(true); setTimeout(() => document.getElementById("deep")?.scrollIntoView({ behavior: "smooth" }), 60); }}>
+                Open the deep dive
               </Button>
             </div>
           </div>
