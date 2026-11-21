@@ -10,6 +10,7 @@ import { Toaster } from "sonner";
 import { ArrowLeftRightIcon, ArrowRightIcon, BoxIcon, ChevronDownIcon, ShieldCheckIcon, SparklesIcon, ZapIcon } from "lucide-react";
 import { BriefTour } from "./brief-tour";
 import { NetworkBackground } from "./network-bg";
+import { PhonesFlow } from "./phones-flow";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ const PROVEN_AT: Record<number, { label: string; href: string }> = {
 const STATUS_COLOR = { live: "var(--ok)", partial: "var(--warn)", design: "var(--muted)" } as const;
 
 const SECTIONS = [
-  { id: "beats", label: "Attack it" }, { id: "how", label: "How it works" }, { id: "layers", label: "Built on top" },
+  { id: "beats", label: "Attack it" }, { id: "how", label: "How it works" }, { id: "phones", label: "Phones" }, { id: "layers", label: "Built on top" },
   { id: "proof", label: "Proof" }, { id: "why", label: "Why it wins" }, { id: "questions", label: "The 15 questions" },
 ];
 
@@ -260,7 +261,7 @@ export default function Overview() {
         >
           <span className="flex flex-col gap-0.5">
             <span className="text-lg font-semibold">Deep dive</span>
-            <span className="text-sm text-muted-foreground">The five demo beats, how it works, everything built on top, the numbers, and the 15 questions</span>
+            <span className="text-sm text-muted-foreground">The five demo beats, how it works, the phones, everything built on top, the numbers, and the 15 questions</span>
           </span>
           <ChevronDownIcon className={`size-5 shrink-0 transition-transform ${deep ? "rotate-180" : ""}`} />
         </button>
@@ -337,6 +338,8 @@ export default function Overview() {
         </section>}
 
         {/* Everything built on the signed channel, one at a time */}
+        {part === "phones" && <section id="phones" className="tab-in flex scroll-mt-16 flex-col gap-5"><PhonesFlow net={net} q={q} /></section>}
+
         {part === "layers" && <section id="layers" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <Tabs value={layer} onValueChange={setLayer}>
             <TabsList className="flex flex-wrap gap-2">
