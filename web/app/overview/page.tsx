@@ -215,7 +215,7 @@ export default function Overview() {
               The network the Directorate <span className="text-shimmer bg-[linear-gradient(90deg,var(--foreground)_0%,var(--foreground)_35%,#c4b8ff_50%,var(--foreground)_65%,var(--foreground)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent">can&apos;t read, fake or shut off.</span>
             </h1>
             <p className="reveal max-w-[60ch] text-lg text-foreground/75" style={{ "--d": "160ms" } as React.CSSProperties}>
-              Every alert is signed at the source and checked by every hub, with no internet. Forgeries are refused and cutting the link loses nothing.
+              Every alert is signed at the source and checked by every hub, with no internet. Forgeries are refused and cutting the link loses nothing. The sensor boxes are simulated in this demo.
             </p>
             <div className="reveal flex flex-wrap gap-2.5 pt-1" style={{ "--d": "240ms" } as React.CSSProperties}>
               <Button asChild size="lg" className="shine relative overflow-hidden shadow-[0_8px_30px_-10px_var(--accent)] transition-shadow hover:shadow-[0_10px_40px_-8px_var(--accent)]">
