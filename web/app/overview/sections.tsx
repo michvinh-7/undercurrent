@@ -519,6 +519,8 @@ export function useHubPoll<T>(net: Undercurrent, path: string, everyMs: number) 
     const t = setInterval(poll, everyMs);
     return () => { stop = true; clearInterval(t); };
   }, [net.mode, primary?.url, path, everyMs]); // eslint-disable-line react-hooks/exhaustive-deps
+  // No hub: what this endpoint answered in the recorded run, if one loaded.
+  if (net.mode !== "live") return { data: (net.recorded?.endpoints[path] as T | undefined) ?? null, problem: null };
   return { data, problem };
 }
 

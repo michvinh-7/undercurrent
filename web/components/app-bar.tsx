@@ -60,7 +60,9 @@ export function useStatusChips(net: Undercurrent): Chip[] {
   const agreement = useAgreement(primary?.url ?? null, net.mode === "live" && hasPeer);
 
   if (net.mode === "demo")
-    return [{ key: "demo", label: "Demo data: no hub reachable", tone: "sim", loud: true, help: "No hub answered, so this page shows labelled sample data. Add ?hub=…&peer=… to the address to go live." }];
+    return [net.recorded
+      ? { key: "demo", label: `Recorded run · no hub here`, tone: "sim", loud: true, help: `No hub answered, so this page plays back a real run of our hubs, recorded ${new Date(net.recorded.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}, with times shifted to now. Buttons act on the recording only. Add ?hub=…&peer=… to the address to go live.` }
+      : { key: "demo", label: "Demo data: no hub reachable", tone: "sim", loud: true, help: "No hub answered, so this page shows labelled sample data. Add ?hub=…&peer=… to the address to go live." }];
   if (net.mode === "connecting")
     return [{ key: "connecting", label: "Connecting to the hubs…", tone: "muted", help: "Waiting for the first answer from the hubs." }];
 

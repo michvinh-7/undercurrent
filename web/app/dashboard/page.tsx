@@ -78,9 +78,19 @@ export default function Console() {
 
       {net.mode === "demo" && (
         <p className="sim-hatch mt-4 rounded-lg border border-[var(--sim)] px-3 py-2 text-sm">
-          <span className="caption mr-2 !text-[var(--sim)]">Demo data</span>
-          No hub answered{primary ? ` at ${primary.url}` : ""}. Showing example events, not real reports. Buttons
-          change the demo only.
+{net.recorded ? (
+            <>
+              <span className="caption mr-2 !text-[var(--sim)]">Recorded run</span>
+              No hub here, so this is a real run of our hubs played back: the simulation, then the Directorate&apos;s attacks, recorded{" "}
+              {new Date(net.recorded.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}, with times shifted to now. Buttons act on the recording only.
+            </>
+          ) : (
+            <>
+              <span className="caption mr-2 !text-[var(--sim)]">Demo data</span>
+              No hub answered{primary ? ` at ${primary.url}` : ""}. Showing example events, not real reports. Buttons
+              change the demo only.
+            </>
+          )}
         </p>
       )}
 
@@ -168,7 +178,7 @@ function HeaderControls({
 }) {
   return (
     <>
-        <ModeBadge mode={net.mode} />
+        <ModeBadge mode={net.mode} recorded={!!net.recorded} />
         <button
           role="switch"
           aria-checked={directorate}
@@ -194,9 +204,9 @@ function HeaderControls({
   );
 }
 
-function ModeBadge({ mode }: { mode: Undercurrent["mode"] }) {
+function ModeBadge({ mode, recorded }: { mode: Undercurrent["mode"]; recorded?: boolean }) {
   const color = mode === "live" ? "var(--ok)" : mode === "demo" ? "var(--sim)" : "var(--warn)";
-  const text = mode === "live" ? "Live" : mode === "demo" ? "Demo data" : "Reconnecting…";
+  const text = mode === "live" ? "Live" : mode === "demo" ? (recorded ? "Recorded run" : "Demo data") : "Reconnecting…";
   return (
     <span className="flex items-center gap-2 text-sm">
       <span className="h-2 w-2 rounded-full" style={{ background: color }} />

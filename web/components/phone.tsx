@@ -86,8 +86,7 @@ export function usePhoneHub(): HubChip {
   return chip;
 }
 
-function HubStatusChip() {
-  const hub = usePhoneHub();
+function HubStatusChip({ hub }: { hub: HubChip }) {
   const [tone, label] =
     hub.state === "checking"
       ? ["var(--muted)", "Finding the hub…"]
@@ -111,6 +110,7 @@ function HubStatusChip() {
 /** The thin bar at the top of every phone page: wordmark and the hub chip. */
 export function PhoneHeader() {
   const q = useCarriedQuery();
+  const hub = usePhoneHub();
   return (
     <header className="border-b border-border bg-card">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-4 py-3">
@@ -119,8 +119,15 @@ export function PhoneHeader() {
           <WavesIcon className="size-5 text-primary" aria-hidden="true" />
           <span className="font-mono text-xs font-medium tracking-[0.18em]">UNDERCURRENT</span>
         </Link>
-        <HubStatusChip />
+        <HubStatusChip hub={hub} />
       </div>
+      {hub.state === "down" && (
+        // On the hosted site there's no hub, so say what this is rather than look broken.
+        <p className="mx-auto max-w-md px-4 pb-3 text-[13px] leading-snug text-muted-foreground">
+          No hub here, so this is a preview of a resident&apos;s screen. On the residents&apos; Wi-Fi, reports go to the level&apos;s hub;
+          here they wait on this phone.
+        </p>
+      )}
     </header>
   );
 }

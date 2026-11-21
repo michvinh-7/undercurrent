@@ -102,7 +102,7 @@ export function MapBanners({ sim, demo, onExit }: { sim: string | null; demo: bo
         )}
         {demo && (
           <div className="max-w-full truncate rounded-full border border-[var(--warn)] bg-[var(--panel)] px-3 py-1 text-xs text-[var(--warn)] shadow-sm">
-            Demo data: no hub reachable. Pass <code>?hub=</code> to go live.
+            Not live: no hub here, so this is a recorded run (or sample data). Pass <code>?hub=</code> to go live.
           </div>
         )}
       </div>
