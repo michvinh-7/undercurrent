@@ -7,17 +7,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
-import { ArrowLeftRightIcon, ArrowRightIcon } from "lucide-react";
+import { ArrowLeftRightIcon, ArrowRightIcon, BoxIcon, ChevronDownIcon, ShieldCheckIcon, SparklesIcon, ZapIcon } from "lucide-react";
+import { BriefTour } from "./brief-tour";
+import { NetworkBackground } from "./network-bg";
 import { AppBar, useCarriedQuery } from "@/components/app-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isEncrypted, useUndercurrent } from "@/lib/useUndercurrent";
+import { useUndercurrent } from "@/lib/useUndercurrent";
 import { BEATS, RESULTS } from "./beats";
-import { PROOF, QUESTIONS } from "../pitch/slides";
+import { QUESTIONS } from "../pitch/slides";
 import {
-  CopyCommand, Dot, Eyebrow, ExchangeSection, ForecastSection, HowItWorks, SurfaceReturnSection, SurfaceSection, TONE,
+  Dot, ExchangeSection, ForecastSection, HowItWorks, SurfaceReturnSection, SurfaceSection, TONE,
   LivabilitySection, TriageSection, useLiveToasts, useProofs, WellbeingSection,
 } from "./sections";
 
@@ -58,17 +60,41 @@ function DemoVideo() {
   );
 }
 
-/** Four headline numbers, above the fold. */
-function ProofStrip() {
+/** One of the four best things in the app, on the first screen. */
+function Feature({ icon, image, title, body, href, action, delay = 0 }: { icon?: React.ReactNode; image?: boolean; title: string; body: string; href: string; action: string; delay?: number }) {
+  const inner = (
+    <>
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <span className="scan relative -mx-5 -mt-5 mb-1 block overflow-hidden rounded-t-xl">
+          <img src="/overview-map.png" alt="The 3D map of level 34 with live alerts" className="block aspect-[900/520] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]" />
+        </span>
+      ) : (
+        <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-primary transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3 [&_svg]:size-5">{icon ?? <BoxIcon />}</span>
+      )}
+      <span className="text-lg font-semibold">{title}</span>
+      <span className="text-[15px] leading-relaxed text-foreground/75">{body}</span>
+      <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-sm font-medium text-primary">{action} <ArrowRightIcon className="size-4 transition-transform duration-300 group-hover:translate-x-1" /></span>
+    </>
+  );
+  const cls = "reveal group flex flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card/85 p-5 backdrop-blur-[2px] transition-[transform,box-shadow,border-color,background-color] duration-300 hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] hover:bg-accent hover:shadow-[0_16px_40px_-18px_var(--accent)]";
+  const style = { "--d": `${delay}ms` } as React.CSSProperties;
+  return href.startsWith("#") ? <a href={href} className={cls} style={style}>{inner}</a> : <Link href={href} className={cls} style={style}>{inner}</Link>;
+}
+
+/** The headline numbers, kept small and quiet: one line under the features. */
+function StatLine() {
+  const items = [
+    ["0 of 300", "forgeries accepted"], ["160 of 160", "edits caught"], ["0 of 1,120", "alerts lost across 40 hubs"], ["0 breaches", "in 40,156 attacks"],
+  ];
   return (
-    <dl className="grid max-w-3xl grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-5 sm:grid-cols-4">
-      {PROOF.slice(0, 4).map((r) => (
-        <div key={r.label} className="flex flex-col gap-1">
-          <dd className="font-mono text-2xl font-medium tabular-nums sm:text-3xl">{r.value}</dd>
-          <dt className="order-last text-[13px] leading-snug text-muted-foreground">{r.label}</dt>
-        </div>
+    <p className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-border pt-4 text-[13px] text-muted-foreground">
+      <span className="font-mono text-[11px] uppercase tracking-[0.14em]">Measured</span>
+      {items.map(([v, l]) => (
+        <span key={l}><span className="font-mono text-foreground/85">{v}</span> {l}</span>
       ))}
-    </dl>
+      <a href="#proof" className="underline-offset-4 hover:text-foreground hover:underline">All the numbers →</a>
+    </p>
   );
 }
 
@@ -115,15 +141,20 @@ function QuestionIndex({ q }: { q: string }) {
   );
 }
 
-/** Jump links that stay at the top while the page scrolls. */
-function SectionBar() {
+/** The deep dive's tabs: one part showing at a time. */
+function SectionBar({ part, setPart }: { part: string; setPart: (p: string) => void }) {
   return (
-    <nav aria-label="Sections" className="sticky top-0 z-[var(--z-header)] -mx-4 border-b border-border bg-background/90 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
+    <nav aria-label="Deep dive" className="sticky top-0 z-[var(--z-header)] -mx-4 border-b border-border bg-background/90 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
       <div className="flex gap-1 overflow-x-auto">
         {SECTIONS.map((x) => (
-          <a key={x.id} href={`#${x.id}`} className="shrink-0 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <button
+            key={x.id}
+            onClick={() => setPart(x.id)}
+            aria-current={part === x.id ? "page" : undefined}
+            className={`shrink-0 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${part === x.id ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+          >
             {x.label}
-          </a>
+          </button>
         ))}
       </div>
     </nav>
@@ -134,16 +165,31 @@ export default function Overview() {
   const net = useUndercurrent();
   const q = useCarriedQuery();
   const [layer, setLayer] = useState<string>("triage");
+  // Everything below the first screen is folded under "Deep dive"; any #anchor opens it first.
+  const [deep, setDeep] = useState(false);
+  const [part, setPart] = useState<string>("beats");
+  const [tour, setTour] = useState(false);
   useEffect(() => {
-    // The old anchors (#forecast, #exchange, ...) now name tabs: open the tab, then scroll to the block.
+    // The old anchors (#forecast, #exchange, ...) name tabs: open the deep dive and the tab, then scroll to the block.
     const open = () => {
       const id = window.location.hash.slice(1);
+      if (!id) return;
+      setDeep(true);
+      const go = (el: string) => setTimeout(() => document.getElementById(el)?.scrollIntoView({ behavior: "smooth" }), 60);
       if (LAYERS.some((l) => l.id === id)) {
         setLayer(id);
-        requestAnimationFrame(() => document.getElementById("layers")?.scrollIntoView({ behavior: "smooth" }));
+        setPart("layers");
+        go("deep");
       } else if (id === "questions") {
-        const d = document.querySelector<HTMLDetailsElement>("#questions details");
-        if (d) d.open = true;
+        setTimeout(() => {
+          const d = document.querySelector<HTMLDetailsElement>("#questions details");
+          if (d) d.open = true;
+        }, 60);
+        setPart("questions");
+        go("deep");
+      } else {
+        if (SECTIONS.some((x) => x.id === id)) setPart(id);
+        go("deep");
       }
     };
     open();
@@ -153,67 +199,78 @@ export default function Overview() {
   const proofs = useProofs(net);
   useLiveToasts(net);
 
-  const verified = net.events.filter(net.isVerified).length;
-  const sealed = net.events.filter(isEncrypted).length;
-  const queued = net.sendingHub?.link?.queued ?? 0;
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen overflow-x-clip bg-background">
+      <NetworkBackground />
       <AppBar net={net} />
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
-      <main className="mx-auto flex max-w-7xl flex-col gap-14 px-4 pb-24 sm:px-6">
-        {/* Hero */}
-        <section className="flex flex-wrap items-end gap-10 pt-14">
-          <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
-            <p className="caption">The Hollow · 40 levels underground · Patriot Hackfest 2026</p>
-            <h1 className="max-w-[15ch] text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
-              The network the Directorate can&apos;t read, fake or shut off.
+      <BriefTour open={tour} onClose={() => setTour(false)} q={q} />
+      <main className="relative z-10 mx-auto flex max-w-7xl flex-col gap-14 px-4 pb-24 sm:px-6">
+        {/* Hero: who we are, two actions, and the best things in the app. The numbers sit in one quiet line. */}
+        <section className="relative flex flex-col gap-8 pt-12">
+          <div className="hero-glow" aria-hidden />
+          <div className="relative flex flex-col gap-5">
+            <p className="caption reveal">The Hollow · 40 levels underground · Patriot Hackfest 2026</p>
+            <h1 className="reveal max-w-[22ch] text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl" style={{ "--d": "80ms" } as React.CSSProperties}>
+              The network the Directorate <span className="text-shimmer bg-[linear-gradient(90deg,var(--foreground)_0%,var(--foreground)_35%,#c4b8ff_50%,var(--foreground)_65%,var(--foreground)_100%)] bg-[length:200%_100%] bg-clip-text text-transparent">can&apos;t read, fake or shut off.</span>
             </h1>
-            <p className="max-w-[62ch] text-lg text-foreground/75">
-              Canary sensor boxes (simulated in this demo) and residents&apos; phones sign every alert. Two hubs check each one and keep identical copies, so a
-              forged alert is refused, an edited record is caught, and cutting the link loses nothing.
+            <p className="reveal max-w-[60ch] text-lg text-foreground/75" style={{ "--d": "160ms" } as React.CSSProperties}>
+              Every alert is signed at the source and checked by every hub, with no internet. Forgeries are refused and cutting the link loses nothing. The sensor boxes are simulated in this demo.
             </p>
-            <div className="flex flex-wrap gap-2.5 pt-1">
-              <Button asChild size="lg">
+            <div className="reveal flex flex-wrap gap-2.5 pt-1" style={{ "--d": "240ms" } as React.CSSProperties}>
+              <Button asChild size="lg" className="shine relative overflow-hidden shadow-[0_8px_30px_-10px_var(--accent)] transition-shadow hover:shadow-[0_10px_40px_-8px_var(--accent)]">
                 <Link href={`/pitch${q}`}>
                   Watch the 3-minute pitch <ArrowRightIcon />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <a href="#beats">Walk through the demo</a>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href={`/hollow${q}`}>Open the 3D map</Link>
+              <Button size="lg" variant="outline" onClick={() => setTour(true)}>
+                How does this answer the brief?
               </Button>
             </div>
-            <ProofStrip />
           </div>
-          <Card className="min-w-0 flex-[1_1_320px] gap-0 p-5">
-            <p className="caption mb-3">{net.mode === "demo" ? "Sample data (no hub reachable)" : "Right now, on the hubs"}</p>
-            <dl className="grid grid-cols-2 gap-x-5 gap-y-4">
-              {[
-                { v: net.events.length, l: "events stored", c: "var(--foreground)" },
-                { v: verified, l: "signed and verified", c: "var(--ok)" },
-                { v: sealed, l: "sealed cell messages", c: "var(--accent)" },
-                { v: queued, l: "waiting to send", c: queued ? "var(--warn)" : "var(--foreground)" },
-              ].map((m) => (
-                <div key={m.l} className="flex flex-col gap-0.5">
-                  <dd className="font-mono text-3xl font-medium tabular-nums" style={{ color: m.c }}>{m.v}</dd>
-                  <dt className="order-last text-[13px] text-muted-foreground">{m.l}</dt>
-                </div>
-              ))}
-            </dl>
-          </Card>
+
+          <div className="relative grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <Feature
+              icon={<ShieldCheckIcon />} delay={320} title="Try to forge an alert" body="Send a fake all-clear signed by a key no hub knows. The hub refuses it, live, and says why."
+              href={`/dashboard${q}`} action="Attack it live"
+            />
+            <Feature
+              image delay={400} title="The 3D city" body="Every signed alert drawn where it happened: floods close streets, bad air and heat glow, the safe route appears."
+              href={`/hollow${q}`} action="Open the map"
+            />
+            <Feature
+              icon={<SparklesIcon />} delay={480} title="AI reads the panic" body="Type a messy SOS. An offline model on the hub pulls out the facts and code ranks it first on a slow link."
+              href="#triage" action="Try it"
+            />
+            <Feature
+              icon={<ZapIcon />} delay={560} title="Blackout forecast" body="A relay box's signed voltage readings predict when the power drops, with a range, before it happens."
+              href="#forecast" action="See it"
+            />
+          </div>
+
+          <div className="reveal relative" style={{ "--d": "680ms" } as React.CSSProperties}><StatLine /></div>
         </section>
 
         <DemoVideo />
 
-        <SectionBar />
+        <button
+          onClick={() => setDeep((d) => !d)}
+          aria-expanded={deep}
+          className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4 text-left transition-colors hover:bg-accent"
+        >
+          <span className="flex flex-col gap-0.5">
+            <span className="text-lg font-semibold">Deep dive</span>
+            <span className="text-sm text-muted-foreground">The five demo beats, how it works, everything built on top, the numbers, and the 15 questions</span>
+          </span>
+          <ChevronDownIcon className={`size-5 shrink-0 transition-transform ${deep ? "rotate-180" : ""}`} />
+        </button>
+
+        {deep && (<div id="deep" className="-mt-10 flex scroll-mt-4 flex-col gap-6">
+        <SectionBar part={part} setPart={setPart} />
 
         {/* The five beats */}
-        <section id="beats" className="flex scroll-mt-16 flex-col gap-5">
+        {part === "beats" && <section id="beats" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>The demo, in five beats · questions 5 and 7</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Each one checked live against the hubs</h2>
           </div>
           <Tabs defaultValue="box">
@@ -259,10 +316,6 @@ export default function Overview() {
                           {b.open.label} <ArrowRightIcon />
                         </Link>
                       </Button>
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[13px] text-muted-foreground">{b.commandLabel}</span>
-                        <CopyCommand text={b.command} />
-                      </div>
                       <div className="flex flex-col gap-0.5 pt-1">
                         <span className="text-[13px] text-muted-foreground">Measured</span>
                         <span className="font-mono text-[15px]">{b.measured}</span>
@@ -273,29 +326,23 @@ export default function Overview() {
               );
             })}
           </Tabs>
-        </section>
+        </section>}
 
         {/* How it works */}
-        <section id="how" className="flex scroll-mt-16 flex-col gap-5">
+        {part === "how" && <section id="how" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>How it works · question 7</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">One alert, from the water probe to every hub</h2>
           </div>
           <HowItWorks net={net} />
-        </section>
+        </section>}
 
         {/* Everything built on the signed channel, one at a time */}
-        <section id="layers" className="flex scroll-mt-16 flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
-            <Eyebrow>Built on the same signed channel</Eyebrow>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Seven more answers to the brief, from the same data</h2>
-          </div>
+        {part === "layers" && <section id="layers" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <Tabs value={layer} onValueChange={setLayer}>
             <TabsList className="flex flex-wrap gap-2">
               {LAYERS.map((l) => (
                 <TabsTrigger key={l.id} value={l.id} className="min-h-11 flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-2 data-[state=active]:border-primary">
                   <span className="text-[15px] font-semibold text-foreground">{l.label}</span>
-                  <span className="font-mono text-[11px] font-normal text-muted-foreground">{l.q}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -307,12 +354,11 @@ export default function Overview() {
             <TabsContent value="surface" className="mt-3"><SurfaceSection net={net} q={q} /></TabsContent>
             <TabsContent value="next" className="mt-3"><SurfaceReturnSection net={net} /></TabsContent>
           </Tabs>
-        </section>
+        </section>}
 
         {/* Results */}
-        <section id="proof" className="flex scroll-mt-16 flex-col gap-5">
+        {part === "proof" && <section id="proof" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>What we measured</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The numbers behind each beat</h2>
           </div>
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-5">
@@ -328,12 +374,11 @@ export default function Overview() {
             What it doesn&apos;t do: hubs can see who sent a cell message and when, just not what it says. The Directorate can still cut
             power to a hub; nothing is lost, but nothing moves until it&apos;s back. Full table in <code className="font-mono">eval/results/RESULTS.md</code>.
           </p>
-        </section>
+        </section>}
 
         {/* Why it should win */}
-        <section id="why" className="flex scroll-mt-16 flex-col gap-5">
+        {part === "why" && <section id="why" className="tab-in flex scroll-mt-16 flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Eyebrow>Why Undercurrent should win</Eyebrow>
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">What a judge can check in five minutes</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -344,20 +389,20 @@ export default function Overview() {
               </Card>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* The 15 questions */}
-        <section id="questions" className="scroll-mt-16">
-          <details className="rounded-xl border border-border bg-card">
+        {part === "questions" && <section id="questions" className="tab-in scroll-mt-16">
+          <details open className="rounded-xl border border-border bg-card">
             <summary className="cursor-pointer select-none px-5 py-4 text-lg font-semibold">
               The brief&apos;s 15 questions: {QUESTIONS.filter((x) => x.status === "live").length} live{QUESTIONS.some((x) => x.status === "partial") ? `, ${QUESTIONS.filter((x) => x.status === "partial").length} partly` : ""}, {QUESTIONS.filter((x) => x.status === "design").length} designed
             </summary>
             <div className="px-5 pb-5"><QuestionIndex q={q} /></div>
           </details>
-        </section>
+        </section>}
 
-        {/* Try it */}
-        <Card className="flex-row flex-wrap items-center gap-x-8 gap-y-4 p-6 sm:p-7">
+        {/* Try it (with How it works only) */}
+        {part === "how" && <Card className="flex-row flex-wrap items-center gap-x-8 gap-y-4 p-6 sm:p-7">
           <div className="flex min-w-0 flex-[999_1_420px] flex-col gap-1.5">
             <span className="text-lg font-semibold">Try it on your phone</span>
             <span className="text-foreground/75">
@@ -369,7 +414,8 @@ export default function Overview() {
             <Badge variant="secondary"><ArrowLeftRightIcon />Same Wi-Fi as the hubs</Badge>
             <Badge variant="secondary">No internet needed</Badge>
           </div>
-        </Card>
+        </Card>}
+        </div>)}
       </main>
     </div>
   );

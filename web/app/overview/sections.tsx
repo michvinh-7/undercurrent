@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
+import { RECORDED_FORECAST, RECORDED_ON, RECORDED_POINTS, RECORDED_TRIAGE } from "./recorded";
 import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_MODEL, TRIAGE_RESULTS, type BeatId } from "./beats";
 import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
 import { timeAgo } from "@/lib/format";
@@ -165,7 +166,7 @@ export function FlowArrow({ label, tone, dashed, back }: { label: string; tone: 
 }
 
 /** What POST /triage returns (hub/app/triage.py TriageRecord). */
-interface Triage {
+export interface Triage {
   type: string;
   urgency: "sos" | "urgent" | "routine" | "fake_suspect";
   level: number | null;
@@ -196,8 +197,18 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
   const [result, setResult] = useState<Triage | null>(null);
   const [state, setState] = useState<"idle" | "busy" | "error">("idle");
   const live = net.mode === "live" && !!primary;
+  // No hub: the three examples still work, from answers recorded from the hub's model.
+  const recorded = !live ? RECORDED_TRIAGE[text.trim()] : undefined;
+  const [fromRecording, setFromRecording] = useState(false);
 
   async function rank(message = text) {
+    if (!live && recorded) {
+      setResult(recorded);
+      setFromRecording(true);
+      setState("idle");
+      return;
+    }
+    setFromRecording(false);
     if (!primary || !message.trim()) return;
     setState("busy");
     try {
@@ -231,7 +242,7 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>How the hub decides what&apos;s urgent · questions 7 and 10</Eyebrow>
+        <Eyebrow>How the hub decides what&apos;s urgent</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">AI reads the panic, code does the math</h2>
         <p className="max-w-[70ch] text-foreground/75">
           On a slow link, the most urgent message has to go first. An AI model running on the hub reads each free-text report and pulls out
@@ -263,11 +274,15 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
             className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base outline-none focus:border-primary"
           />
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => rank()} disabled={!live || state === "busy" || !text.trim()}>
+            <Button onClick={() => rank()} disabled={(!live && !recorded) || state === "busy" || !text.trim()}>
               {state === "busy" ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : <BrainCircuitIcon aria-hidden="true" />}
               {state === "busy" ? "Reading it…" : "Rank it"}
             </Button>
-            {!live && <span className="text-sm text-muted-foreground">Connect to a hub to try it live.</span>}
+            {!live && (
+              <span className="text-sm text-muted-foreground">
+                {recorded ? `No hub here: the examples show the hub's model's real answers, recorded ${RECORDED_ON}.` : "No hub here: pick an example above, or connect to a hub to try your own text."}
+              </span>
+            )}
             {state === "error" && <span className="text-sm text-[var(--danger)]">The hub didn&apos;t answer. Try again.</span>}
           </div>
           {result && u && (
@@ -296,7 +311,7 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
                     : `It would be number ${ahead + 1} of ${queue.length + 1} in the queue.`
                   : "With nothing else waiting, it would go out first."}
               </p>
-              <p className="text-xs text-muted-foreground">Read by: {SOURCE[result.source]}</p>
+              <p className="text-xs text-muted-foreground">Read by: {SOURCE[result.source]}{fromRecording ? ` · recorded ${RECORDED_ON}, no hub here` : ""}</p>
             </div>
           )}
         </Card>
@@ -359,7 +374,7 @@ export function SurfaceSection({ net, q, compact = false }: { net: Undercurrent;
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Is the surface safe? · question 13</Eyebrow>
+        <Eyebrow>Is the surface safe?</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Their word against a signed reading</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at the top of the shaft measures the surface air and signs every reading with its own key. Hubs refuse anything else, so
@@ -419,7 +434,7 @@ export function SurfaceSection({ net, q, compact = false }: { net: Undercurrent;
 }
 
 /** One box's forecast, as GET /forecast returns it (hub/app/forecast.py). */
-interface BoxForecast {
+export interface BoxForecast {
   device_id: string;
   level: number;
   hub_id: string;
@@ -522,10 +537,14 @@ export function HubProblem({ problem, path }: { problem: "old" | "down"; path: s
 export function ForecastSection({ net, compact = false }: { net: Undercurrent; compact?: boolean }) {
   const primary = net.hubs.find((h) => h.role === "primary");
   const fc = useHubPoll<{ boxes: BoxForecast[] }>(net, "/forecast", 4000);
-  const boxes = fc.data?.boxes ?? null;
+  // No hub: show a forecast recorded from the hubs, labelled, instead of an empty box.
+  const recorded = net.mode !== "live";
+  const boxes = recorded ? [RECORDED_FORECAST] : fc.data?.boxes ?? null;
 
   const f = boxes?.find((b) => b.status === "falling") ?? boxes?.[0] ?? null;
-  const points = f
+  const points = recorded
+    ? RECORDED_POINTS.map((p) => ({ t: Date.parse(p.t), v: p.v }))
+    : f
     ? net.events
         .filter((e) => e.device_id === f.device_id && (e.payload as { reading?: { unit?: string } }).reading?.unit === "V")
         .map((e) => ({ t: Date.parse(e.created_at), v: Number((e.payload as { reading: { value: number } }).reading.value) }))
@@ -547,7 +566,7 @@ export function ForecastSection({ net, compact = false }: { net: Undercurrent; c
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Warn before the power cuts out · question 1</Eyebrow>
+        <Eyebrow>Warn before the power cuts out</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The hub predicts the blackout, not just reports it</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at a power relay reports its voltage. When the supply is failing it sags before it drops out, so the hub fits a straight
@@ -559,8 +578,14 @@ export function ForecastSection({ net, compact = false }: { net: Undercurrent; c
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[999_1_480px] gap-3 p-6" style={{ borderColor: f ? tone : "var(--border)" }}>
           <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: tone }}>
-            <ZapIcon className="size-4" aria-hidden="true" /> Live forecast
+            <ZapIcon className="size-4" aria-hidden="true" /> {recorded ? `Recorded forecast · ${RECORDED_ON}` : "Live forecast"}
           </span>
+          {recorded && f && (
+            <p className="text-sm text-muted-foreground">
+              No hub here, so this is a real forecast recorded from the hubs during a simulation run. The simulation plays a night in a
+              minute, so its times are short.
+            </p>
+          )}
           {f ? (
             <>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1" aria-live="polite">
@@ -638,7 +663,7 @@ export function ExchangeSection({ net, compact = false }: { net: Undercurrent; c
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Share what&apos;s left · questions 2, 6, 10 and 12</Eyebrow>
+        <Eyebrow>Share what&apos;s left</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">A Have / Need board the Directorate can&apos;t ration</h2>
         <p className="max-w-[70ch] text-foreground/75">
           Residents post what they can spare and what they need: a bed, food or seeds, water, medicine, hours of power. Every post is
@@ -722,7 +747,7 @@ export function WellbeingSection({ net, compact = false }: { net: Undercurrent; 
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>What living underground does to people · questions 11 and 8</Eyebrow>
+        <Eyebrow>What living underground does to people</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {gap !== null && gap > 0.5 ? `The deep levels sleep ${gap.toFixed(1)} hours less` : "Sleep and mood, level by level"}
         </h2>
@@ -810,7 +835,7 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Keep every level livable · question 3</Eyebrow>
+        <Eyebrow>Keep every level livable</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {worst && worst.band !== "livable" ? `${levelName(worst.level)} is ${worst.band}: ${worst.limited_why}` : "The Livability Index, level by level"}
         </h2>
@@ -946,7 +971,7 @@ export function SurfaceReturnSection({ net }: { net: Undercurrent }) {
   return (
     <section className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Going back up · questions 14 and 15</Eyebrow>
+        <Eyebrow>Going back up</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The same network carries the move to the surface</h2>
         <p className="max-w-[70ch] text-foreground/75">
           We haven&apos;t built these two. They are designs, and each step uses a piece that already runs today. The live inputs they would
