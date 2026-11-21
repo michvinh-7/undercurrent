@@ -56,7 +56,7 @@ function LegendBody() {
         <Swatch c="#5f7d6b">Shelters</Swatch>
         <Swatch c="#3b82c4">Pipe carrying water; arrows show which way it flows</Swatch>
         <Swatch c="#c98f2e">Building cut off from water (simulated)</Swatch>
-        <Swatch c="#b9975a">Gets water through the likely bad-water source (a guess)</Swatch>
+        <Swatch c="#9bc53d">Gets water through the likely bad-water source (a guess)</Swatch>
         <Swatch c="#62605b">No dry way to the stairs during a flood</Swatch>
         <Swatch c="#2fbf8f">Safest walking route</Swatch>
         <Swatch c="#c2412d" round>Pin: a sensor alert at a known spot. Faded = not verified.</Swatch>

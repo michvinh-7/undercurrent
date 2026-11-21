@@ -151,7 +151,7 @@ function useLabels(p: CitySceneProps): Label[] {
         out.push({ id: `zone-${z.id}`, pos: [z.at[0], 3, z.at[1] + z.radius * 0.6], rank: 72, node: <span className="map-label" style={{ borderColor: z.color, color: z.kind === "blackout" ? "var(--foreground)" : z.color }}>{z.label}</span> });
     if (p.trace && layers.water) {
       const at = sourcePoint(world, active, p.trace.source);
-      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#b07d2a", color: "#e0b36a" }}>Likely bad-water source (a guess)</span>, rank: 75 });
+      if (at) out.push({ id: "source", pos: [at[0] + 10, 3, at[1] + 6], node: <span className="map-label" style={{ borderColor: "#a3d147", color: "#c5e57a" }}>Likely bad-water source (a guess)</span>, rank: 75 });
     }
     if (p.route) {
       const mid = p.route.points[Math.floor(p.route.points.length / 2)];

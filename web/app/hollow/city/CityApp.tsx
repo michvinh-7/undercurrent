@@ -126,6 +126,7 @@ export default function CityApp() {
 
   const goLevel = (n: number) => {
     setActive(n);
+    setTraceOn(false);
     setSelection(null);
     setFocus(null);
   };
@@ -201,6 +202,10 @@ export default function CityApp() {
     return { chains: chains.length, result: traceSource(world, chains) };
   }, [events, world]);
   const showTrace = layers.water && trace.result ? trace.result : null;
+  // Paint the traced pipes and the buildings they feed only after "Show me" (Briefs, bad water), so the
+  // whole level isn't green all the time; leaving the level turns it off again.
+  const [traceOn, setTraceOn] = useState(false);
+  const paintTrace = traceOn ? showTrace : null;
 
   // Nearest care for this level, in words (another level if this one has none).
   const care = useMemo(() => {
@@ -280,6 +285,7 @@ export default function CityApp() {
     test: sendTest,
     showWater: () => {
       if (!briefInput.water || !showTrace) return;
+      setTraceOn(true);
       setLayers((l) => ({ ...l, water: true }));
       setActive(briefInput.water.level);
       setSelection(null);
@@ -343,7 +349,7 @@ export default function CityApp() {
             world={world} active={level.n} view={view} layers={layers} water={water} selection={selection}
             onSelect={select} onLevel={goLevel} events={events} fresh={fresh} hubs={hubs} packetKey={packetKey}
             focus={focus} resetKey={resetKey} flood={flood} route={route} cut={cut} zones={zones} dark={dark}
-            trace={showTrace ? { pipes: showTrace.pipes, source: showTrace.source } : null} risk={showTrace?.atRisk ?? EMPTY}
+            trace={paintTrace ? { pipes: paintTrace.pipes, source: paintTrace.source } : null} risk={paintTrace?.atRisk ?? EMPTY}
           />
 
           {/* Top of the map: collapse buttons at the edges, banners in the middle. */}

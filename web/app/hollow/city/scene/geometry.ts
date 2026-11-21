@@ -29,9 +29,9 @@ export const P = {
   route: "#2fbf8f",
   cutWall: "#42454f",
   cutRoof: "#62605b",
-  risk: "#b07d2a",
-  riskWall: "#7a6640",
-  riskRoof: "#b9975a",
+  risk: "#a3d147", // bad water: traced pipes
+  riskWall: "#5f7d27", // bad water: buildings it reaches
+  riskRoof: "#9bc53d",
   darkWall: "#15171d", // no power (blackout)
   darkRoof: "#0c0d11",
 };
