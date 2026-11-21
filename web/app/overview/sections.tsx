@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAgreement } from "@/lib/useAgreement";
 import { isEncrypted, isSimulated, useUndercurrent, type Undercurrent } from "@/lib/useUndercurrent";
 import { RECORDED_FORECAST, RECORDED_ON, RECORDED_POINTS, RECORDED_TRIAGE } from "./recorded";
+import RECORDED_POLLS from "./recorded-polls.json";
 import { BEATS, FORECAST_RESULTS, RESULTS, TRIAGE_EXAMPLES, TRIAGE_MODEL, TRIAGE_RESULTS, type BeatId } from "./beats";
 import { DIRECTORATE_SURFACE_CLAIM } from "../hollow/city/directorate";
 import { timeAgo } from "@/lib/format";
@@ -500,6 +501,9 @@ export function useHubPoll<T>(net: Undercurrent, path: string, everyMs: number) 
   const primary = net.hubs.find((h) => h.role === "primary");
   const [data, setData] = useState<T | null>(null);
   const [problem, setProblem] = useState<"old" | "down" | null>(null);
+  // No live hub (a hosted copy of the site, or the hubs down): show the hubs' real answers recorded
+  // on Nov 20 from the signed simulation, labelled as recorded, instead of an empty box.
+  const recorded = net.mode !== "live" ? ((RECORDED_POLLS as Record<string, unknown>)[path] as T | undefined) ?? null : null;
   useEffect(() => {
     if (net.mode !== "live" || !primary) return;
     let stop = false;
@@ -519,7 +523,16 @@ export function useHubPoll<T>(net: Undercurrent, path: string, everyMs: number) 
     const t = setInterval(poll, everyMs);
     return () => { stop = true; clearInterval(t); };
   }, [net.mode, primary?.url, path, everyMs]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { data, problem };
+  return recorded ? { data: recorded, problem: null, recorded: true } : { data, problem, recorded: false };
+}
+
+/** The label on a section showing recorded answers instead of a live hub. */
+export function RecordedNote() {
+  return (
+    <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+      No hub here, so this shows the hubs&apos; real answers recorded {RECORDED_ON} from the signed simulation. Connect to a hub to see it live.
+    </p>
+  );
 }
 
 export function HubProblem({ problem, path }: { problem: "old" | "down"; path: string }) {
@@ -661,6 +674,7 @@ export function ExchangeSection({ net, compact = false }: { net: Undercurrent; c
   const simulated = b ? [...b.needs, ...b.haves].some((p) => p.simulated) : false;
   return (
     <section className="flex flex-col gap-5">
+      {board.recorded && <RecordedNote />}
       {!compact && (
       <div className="flex flex-col gap-1.5">
         <Eyebrow>Share what&apos;s left</Eyebrow>
@@ -745,6 +759,7 @@ export function WellbeingSection({ net, compact = false }: { net: Undercurrent; 
 
   return (
     <section className="flex flex-col gap-5">
+      {wb.recorded && <RecordedNote />}
       {!compact && (
       <div className="flex flex-col gap-1.5">
         <Eyebrow>What living underground does to people</Eyebrow>
@@ -833,6 +848,7 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
 
   return (
     <section className="flex flex-col gap-5">
+      {poll.recorded && <RecordedNote />}
       {!compact && (
       <div className="flex flex-col gap-1.5">
         <Eyebrow>Keep every level livable</Eyebrow>

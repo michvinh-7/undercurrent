@@ -1,0 +1,429 @@
+{
+ "/exchange": {
+  "needs": [
+   {
+    "id": "41e04b5a-a28d-4cda-b178-e0bf0712b586",
+    "side": "need",
+    "category": "medicine",
+    "item": "Oral rehydration salts for 2 kids",
+    "quantity": 2,
+    "location": null,
+    "note": null,
+    "level": 34,
+    "hub_id": "hub-L34",
+    "author": "anon-34b9",
+    "author_pub": "IwMOmVqNT/xjCe9oFgLWKfIg5rOeFfdnMOYRjqVkVyE=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:55:55.238Z",
+    "waiting_s": 12649,
+    "matched": true
+   },
+   {
+    "id": "8017ddaf-51a1-45df-802d-9853d84fff37",
+    "side": "need",
+    "category": "food",
+    "item": "Food for 3 days, family of 5",
+    "quantity": 5,
+    "location": null,
+    "note": null,
+    "level": 34,
+    "hub_id": "hub-L34",
+    "author": "anon-34d0",
+    "author_pub": "mqs97n6D9G9bOm6u6674Kslg4l1agf2RO+VgGpwhzwY=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:56:19.904Z",
+    "waiting_s": 12624,
+    "matched": true
+   },
+   {
+    "id": "a8dcfce1-73b8-4def-82cf-54ac7d670d62",
+    "side": "need",
+    "category": "power",
+    "item": "2 hours of power to charge a breathing machine",
+    "quantity": null,
+    "location": null,
+    "note": null,
+    "level": 34,
+    "hub_id": "hub-L34",
+    "author": "anon-34c4",
+    "author_pub": "/TGMmpdrs7zRz6LfmJXbvipcu8BbXBrkS0NJePEIHMM=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:56:05.235Z",
+    "waiting_s": 12639,
+    "matched": false
+   },
+   {
+    "id": "847732ab-824b-49f4-a857-8b9c4bd3331e",
+    "side": "need",
+    "category": "space",
+    "item": "Dry place to sleep for 4, our rooms flooded",
+    "quantity": 4,
+    "location": "Cistern Row",
+    "note": null,
+    "level": 35,
+    "hub_id": "hub-L34",
+    "author": "anon-35b7",
+    "author_pub": "wnhq4vCrypIVS3YRNAe6ZHF99SDJYh62tMunHj/tXmo=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:55:37.902Z",
+    "waiting_s": 12666,
+    "matched": true
+   }
+  ],
+  "haves": [
+   {
+    "id": "b2f0ecb3-4345-4fbc-9c96-1df5791c0f68",
+    "side": "have",
+    "category": "space",
+    "item": "2 spare beds in our flat",
+    "quantity": 2,
+    "location": "North Gallery",
+    "note": null,
+    "level": 12,
+    "hub_id": "hub-L12",
+    "author": "anon-12a5",
+    "author_pub": "4SjLXHmJZ5Du5BD4bhwVWobUqwo3Y7bAUlH4NJN3s38=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:55:50.570Z",
+    "waiting_s": 12654,
+    "matched": true
+   },
+   {
+    "id": "e1079297-8302-47ce-827f-caeed1c180c1",
+    "side": "have",
+    "category": "medicine",
+    "item": "Box of oral rehydration salts",
+    "quantity": 10,
+    "location": null,
+    "note": null,
+    "level": 12,
+    "hub_id": "hub-L12",
+    "author": "anon-12b3",
+    "author_pub": "rVk+lUrczoCkBEjqxtCVa106QOYhbbgAPsU/rGD/gLg=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:55:59.904Z",
+    "waiting_s": 12644,
+    "matched": true
+   },
+   {
+    "id": "6a6eed76-4342-4df6-85c0-fbad4cdd812f",
+    "side": "have",
+    "category": "food",
+    "item": "Seed potatoes and a grow light to share",
+    "quantity": null,
+    "location": null,
+    "note": null,
+    "level": 12,
+    "hub_id": "hub-L12",
+    "author": "anon-12a5",
+    "author_pub": "4SjLXHmJZ5Du5BD4bhwVWobUqwo3Y7bAUlH4NJN3s38=",
+    "signed": true,
+    "simulated": true,
+    "created_at": "2026-11-20T23:56:15.903Z",
+    "waiting_s": 12628,
+    "matched": true
+   }
+  ],
+  "matches": [
+   {
+    "need_id": "41e04b5a-a28d-4cda-b178-e0bf0712b586",
+    "have_id": "e1079297-8302-47ce-827f-caeed1c180c1",
+    "category": "medicine",
+    "need_level": 34,
+    "have_level": 12,
+    "levels_apart": 22,
+    "need_item": "Oral rehydration salts for 2 kids",
+    "have_item": "Box of oral rehydration salts"
+   },
+   {
+    "need_id": "8017ddaf-51a1-45df-802d-9853d84fff37",
+    "have_id": "6a6eed76-4342-4df6-85c0-fbad4cdd812f",
+    "category": "food",
+    "need_level": 34,
+    "have_level": 12,
+    "levels_apart": 22,
+    "need_item": "Food for 3 days, family of 5",
+    "have_item": "Seed potatoes and a grow light to share"
+   },
+   {
+    "need_id": "847732ab-824b-49f4-a857-8b9c4bd3331e",
+    "have_id": "b2f0ecb3-4345-4fbc-9c96-1df5791c0f68",
+    "category": "space",
+    "need_level": 35,
+    "have_level": 12,
+    "levels_apart": 23,
+    "need_item": "Dry place to sleep for 4, our rooms flooded",
+    "have_item": "2 spare beds in our flat"
+   }
+  ],
+  "unmet": [
+   "a8dcfce1-73b8-4def-82cf-54ac7d670d62"
+  ],
+  "by_level": [
+   {
+    "level": 12,
+    "needs": 0,
+    "haves": 3
+   },
+   {
+    "level": 34,
+    "needs": 3,
+    "haves": 0
+   },
+   {
+    "level": 35,
+    "needs": 1,
+    "haves": 0
+   }
+  ],
+  "closed": 0
+ },
+ "/wellbeing": {
+  "window_h": 24,
+  "min_people": 2,
+  "levels": [
+   {
+    "level": 12,
+    "people": 2,
+    "sleep_avg_h": 7.0,
+    "short_sleep_share": 0.0,
+    "mood_avg": 4.5,
+    "low_mood_share": 0.0
+   },
+   {
+    "level": 34,
+    "people": 3,
+    "sleep_avg_h": 4.3,
+    "short_sleep_share": 1.0,
+    "mood_avg": 1.7,
+    "low_mood_share": 1.0
+   },
+   {
+    "level": 35,
+    "people": 2,
+    "sleep_avg_h": 3.5,
+    "short_sleep_share": 1.0,
+    "mood_avg": 1.5,
+    "low_mood_share": 1.0
+   }
+  ],
+  "heard_from": 8,
+  "known": 8,
+  "unaccounted": []
+ },
+ "/livability": {
+  "window_h": 6,
+  "weights": {
+   "flooding": 1.0,
+   "water": 1.0,
+   "air": 1.0,
+   "heat": 0.75,
+   "power": 0.75,
+   "health": 1.0,
+   "food": 0.75,
+   "needs": 0.5,
+   "people": 0.5
+  },
+  "levels": [
+   {
+    "level": 34,
+    "score": 20,
+    "band": "unsafe",
+    "capped": false,
+    "limited_by": "air",
+    "limited_why": "CO\u2082 2400 ppm",
+    "coverage": 6,
+    "of": 9,
+    "dimensions": {
+     "water": {
+      "score": 20,
+      "why": "high bad_water report",
+      "events": [
+       "79a5ef70-5bfa-4275-8b13-7091c9457a9e"
+      ],
+      "from": [
+       "report"
+      ]
+     },
+     "air": {
+      "score": 7,
+      "why": "CO\u2082 2400 ppm",
+      "events": [
+       "336bd47b-9abd-4d0d-84dd-8848bc944afa",
+       "e953e7fd-7abb-4e22-b5a9-86fccda75b5a"
+      ],
+      "from": [
+       "report",
+       "sensor"
+      ]
+     },
+     "heat": {
+      "score": 8,
+      "why": "39 \u00b0C",
+      "events": [
+       "f41e9afd-d9fd-4516-b0a3-4cdf65a51d96"
+      ],
+      "from": [
+       "sensor"
+      ]
+     },
+     "health": {
+      "score": 12,
+      "why": "11 people sick in 4 reports",
+      "events": [
+       "6f3ed17c-5e8e-49ab-9de4-11898b8a2f10",
+       "9b9d2569-eff2-4965-b561-ca32d0b10766",
+       "a7554eb4-cb7c-4ed5-9a6c-9289727e20eb",
+       "fb28a6dc-07b0-460c-a443-a1e69eb6c232"
+      ],
+      "from": [
+       "report"
+      ]
+     },
+     "needs": {
+      "score": 85,
+      "why": "1 unmet request",
+      "events": [
+       "a8dcfce1-73b8-4def-82cf-54ac7d670d62"
+      ],
+      "from": [
+       "exchange"
+      ]
+     },
+     "people": {
+      "score": 12,
+      "why": "sleep 4.3 h, mood 1.7/5 (3 people)",
+      "events": [],
+      "from": [
+       "checkins"
+      ]
+     }
+    }
+   },
+   {
+    "level": 35,
+    "score": 44,
+    "band": "unsafe",
+    "capped": false,
+    "limited_by": "people",
+    "limited_why": "sleep 3.5 h, mood 1.5/5 (2 people)",
+    "coverage": 3,
+    "of": 9,
+    "dimensions": {
+     "flooding": {
+      "score": 15,
+      "why": "water 17 cm",
+      "events": [
+       "1b37a9c1-fa9a-4aec-aeef-7e692fa0c5f5",
+       "80a64c1f-6e0c-47df-a6a4-68ba4a1bc5dc"
+      ],
+      "from": [
+       "report",
+       "sensor"
+      ]
+     },
+     "health": {
+      "score": 92,
+      "why": "1 person sick in 1 report",
+      "events": [
+       "0c12c1ac-851e-49f0-ace4-478db026d7bb"
+      ],
+      "from": [
+       "report"
+      ]
+     },
+     "people": {
+      "score": 6,
+      "why": "sleep 3.5 h, mood 1.5/5 (2 people)",
+      "events": [],
+      "from": [
+       "checkins"
+      ]
+     }
+    }
+   },
+   {
+    "level": 12,
+    "score": 52,
+    "band": "strained",
+    "capped": false,
+    "limited_by": "power",
+    "limited_why": "193 V; forecast: drops out in ~0 min",
+    "coverage": 2,
+    "of": 9,
+    "dimensions": {
+     "power": {
+      "score": 32,
+      "why": "193 V; forecast: drops out in ~0 min",
+      "events": [
+       "4f6a2b41-cf1c-4fe7-8a1b-8386e54078d8",
+       "edeb246f-4c53-46ad-ad1a-bceeeab075b9"
+      ],
+      "from": [
+       "forecast",
+       "report",
+       "sensor"
+      ]
+     },
+     "people": {
+      "score": 82,
+      "why": "sleep 7.0 h, mood 4.5/5 (2 people)",
+      "events": [],
+      "from": [
+       "checkins"
+      ]
+     }
+    }
+   },
+   {
+    "level": 1,
+    "score": 100,
+    "band": "livable",
+    "capped": false,
+    "limited_by": "air",
+    "limited_why": "CO\u2082 410 ppm",
+    "coverage": 1,
+    "of": 9,
+    "dimensions": {
+     "air": {
+      "score": 100,
+      "why": "CO\u2082 410 ppm",
+      "events": [
+       "9549feed-38d1-4369-bb9c-6ee0deefd690"
+      ],
+      "from": [
+       "sensor"
+      ]
+     }
+    }
+   }
+  ],
+  "ignored_unsigned": 0
+ },
+ "/forecast": {
+  "cutoff_v": 180.0,
+  "boxes": [
+   {
+    "device_id": "canary-12-relay",
+    "level": 12,
+    "hub_id": "hub-L12",
+    "readings": 8,
+    "latest_v": 193.0,
+    "latest_at": "2026-11-20T23:56:21.234Z",
+    "slope_v_per_min": -42.501,
+    "status": "falling",
+    "eta_s": 18.623,
+    "eta_low_s": 17.87,
+    "eta_high_s": 19.441,
+    "cutoff_v": 180.0,
+    "simulated": true
+   }
+  ]
+ }
+}
