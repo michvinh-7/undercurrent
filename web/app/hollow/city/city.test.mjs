@@ -295,3 +295,24 @@ test("narrator: a coming blackout leads and says it hasn't happened; bad air and
   assert.match(narrate({ ...base, sensors: [{ ...s, kind: "bad_air", reading: "1850 ppm CO₂" }] }).title, /Bad air near the L34 Market \(1850 ppm CO₂\)/);
   assert.match(narrate({ ...base, sensors: [{ ...s, kind: "bad_air", test: true }] }).source, /test alert/);
 });
+
+test("homesFrom: newest assignment per name wins; other check-ins ignored", async () => {
+  const { homesFrom } = await import("./adapter.ts");
+  const ci = (id, at, payload) => ev({ id, type: "checkin", created_at: at, payload });
+  const homes = homesFrom([
+    ci("a", "2026-11-20T10:00:00Z", { status: "ok", home: "L34/b1", name: "Ana" }),
+    ci("b", "2026-11-20T11:00:00Z", { status: "ok", home: "L34/b2", name: "ana " }),
+    ci("c", "2026-11-20T10:30:00Z", { status: "ok", home: "L34/b2", name: "Bo" }),
+    ci("d", "2026-11-20T12:00:00Z", { status: "ok" }),
+    ev({ id: "e", payload: { home: "L34/b9", name: "Hazard" } }),
+  ]);
+  assert.equal(homes.get("L34/b1"), undefined);
+  assert.deepEqual(homes.get("L34/b2").map((r) => r.name), ["ana", "Bo"]);
+  assert.equal(homes.size, 1);
+});
+
+test("a check-in's note can place it on the map", () => {
+  const street = world.levels.find((l) => l.n === 35) && (() => { const e = adaptEvent(ev({ type: "checkin", level: 35, payload: { status: "need_help", note: "stuck at Cistern Row, water rising" } }), world, opts); return e; })();
+  assert.ok(street, "adapted");
+  assert.equal(street.place.kind, "named");
+});

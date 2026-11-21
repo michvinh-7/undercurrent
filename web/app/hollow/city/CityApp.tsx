@@ -10,7 +10,7 @@ import { timeAgo } from "@/lib/format";
 import { useUndercurrent } from "@/lib/useUndercurrent";
 import { AppBar } from "@/components/app-bar";
 import { PageIntroSlim } from "@/components/page-intro";
-import { adaptEvents, checkinStatus, isLungReport, isWaterReport, peopleIn, pinOf, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
+import { adaptEvents, checkinStatus, homesFrom, isLungReport, isWaterReport, peopleIn, pinOf, SEVERITY_RANK, summarize, type MapEvent } from "./adapter";
 import {
   addLevel, buildingById, createWorld, cutOffBuildings, destinations, floodedEdges, levelInlet, safeRoute, streetGraph, streetMain, traceSource, upstream,
   FACILITY_USES, levelOf, nameOf, pumpId, solveWater, USE_LABEL, type CityWorld, type Failure,
@@ -65,6 +65,7 @@ export default function CityApp() {
   // The "Test a sensor alert" panel shows only with ?test= in the address, so a stray click
   // during the live demo can't put fake alerts on the map.
   const [testMode, setTestMode] = useState(false);
+  const homes = useMemo(() => homesFrom(net.events), [net.events]);
   const events = useMemo(() => adaptEvents([...net.events, ...tests], world, { isVerified: net.isVerified, demo }), [net.events, tests, net.isVerified, world, demo]);
   const fresh = useMemo(() => {
     const now = Date.now();
@@ -291,7 +292,7 @@ export default function CityApp() {
     <SideTabs
       tab={tab} setTab={setTab} hasSelection={!!selection} simOn={simOn} count={events.length}
       briefs={<Briefs input={briefInput} actions={briefActions} />}
-      selected={selection && <Inspector world={world} selection={selection} events={events} water={water} net={net} hubs={hubs} onClose={() => select(null)} onFocus={() => focusOn(selection)} onSim={(label, failure) => { setSim({ label, failure }); }} sim={sim} />}
+      selected={selection && <Inspector world={world} selection={selection} events={events} water={water} net={net} hubs={hubs} homes={homes} onClose={() => select(null)} onFocus={() => focusOn(selection)} onSim={(label, failure) => { setSim({ label, failure }); }} sim={sim} />}
       whatIf={
         <div className="flex flex-col gap-3">
           <WhatIf world={world} level={level.n} sim={sim} setSim={setSim} water={water} />

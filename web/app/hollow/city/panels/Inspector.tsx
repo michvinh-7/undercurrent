@@ -2,15 +2,19 @@
 
 // The "Selected" tab: details for whatever was clicked (building, pipe, hub or report).
 
+import { useState } from "react";
 import { summary, timeAgo } from "@/lib/format";
+import { sendOrQueue } from "@/lib/outbox";
+import { NotJoinedError } from "@/lib/sign";
 import type { Undercurrent } from "@/lib/useUndercurrent";
-import { SEVERITY_LABEL, type MapEvent } from "../adapter";
-import { buildingById, nameOf, USE_LABEL, type CityWorld, type Failure, type solveWater } from "../model";
+import { SEVERITY_LABEL, type MapEvent, type Resident } from "../adapter";
+import { buildingById, nameOf, USE_LABEL, type Building, type CityWorld, type Failure, type solveWater } from "../model";
 import { pinTitle, SEVERITY_COLOR, type HubView, type Selection } from "../scene/CityScene";
 import { Btn, Card, Row, SimTag } from "./ui";
 
-export default function Inspector({ world, selection, events, water, net, hubs, onClose, onFocus, onSim, sim }: {
+export default function Inspector({ world, selection, events, water, net, hubs, homes, onClose, onFocus, onSim, sim }: {
   world: CityWorld; selection: Selection; events: MapEvent[]; water: ReturnType<typeof solveWater>; net: Undercurrent; hubs: HubView[];
+  homes: Map<string, Resident[]>;
   onClose: () => void; onFocus: () => void; onSim: (label: string, f: Failure) => void; sim: { label: string; failure: Failure } | null;
 }) {
   const close = (
@@ -34,6 +38,7 @@ export default function Inspector({ world, selection, events, water, net, hubs, 
         <Row k="Height" v={`${b.height} m`} />
         {tap && <Row k="Fed by" v={nameOf(world, tap.pipe)} />}
         {tap && !dry && <Btn onClick={() => onSim(`${nameOf(world, tap.pipe)} breaks`, { pipes: [tap.pipe] })}>What if its main breaks?</Btn>}
+        <Residents key={b.id} b={b} list={homes.get(b.id) ?? []} net={net} />
       </Card>
     );
   }
@@ -91,5 +96,61 @@ export default function Inspector({ world, selection, events, water, net, hubs, 
       <Row k="Where" v={where} />
       <Row k="Via" v={e.event.hub_id} />
     </Card>
+  );
+}
+
+// Who is in this building. Assigning is a signed check-in with { home, name }, so it reaches
+// every hub and every viewer; nothing is kept only in this browser.
+function Residents({ b, list, net }: { b: Building; list: Resident[]; net: Undercurrent }) {
+  const [name, setName] = useState("");
+  const [state, setState] = useState<{ kind: "idle" | "sending" | "done" | "error"; msg?: string }>({ kind: "idle" });
+  const live = net.mode === "live" && !!net.sendingHub?.url;
+  const assign = async () => {
+    const who = name.trim().slice(0, 40);
+    if (!who || !live) return;
+    setState({ kind: "sending" });
+    try {
+      const r = await sendOrQueue(
+        { type: "checkin", level: b.level, author: "hollow-map", payload: { status: "ok", home: b.id, name: who } },
+        net.sendingHub!.url,
+      );
+      setName("");
+      setState({ kind: "done", msg: r.state === "sent" ? `${who} assigned here.` : "Hub unreachable: saved, sends itself when it's back." });
+    } catch (err) {
+      setState({ kind: "error", msg: err instanceof NotJoinedError ? "This browser isn't on the roster yet: add its key from /join." : String((err as Error)?.message ?? err) });
+    }
+  };
+  return (
+    <div className="mt-3 border-t border-[var(--border)] pt-3">
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold">Residents</h3>
+        <span className="text-xs text-[var(--muted)]">{list.length} assigned</span>
+      </div>
+      {list.length > 0 ? (
+        <ul className="mb-2 flex flex-wrap gap-1.5">
+          {list.map((r) => (
+            <li key={r.name} className="rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-xs">{r.name}{r.simulated && <SimTag />}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-2 text-xs text-[var(--muted)]">Nobody assigned yet.</p>
+      )}
+      <form onSubmit={(e) => { e.preventDefault(); assign(); }} className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Person's name"
+          maxLength={40}
+          disabled={!live}
+          className="min-w-0 flex-1 rounded-md border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-sm"
+        />
+        <button disabled={!live || !name.trim() || state.kind === "sending"} className="rounded-md bg-[var(--foreground)] px-3 py-1.5 text-sm font-medium text-[var(--panel)] disabled:opacity-40">
+          {state.kind === "sending" ? "Assigning…" : "Assign"}
+        </button>
+      </form>
+      <p className={`mt-1.5 text-xs ${state.kind === "error" ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>
+        {!live ? "Needs a live hub: assignments are shared through the hubs." : state.msg ?? "Shared with every hub. Assigning a name again moves that person."}
+      </p>
+    </div>
   );
 }

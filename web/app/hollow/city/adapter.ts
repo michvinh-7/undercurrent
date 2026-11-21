@@ -106,7 +106,10 @@ export function adaptEvent(raw: unknown, world: CityWorld, opts: AdaptOptions): 
     const s = e.device_id ? world.sensors.find((m) => m.deviceId === e.device_id) : undefined;
     place = s && s.level === level
       ? { kind: "exact", x: s.x, z: s.z, y: s.y, deviceId: s.deviceId }
-      : matchPlace(payloadOf(e).location, world, level) ?? { kind: "level" };
+      : matchPlace(payloadOf(e).location, world, level)
+        // A check-in has no location field, so its note can name the place ("stuck at Cistern Row").
+        ?? (e.type === "checkin" ? matchPlace(payloadOf(e).note, world, level) : null)
+        ?? { kind: "level" };
   }
   const t = Date.parse(e.created_at);
   let verified = false;
@@ -155,3 +158,28 @@ export const isLungReport = (m: MapEvent) => m.event.type === "case" && mentions
 export const peopleIn = (m: MapEvent) => { const n = payloadOf(m.event).people_affected; return typeof n === "number" && n > 0 ? n : 1; };
 export const checkinStatus = (m: MapEvent): "ok" | "need_help" | null =>
   m.event.type === "checkin" ? (payloadOf(m.event).status === "need_help" ? "need_help" : "ok") : null;
+
+// --- Residents ------------------------------------------------------------------------------
+// Assigning a person to a building is an ordinary signed check-in whose payload also names the
+// building: { status: "ok", home: "L34/b12", name: "Ana" }. No new event type, so the hub, the
+// schema and sync are unchanged, and every hub and every viewer sees the same assignments.
+
+export interface Resident { name: string; building: string; at: string; simulated: boolean }
+
+/** Who is in which building: the newest assignment per name wins (assigning a name again moves them). */
+export function homesFrom(events: readonly HollowEvent[]): Map<string, Resident[]> {
+  const latest = new Map<string, Resident>();
+  for (const e of events) {
+    if (e.type !== "checkin") continue;
+    const p = payloadOf(e);
+    if (typeof p.home !== "string" || typeof p.name !== "string" || !p.name.trim()) continue;
+    const key = p.name.trim().toLowerCase();
+    const prev = latest.get(key);
+    if (prev && prev.at >= e.created_at) continue;
+    latest.set(key, { name: p.name.trim(), building: p.home, at: e.created_at, simulated: p.simulated === true });
+  }
+  const byBuilding = new Map<string, Resident[]>();
+  for (const r of latest.values()) byBuilding.set(r.building, [...(byBuilding.get(r.building) ?? []), r]);
+  for (const list of byBuilding.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+  return byBuilding;
+}
