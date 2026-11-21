@@ -165,3 +165,41 @@ body {
 @keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .bubble-in { animation: bubble-in 260ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .bubble-in { animation: none; } }
+
+/* Overview polish: motion that amplifies the existing look. Nothing here changes a colour token. */
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.reveal { animation: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes tab-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tab-in { animation: tab-in 0.35s ease-out both; }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: none; } }
+.pop-in { animation: pop-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes shimmer { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+.text-shimmer { animation: shimmer 6s linear infinite; }
+@keyframes glow-drift {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.55; }
+  50% { transform: translate(-46%, 18px) scale(1.08); opacity: 0.8; }
+}
+.hero-glow {
+  position: absolute; left: 50%; top: -140px; width: min(1100px, 120vw); height: 520px; pointer-events: none; z-index: 0;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+  filter: blur(20px);
+  animation: glow-drift 14s ease-in-out infinite;
+}
+/* A slow radar sweep over the map preview. */
+@keyframes scan { 0% { transform: translateY(-120%); } 60%, 100% { transform: translateY(260%); } }
+.scan::after {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 40%; pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent) 70%, color-mix(in srgb, var(--accent) 55%, transparent) 72%, transparent 74%);
+  mix-blend-mode: screen; animation: scan 4.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+/* A light sweep across a button on hover. */
+.shine::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.35), transparent);
+  transform: skewX(-20deg); transition: left 0.6s ease;
+}
+.shine:hover::after { left: 130%; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .tab-in, .pop-in, .text-shimmer, .hero-glow, .scan::after { animation: none; }
+  .scan::after { display: none; }
+}

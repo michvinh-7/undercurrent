@@ -231,7 +231,7 @@ export function TriageSection({ net, compact = false }: { net: Undercurrent; com
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>How the hub decides what&apos;s urgent · questions 7 and 10</Eyebrow>
+        <Eyebrow>How the hub decides what&apos;s urgent</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">AI reads the panic, code does the math</h2>
         <p className="max-w-[70ch] text-foreground/75">
           On a slow link, the most urgent message has to go first. An AI model running on the hub reads each free-text report and pulls out
@@ -359,7 +359,7 @@ export function SurfaceSection({ net, q, compact = false }: { net: Undercurrent;
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Is the surface safe? · question 13</Eyebrow>
+        <Eyebrow>Is the surface safe?</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Their word against a signed reading</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at the top of the shaft measures the surface air and signs every reading with its own key. Hubs refuse anything else, so
@@ -547,7 +547,7 @@ export function ForecastSection({ net, compact = false }: { net: Undercurrent; c
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Warn before the power cuts out · question 1</Eyebrow>
+        <Eyebrow>Warn before the power cuts out</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The hub predicts the blackout, not just reports it</h2>
         <p className="max-w-[70ch] text-foreground/75">
           A box at a power relay reports its voltage. When the supply is failing it sags before it drops out, so the hub fits a straight
@@ -638,7 +638,7 @@ export function ExchangeSection({ net, compact = false }: { net: Undercurrent; c
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Share what&apos;s left · questions 2, 6, 10 and 12</Eyebrow>
+        <Eyebrow>Share what&apos;s left</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">A Have / Need board the Directorate can&apos;t ration</h2>
         <p className="max-w-[70ch] text-foreground/75">
           Residents post what they can spare and what they need: a bed, food or seeds, water, medicine, hours of power. Every post is
@@ -722,7 +722,7 @@ export function WellbeingSection({ net, compact = false }: { net: Undercurrent; 
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>What living underground does to people · questions 11 and 8</Eyebrow>
+        <Eyebrow>What living underground does to people</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {gap !== null && gap > 0.5 ? `The deep levels sleep ${gap.toFixed(1)} hours less` : "Sleep and mood, level by level"}
         </h2>
@@ -810,7 +810,7 @@ export function LivabilitySection({ net, compact = false }: { net: Undercurrent;
     <section className="flex flex-col gap-5">
       {!compact && (
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Keep every level livable · question 3</Eyebrow>
+        <Eyebrow>Keep every level livable</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {worst && worst.band !== "livable" ? `${levelName(worst.level)} is ${worst.band}: ${worst.limited_why}` : "The Livability Index, level by level"}
         </h2>
@@ -946,7 +946,7 @@ export function SurfaceReturnSection({ net }: { net: Undercurrent }) {
   return (
     <section className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        <Eyebrow>Going back up · questions 14 and 15</Eyebrow>
+        <Eyebrow>Going back up</Eyebrow>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The same network carries the move to the surface</h2>
         <p className="max-w-[70ch] text-foreground/75">
           We haven&apos;t built these two. They are designs, and each step uses a piece that already runs today. The live inputs they would
