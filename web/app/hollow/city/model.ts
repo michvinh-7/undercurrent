@@ -346,7 +346,7 @@ export function buildNetwork(grid: Grid, levels: Level[]): Network {
         seen.add(b);
         queue.push([i + di, j + dj]);
         const street = di === 0 ? ns[i - 1] : ew[j - 1];
-        add({ kind: "main", level: n, from: a, to: b, label: `Main under ${street.name}` });
+        add({ kind: "main", level: n, from: a, to: b, label: `Water main under ${street.name}` });
       }
     }
 
@@ -674,7 +674,7 @@ export const levelInlet = (world: CityWorld, n: number) => world.network.feeds.g
 
 /** The main closest to the supply among those under a named street on a level. */
 export function streetMain(world: CityWorld, n: number, street: string): string | null {
-  const mains = world.network.pipes.filter((p) => p.level === n && p.kind === "main" && p.label === `Main under ${street}`);
+  const mains = world.network.pipes.filter((p) => p.level === n && p.kind === "main" && p.label === `Water main under ${street}`);
   if (!mains.length) return null;
   return mains.sort((a, b) => upstream(world, a.id).length - upstream(world, b.id).length)[0].id;
 }
